@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { RevenueManagerComponent } from './components/revenue-manager/revenue-manager.component';
 import { PipelineManagerComponent } from './components/pipeline-manager/pipeline-manager.component';
  import { CostManagerComponent } from './components/cost-manager/cost-manager.component';     // Import
-import { ExcelService } from './services/excel.service';
+import { ExcelService } from './services/data.service';
 import { TargetManagerComponent } from './components/TargetManagerComponent/target-manager.component';
 
 @Component({

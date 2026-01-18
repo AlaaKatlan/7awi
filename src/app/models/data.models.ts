@@ -1,45 +1,49 @@
-export interface FactRevenue {
-  Date: any; // يمكن تحويلها لـ Date object لاحقاً
-  Year: number;
-  Month: number;
-  Product_ID: number;
-  Client_ID: number;
-  Country: string;
-  Type: string;
-  Status: string;
-  Gross: number;
-}
-
-export interface FactPipeline {
-  Product_ID: number;
-  Client_ID: number;
-  Target_Amount: number;
-  Quarter: number;
-  Year: number;
-  Status: string;
-}
+// src/app/models/data.models.ts
 
 export interface DimProduct {
-  Product_ID: number;
-  Product_Name: string;
-  Category: string;
+  product_id: number;
+  product_name: string;
+  category: string;
 }
 
 export interface DimClient {
-  Client_ID: number;
-  Client_Name: string;
-  Country: string;
+  client_id: number;
+  client_name: string;
+  country: string;
 }
+
+export interface FactRevenue {
+  id?: number;
+  date: string;
+  product_id: number;
+  client_id: number;
+  country: string;
+  type?: string;
+  status?: string;
+  gross_amount: number; // تأكد من مطابقة الاسم في قاعدة البيانات
+}
+
 export interface FactTarget {
-  Product_ID: number;
-  Country: string;
-  Year: number;
-  Target_Amount: number;
+  id?: number;
+  product_id: number;
+  year: number;
+  annual_target: number;
 }
 
 export interface FactCost {
-  Date: string; // يفضل توحيد صيغة التاريخ
-  Year: number;
-  Month: number;
-  Monthly_Cost: number;
+  id?: number;
+  date: string;
+  product_id: number;
+  amount: number;
+  description: string;
+}
+
+export interface FactPipeline {
+  id?: number;
+  product_id: number;
+  client_id: number;
+  target_amount: number;
+  quarter: number;
+  year: number;
+  status: string;
 }

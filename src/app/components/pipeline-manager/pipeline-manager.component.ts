@@ -1,7 +1,7 @@
 import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ExcelService } from '../../services/excel.service';
+import { ExcelService } from '../../services/data.service';
 import { FactPipeline } from '../../models/data.models';
 
 @Component({

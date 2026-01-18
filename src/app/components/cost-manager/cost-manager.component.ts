@@ -1,8 +1,8 @@
 import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ExcelService } from '../../services/excel.service';
-import { FactCost } from '../../models/data.models';
+ import { FactCost } from '../../models/data.models';
+import { DataService } from '../../services/data.service';
 
 @Component({
   selector: 'app-cost-manager',
@@ -84,7 +84,7 @@ import { FactCost } from '../../models/data.models';
   `
 })
 export class CostManagerComponent {
-  excelService = inject(ExcelService);
+  excelService = inject(DataService);
   showModal = false;
   isEditMode = false;
   editIndex = -1;
