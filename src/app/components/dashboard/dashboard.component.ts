@@ -1,8 +1,8 @@
-import { Component, inject, computed, signal, AfterViewInit } from '@angular/core'; // الإصلاح هنا
+import { Component, inject, computed, signal, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DataService } from '../../services/data.service';
-import { FactRevenue, FactCost, DimProduct } from '../../models/data.models'; // استيراد الموديلات
+import { FactRevenue, FactCost, DimProduct, FactTarget } from '../../models/data.models';
 import Chart from 'chart.js/auto';
 
 @Component({
@@ -10,232 +10,283 @@ import Chart from 'chart.js/auto';
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="p-6 bg-[#f8fafc] min-h-screen font-sans">
+    <div class="p-6 bg-[#f8fafc] min-h-screen font-sans text-slate-800">
       <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-        <div>
-          <h1 class="text-2xl font-black text-slate-800 tracking-tight">FINANCIAL COMMAND CENTER</h1>
-          <p class="text-slate-500 text-sm font-medium">Detailed performance analytics for {{ selectedYear() }}</p>
-        </div>
-
+        <h1 class="text-2xl font-black tracking-tight text-slate-900 uppercase">Financial Center</h1>
         <div class="flex items-center gap-3 bg-white p-2 rounded-2xl shadow-sm border border-slate-100">
-          <span class="text-xs font-bold text-slate-400 ml-3">SELECT YEAR</span>
+          <span class="text-[10px] font-black text-slate-400 ml-3 uppercase">Year Selection</span>
           <select [ngModel]="selectedYear()" (ngModelChange)="onYearChange($event)"
-                  class="bg-slate-50 border-0 rounded-xl px-4 py-2 font-bold text-hawy-blue outline-none focus:ring-2 focus:ring-hawy-blue transition-all">
-            <option [value]="2024">2024</option>
-            <option [value]="2025">2025</option>
-            <option [value]="2026">2026</option>
+                  class="bg-slate-50 border-0 rounded-xl px-4 py-2 font-bold text-blue-600 outline-none focus:ring-2 focus:ring-blue-500 transition-all cursor-pointer">
+            @for (year of yearsList(); track year) {
+              <option [value]="year">{{ year }}</option>
+            }
           </select>
         </div>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 group hover:border-blue-500 transition-all duration-300">
-          <div class="flex justify-between items-start mb-4">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+        <div class="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 group hover:border-blue-500 transition-all duration-300">
+          <div class="flex justify-between items-center mb-4">
             <div class="p-3 bg-blue-50 rounded-2xl text-blue-600"><span class="material-icons">payments</span></div>
-            <span class="text-[10px] font-black bg-blue-100 text-blue-700 px-2 py-1 rounded-lg">GROSS</span>
+            <span class="text-[10px] font-black bg-blue-100 text-blue-700 px-2 py-1 rounded-lg uppercase">Gross</span>
           </div>
           <h3 class="text-slate-400 text-xs font-bold uppercase tracking-wider">Total Revenue</h3>
-          <div class="text-2xl font-black text-slate-800 mt-1">{{ stats().revenue | currency:'AED ':'symbol':'1.0-0' }}</div>
+          <div class="text-2xl font-black mt-1">{{ stats().revenue | currency:'AED ':'symbol':'1.0-0' }}</div>
         </div>
 
-        <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 group hover:border-red-500 transition-all duration-300">
-          <div class="flex justify-between items-start mb-4">
-            <div class="p-3 bg-red-50 rounded-2xl text-red-600"><span class="material-icons">shopping_cart</span></div>
-            <span class="text-[10px] font-black bg-red-100 text-red-700 px-2 py-1 rounded-lg">EXPENSES</span>
+        <div class="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 group hover:border-rose-500 transition-all duration-300">
+          <div class="flex justify-between items-center mb-4">
+            <div class="p-3 bg-rose-50 rounded-2xl text-rose-600"><span class="material-icons">shopping_cart</span></div>
+            <span class="text-[10px] font-black bg-rose-100 text-rose-700 px-2 py-1 rounded-lg uppercase">Expenses</span>
           </div>
           <h3 class="text-slate-400 text-xs font-bold uppercase tracking-wider">Total Costs</h3>
-          <div class="text-2xl font-black text-slate-800 mt-1">{{ stats().cost | currency:'AED ':'symbol':'1.0-0' }}</div>
+          <div class="text-2xl font-black mt-1">{{ stats().cost | currency:'AED ':'symbol':'1.0-0' }}</div>
         </div>
 
-        <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 group hover:border-emerald-500 transition-all duration-300">
-          <div class="flex justify-between items-start mb-4">
+        <div class="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 group hover:border-emerald-500 transition-all duration-300">
+          <div class="flex justify-between items-center mb-4">
             <div class="p-3 bg-emerald-50 rounded-2xl text-emerald-600"><span class="material-icons">account_balance_wallet</span></div>
-            <span class="text-[10px] font-black bg-emerald-100 text-emerald-700 px-2 py-1 rounded-lg">NET PROFIT</span>
+            <span class="text-[10px] font-black bg-emerald-100 text-emerald-700 px-2 py-1 rounded-lg uppercase">Net</span>
           </div>
           <h3 class="text-slate-400 text-xs font-bold uppercase tracking-wider">Net Profit</h3>
-          <div class="text-2xl font-black text-slate-800 mt-1" [class.text-red-600]="stats().profit < 0">
-            {{ stats().profit | currency:'AED ':'symbol':'1.0-0' }}
-          </div>
+          <div class="text-2xl font-black" [class.text-rose-600]="stats().profit < 0">{{ stats().profit | currency:'AED ':'symbol':'1.0-0' }}</div>
         </div>
 
-        <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 group hover:border-orange-500 transition-all duration-300">
-          <div class="flex justify-between items-start mb-4">
-            <div class="p-3 bg-orange-50 rounded-2xl text-orange-600"><span class="material-icons">trending_up</span></div>
-            <span class="text-[10px] font-black bg-orange-100 text-orange-700 px-2 py-1 rounded-lg">MARGIN</span>
+        <div class="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 group hover:border-amber-500 transition-all duration-300">
+          <div class="flex justify-between items-center mb-4">
+            <div class="p-3 bg-amber-50 rounded-2xl text-amber-600"><span class="material-icons">trending_up</span></div>
+            <span class="text-[10px] font-black bg-amber-100 text-amber-700 px-2 py-1 rounded-lg uppercase">Ratio</span>
           </div>
           <h3 class="text-slate-400 text-xs font-bold uppercase tracking-wider">Profit Margin</h3>
-          <div class="text-2xl font-black text-slate-800 mt-1">{{ stats().margin }}%</div>
+          <div class="text-2xl font-black mt-1">{{ stats().margin }}%</div>
         </div>
       </div>
 
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        <div class="lg:col-span-8 bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100">
-          <div class="h-[400px]"><canvas id="mainChart"></canvas></div>
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-12">
+        <div class="lg:col-span-8 bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
+           <h3 class="font-black text-slate-800 mb-6 flex items-center gap-2 italic uppercase text-sm tracking-widest"><span class="w-2 h-6 bg-blue-600 rounded-full"></span> Cash Flow</h3>
+           <div class="h-[300px]"><canvas id="mainChart"></canvas></div>
         </div>
-        <div class="lg:col-span-4 bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100">
-          <div class="h-[400px]"><canvas id="productProfitChart"></canvas></div>
+
+        <div class="lg:col-span-4 bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
+           <h3 class="font-black text-slate-800 mb-6 text-center italic uppercase text-sm tracking-widest">Revenue Mix</h3>
+           <div class="h-[300px]"><canvas id="productProfitChart"></canvas></div>
         </div>
-        <div class="lg:col-span-6 bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100">
-          <div class="h-[300px]"><canvas id="quarterlyChart"></canvas></div>
+
+        <div class="lg:col-span-12 bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
+           <h3 class="font-black text-slate-800 mb-6 flex items-center gap-2 italic uppercase text-sm tracking-widest">
+             <span class="w-2 h-6 bg-amber-500 rounded-full"></span> Performance vs Annual Target
+           </h3>
+           <div class="h-[350px]"><canvas id="targetVsActualChart"></canvas></div>
         </div>
-        <div class="lg:col-span-6 bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100">
-          <div class="h-[300px]"><canvas id="rankingChart"></canvas></div>
+      </div>
+
+      <div class="bg-white rounded-[2.5rem] shadow-xl overflow-hidden border border-slate-100 mb-10">
+        <div class="bg-slate-900 p-6 text-white flex justify-between items-center">
+          <div class="flex items-center gap-3">
+            <div class="p-2 bg-blue-600 rounded-xl"><span class="material-icons text-sm">analytics</span></div>
+            <h3 class="font-black tracking-widest uppercase text-sm">Annual Financial Matrix</h3>
+          </div>
+          <span class="text-[10px] font-black opacity-50 uppercase tracking-widest">AED Values</span>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-slate-50 text-slate-400 uppercase text-[10px] font-black tracking-widest border-b border-slate-100">
+                <th class="p-5 sticky left-0 bg-slate-50 z-10">Category / Product</th>
+                @for (m of monthNames; track m) {
+                  <th class="p-3 text-center">{{ m }}</th>
+                }
+                <th class="p-3 text-center bg-blue-50 text-blue-700">Total</th>
+                <th class="p-3 text-center bg-amber-50 text-amber-700">Target</th>
+                <th class="p-3 text-center">Ach %</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-50">
+              @for (p of summaryData(); track p.name) {
+                <tr class="hover:bg-blue-50/30 transition-all duration-200 group">
+                  <td class="p-5 font-bold text-slate-700 sticky left-0 bg-white group-hover:bg-blue-50/30 z-10">
+                    <div class="flex items-center gap-2">
+                      <span class="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
+                      {{ p.name }}
+                    </div>
+                  </td>
+                  @for (val of p.monthlyValues; track $index) {
+                    <td class="p-3 text-center text-[11px] font-medium" [class.text-slate-300]="val === 0">
+                      {{ val > 0 ? (val | number:'1.0-0') : '—' }}
+                    </td>
+                  }
+                  <td class="p-3 text-center font-black text-blue-600 bg-blue-50/20 italic">{{ p.total | number:'1.0-0' }}</td>
+                  <td class="p-3 text-center font-bold text-amber-600 bg-amber-50/20">{{ p.target | number:'1.0-0' }}</td>
+                  <td class="p-3 text-center">
+                    <span [class]="p.achievement >= 100 ? 'text-emerald-500' : 'text-rose-500'" class="font-black text-[11px]">
+                      {{ p.achievement | number:'1.0-0' }}%
+                    </span>
+                  </td>
+                </tr>
+              }
+            </tbody>
+            <tfoot class="bg-slate-900 text-white font-bold text-[11px]">
+              <tr>
+                <td class="p-5 uppercase tracking-widest opacity-60">Revenue</td>
+                @for (rev of totals().monthlyRevenue; track $index) {
+                  <td class="p-3 text-center border-l border-slate-800">{{ rev | number:'1.0-0' }}</td>
+                }
+                <td colspan="3" class="bg-slate-800"></td>
+              </tr>
+              <tr class="text-rose-400 border-t border-slate-800">
+                <td class="p-5 uppercase tracking-widest opacity-80">Expenses</td>
+                @for (cst of totals().monthlyCost; track $index) {
+                  <td class="p-3 text-center border-l border-slate-800">({{ cst | number:'1.0-0' }})</td>
+                }
+                <td colspan="3" class="bg-slate-800"></td>
+              </tr>
+              <tr class="bg-blue-600 text-white font-black text-xs">
+                <td class="p-5 rounded-bl-3xl uppercase tracking-widest">Net Profit</td>
+                @for (net of totals().monthlyNet; track $index) {
+                  <td class="p-3 text-center border-l border-blue-500">{{ net | number:'1.0-0' }}</td>
+                }
+                <td colspan="3" class="rounded-br-3xl bg-blue-700"></td>
+              </tr>
+            </tfoot>
+          </table>
         </div>
       </div>
     </div>
-   `
+  `
 })
 export class DashboardComponent implements AfterViewInit {
-  dataService = inject(DataService);
-  selectedYear = signal(2025);
+  private dataService = inject(DataService);
+  selectedYear = signal(new Date().getFullYear());
   charts: any = {};
+  monthNames = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+
+  yearsList = computed(() => {
+    const dbYears = this.dataService.revenues().map(r => new Date(r.date).getFullYear());
+    return Array.from(new Set([...dbYears, new Date().getFullYear()])).sort((a, b) => b - a);
+  });
 
   stats = computed(() => {
     const year = this.selectedYear();
-    const revs = this.dataService.revenues().filter((r: FactRevenue) => new Date(r.date).getFullYear() === year);
-    const costs = this.dataService.costs().filter((c: FactCost) => c.year === year);
-
-    const revenue = revs.reduce((sum: number, r: FactRevenue) => sum + (Number(r.gross_amount) || 0), 0);
-    const cost = costs.reduce((sum: number, c: FactCost) => sum + (Number(c.amount) || 0), 0);
+    const revs = this.dataService.revenues().filter(r => new Date(r.date).getFullYear() === year);
+    const costs = this.dataService.costs().filter(c => c.year === year);
+    const revenue = revs.reduce((sum, r) => sum + (Number(r.gross_amount) || 0), 0);
+    const cost = costs.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
     const profit = revenue - cost;
     const margin = revenue > 0 ? Math.round((profit / revenue) * 100) : 0;
-
     return { revenue, cost, profit, margin };
   });
 
+  summaryData = computed(() => {
+    const year = this.selectedYear();
+    const products = this.dataService.products();
+    const revenues = this.dataService.revenues();
+    const targets = this.dataService.targets();
+
+    return products.map(p => {
+      const monthlyValues = Array.from({ length: 12 }, (_, m) =>
+        revenues.filter(r => r.product_id === p.product_id && new Date(r.date).getFullYear() === year && new Date(r.date).getMonth() === m)
+                .reduce((s, r) => s + Number(r.gross_amount), 0)
+      );
+      const total = monthlyValues.reduce((a, b) => a + b, 0);
+      const targetObj = targets.find(t => t.product_id === p.product_id && t.year === year);
+      const target = targetObj ? Number(targetObj.annual_target) : 0;
+      const achievement = target > 0 ? (total / target) * 100 : 0;
+      return { name: p.product_name, monthlyValues, total, target, achievement };
+    });
+  });
+
+  totals = computed(() => {
+    const data = this.summaryData();
+    const monthlyRevenue = Array.from({ length: 12 }, (_, m) => data.reduce((s, p) => s + p.monthlyValues[m], 0));
+    const monthlyCost = Array.from({ length: 12 }, (_, m) =>
+      this.dataService.costs().filter(c => c.year === this.selectedYear() && c.month === (m + 1)).reduce((s, c) => s + Number(c.amount), 0)
+    );
+    const monthlyNet = monthlyRevenue.map((rev, i) => rev - monthlyCost[i]);
+    return { monthlyRevenue, monthlyCost, monthlyNet };
+  });
+
   ngAfterViewInit() {
-    this.initAllCharts();
+    this.initCharts();
   }
 
   onYearChange(year: any) {
     this.selectedYear.set(Number(year));
-    this.updateAllCharts();
+    this.updateCharts();
   }
 
-  initAllCharts() {
+  private initCharts() {
     this.charts.main = new Chart('mainChart', {
       type: 'line',
       data: this.getMainChartData(),
       options: { responsive: true, maintainAspectRatio: false }
     });
-
-    this.charts.productProfit = new Chart('productProfitChart', {
+    this.charts.donut = new Chart('productProfitChart', {
       type: 'doughnut',
-      data: this.getProductProfitData(),
-      options: { responsive: true, maintainAspectRatio: false }
+      data: this.getDonutData(),
+      options: { responsive: true, maintainAspectRatio: false, cutout: '75%' }
     });
-
-    this.charts.quarterly = new Chart('quarterlyChart', {
+    this.charts.targetVsActual = new Chart('targetVsActualChart', {
       type: 'bar',
-      data: this.getQuarterlyData(),
-      options: { responsive: true, maintainAspectRatio: false }
-    });
-
-    this.charts.ranking = new Chart('rankingChart', {
-      type: 'bar',
-      data: this.getRankingData(),
-      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false }
+      data: this.getTargetVsActualData(),
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom' } },
+        scales: { y: { beginAtZero: true } }
+      }
     });
   }
 
-  updateAllCharts() {
+  private updateCharts() {
     if (this.charts.main) this.charts.main.data = this.getMainChartData();
-    if (this.charts.productProfit) this.charts.productProfit.data = this.getProductProfitData();
-    if (this.charts.quarterly) this.charts.quarterly.data = this.getQuarterlyData();
-    if (this.charts.ranking) this.charts.ranking.data = this.getRankingData();
-
+    if (this.charts.donut) this.charts.donut.data = this.getDonutData();
+    if (this.charts.targetVsActual) this.charts.targetVsActual.data = this.getTargetVsActualData();
     Object.values(this.charts).forEach((c: any) => c?.update());
   }
 
-  getMainChartData() {
-    const year = this.selectedYear();
-    const revMonths = new Array(12).fill(0);
-    const costMonths = new Array(12).fill(0);
-
-    this.dataService.revenues().filter((r: FactRevenue) => new Date(r.date).getFullYear() === year)
-      .forEach((r: FactRevenue) => revMonths[new Date(r.date).getMonth()] += Number(r.gross_amount));
-
-    this.dataService.costs().filter((c: FactCost) => c.year === year)
-      .forEach((c: FactCost) => costMonths[c.month - 1] += Number(c.amount));
-
+  private getMainChartData() {
     return {
-      labels: ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'],
+      labels: this.monthNames,
       datasets: [
-        { label: 'Revenue', data: revMonths, borderColor: '#3b82f6', tension: 0.4 },
-        { label: 'Cost', data: costMonths, borderColor: '#ef4444', tension: 0.4 }
+        { label: 'Revenue', data: this.totals().monthlyRevenue, borderColor: '#2563eb', fill: true, backgroundColor: 'rgba(37, 99, 235, 0.05)', tension: 0.4 },
+        { label: 'Cost', data: this.totals().monthlyCost, borderColor: '#f43f5e', borderDash: [5, 5], tension: 0.4 }
       ]
     };
   }
 
-  getProductProfitData() {
-    const year = this.selectedYear();
-    const profitMap: any = {};
-
-    this.dataService.products().forEach((p: DimProduct) => {
-      const pRev = this.dataService.revenues()
-        .filter((r: FactRevenue) => r.product_id === p.product_id && new Date(r.date).getFullYear() === year)
-        .reduce((s: number, r: FactRevenue) => s + Number(r.gross_amount), 0);
-
-      const pCost = this.dataService.costs()
-        .filter((c: FactCost) => c.product_id === p.product_id && c.year === year)
-        .reduce((s: number, c: FactCost) => s + Number(c.amount), 0);
-
-      const profit = pRev - pCost;
-      if (profit !== 0) profitMap[p.product_name] = profit;
-    });
-
+  private getDonutData() {
+    const activeData = this.summaryData().filter(p => p.total > 0);
     return {
-      labels: Object.keys(profitMap),
+      labels: activeData.map(p => p.name),
       datasets: [{
-        data: Object.values(profitMap),
-        backgroundColor: ['#6366f1', '#a855f7', '#ec4899', '#f43f5e', '#f59e0b', '#10b981', '#06b6d4']
+        data: activeData.map(p => p.total),
+        backgroundColor: ['#1e3a8a', '#2563eb', '#60a5fa', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6']
       }]
     };
   }
 
-  getQuarterlyData() {
-    const year = this.selectedYear();
-    const qProfits = new Array(4).fill(0);
-
-    for (let m = 0; m < 12; m++) {
-      const qIndex = Math.floor(m / 3);
-      const rev = this.dataService.revenues()
-        .filter((r: FactRevenue) => new Date(r.date).getFullYear() === year && new Date(r.date).getMonth() === m)
-        .reduce((s: number, r: FactRevenue) => s + Number(r.gross_amount), 0);
-
-      const cost = this.dataService.costs()
-        .filter((c: FactCost) => c.year === year && c.month === (m + 1))
-        .reduce((s: number, c: FactCost) => s + Number(c.amount), 0);
-
-      qProfits[qIndex] += (rev - cost);
-    }
-
+  private getTargetVsActualData() {
+    const data = this.summaryData().filter(p => p.total > 0 || p.target > 0);
     return {
-      labels: ['Q1', 'Q2', 'Q3', 'Q4'],
-      datasets: [{
-        label: 'Net Profit',
-        data: qProfits,
-        backgroundColor: qProfits.map((v: number) => v >= 0 ? '#10b981' : '#ef4444')
-      }]
-    };
-  }
-
-  getRankingData() {
-    const year = this.selectedYear();
-    const ranking = this.dataService.products().map((p: DimProduct) => ({
-      name: p.product_name,
-      total: this.dataService.revenues()
-        .filter((r: FactRevenue) => r.product_id === p.product_id && new Date(r.date).getFullYear() === year)
-        .reduce((s: number, r: FactRevenue) => s + Number(r.gross_amount), 0)
-    })).sort((a: any, b: any) => b.total - a.total).slice(0, 5);
-
-    return {
-      labels: ranking.map((r: any) => r.name),
-      datasets: [{
-        label: 'Gross Revenue',
-        data: ranking.map((r: any) => r.total),
-        backgroundColor: '#6366f1'
-      }]
+      labels: data.map(p => p.name),
+      datasets: [
+        {
+          label: 'Annual Target',
+          data: data.map(p => p.target),
+          backgroundColor: 'rgba(245, 158, 11, 0.2)',
+          borderColor: '#f59e0b',
+          borderWidth: 1,
+          borderRadius: 8
+        },
+        {
+          label: 'Actual Revenue',
+          data: data.map(p => p.total),
+          backgroundColor: '#2563eb',
+          borderRadius: 8
+        }
+      ]
     };
   }
 }
