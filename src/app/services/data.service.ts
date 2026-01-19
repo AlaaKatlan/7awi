@@ -1,42 +1,131 @@
+import { Injectable, signal, computed } from '@angular/core';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { environment } from '../environments/environment';
-import { Injectable } from '@angular/core';
-import { FactCost, FactRevenue } from '../models/data.models';
+import { DimClient, DimProduct, FactPipeline, FactRevenue, FactTarget, FactCost } from '../models/data.models';
 
-@Injectable({ providedIn: 'root' })
+@Injectable({
+  providedIn: 'root'
+})
 export class DataService {
   private supabase: SupabaseClient;
 
+  // الـ Signals التي تعتمد عليها الواجهات
+  revenues = signal<FactRevenue[]>([]);
+  pipelines = signal<FactPipeline[]>([]);
+  products = signal<DimProduct[]>([]);
+  clients = signal<DimClient[]>([]);
+  targets = signal<FactTarget[]>([]);
+  costs = signal<FactCost[]>([]);
+
   constructor() {
     this.supabase = createClient(environment.supabaseUrl, environment.supabaseKey);
+    this.fetchInitialData();
   }
 
-  // جلب البيانات من جدول الإيرادات
-  async getRevenues() {
-    const { data, error } = await this.supabase
-      .from('fact_revenue')
-      .select('*');
+  // جلب البيانات الأولية عند تشغيل التطبيق
+  async fetchInitialData() {
+    try {
+      // 1. جلب الإيرادات
+      const { data: rev } = await this.supabase.from('fact_revenue').select('*');
+      if (rev) this.revenues.set(rev);
 
-    if (data) this.revenues.set(data);
-    return { data, error };
-  }
+      // 2. جلب المنتجات
+      const { data: prod } = await this.supabase.from('dim_product').select('*');
+      if (prod) this.products.set(prod);
 
-  // إضافة إيراد جديد
-  async addRevenue(item: FactRevenue) {
-    const { data, error } = await this.supabase
-      .from('fact_revenue')
-      .insert([item]);
+      // 3. جلب العملاء
+      const { data: cli } = await this.supabase.from('dim_client').select('*');
+      if (cli) this.clients.set(cli);
 
-    if (!error) {
-      this.revenues.update(v => [item, ...v]);
+      // 4. جلب التكاليف
+      const { data: cst } = await this.supabase.from('fact_cost').select('*');
+      if (cst) this.costs.set(cst);
+
+      // 5. جلب الـ Pipeline
+      const { data: pipe } = await this.supabase.from('fact_pipeline').select('*');
+      if (pipe) this.pipelines.set(pipe);
+
+      // 6. --- الإصلاح هنا: جلب بيانات التارجت ---
+      const { data: targ } = await this.supabase.from('fact_target_annual').select('*');
+      if (targ) {
+        this.targets.set(targ);
+        console.log('Targets fetched successfully:', targ);
+      }
+
+    } catch (error) {
+      console.error('Error fetching data:', error);
     }
   }
 
-  // تحديث التكاليف
-  async updateCost(id: number, item: FactCost) {
-    const { error } = await this.supabase
-      .from('fact_cost')
-      .update(item)
-      .eq('id', id);
+  // دوال الإضافة (CRUD)
+  async addRevenue(item: FactRevenue) {
+    const { data, error } = await this.supabase.from('fact_revenue').insert([item]).select();
+    if (data) this.revenues.update(v => [data[0], ...v]);
+    return { data, error };
   }
+
+  async addCost(item: FactCost) {
+    const { data, error } = await this.supabase.from('fact_cost').insert([item]).select();
+    if (data) this.costs.update(v => [data[0], ...v]);
+    return { data, error };
+  }
+
+  async addTarget(item: FactTarget) {
+    const { data, error } = await this.supabase.from('fact_target_annual').insert([item]).select();
+    if (data) this.targets.update(v => [data[0], ...v]);
+    return { data, error };
+  }
+
+  async updateCost(item: FactCost) {
+    if (!item.id) return;
+    const { data, error } = await this.supabase
+      .from('fact_cost')
+      .update({
+        date: item.date,
+        year: item.year,
+        month: item.month,
+        amount: item.amount,
+        description: item.description,
+        client_id: item.client_id,
+        product_id: item.product_id
+      })
+      .eq('id', item.id)
+      .select();
+
+    if (data) {
+      this.costs.update(v => v.map(c => c.id === item.id ? data[0] : c));
+    }
+    return { data, error };
+  }
+
+  // خرائط مساعدة للتحويل من ID إلى Name
+  productsMap = computed(() => {
+    const map = new Map<number, string>();
+    this.products().forEach(p => map.set(p.product_id, p.product_name));
+    return map;
+  });
+
+  clientsMap = computed(() => {
+    const map = new Map<number, string>();
+    this.clients().forEach(c => map.set(c.client_id, c.client_name));
+    return map;
+  });
+async updateRevenue(item: FactRevenue) {
+  const { data, error } = await this.supabase
+    .from('fact_revenue')
+    .update({
+      date: item.date,
+      product_id: item.product_id,
+      country: item.country,
+      gross_amount: item.gross_amount
+    })
+    .eq('id', item.id)
+    .select();
+
+  if (data) {
+    this.revenues.update(v => v.map(r => r.id === item.id ? data[0] : r));
+  }
+}
+  getProductName(id: number): string { return this.productsMap().get(id) || `Product ${id}`; }
+  getClientName(id: number): string { return this.clientsMap().get(id) || `Client ${id}`; }
 }

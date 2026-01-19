@@ -1,9 +1,7 @@
-// src/app/models/data.models.ts
-
 export interface DimProduct {
   product_id: number;
   product_name: string;
-  category: string;
+  category?: string;
 }
 
 export interface DimClient {
@@ -14,28 +12,14 @@ export interface DimClient {
 
 export interface FactRevenue {
   id?: number;
-  date: string;
+  date: string;         // تم التوحيد للأحرف الصغيرة
+  year?: number;
+  month?: number;
   product_id: number;
-  client_id: number;
+
   country: string;
-  type?: string;
-  status?: string;
-  gross_amount: number; // تأكد من مطابقة الاسم في قاعدة البيانات
-}
 
-export interface FactTarget {
-  id?: number;
-  product_id: number;
-  year: number;
-  annual_target: number;
-}
-
-export interface FactCost {
-  id?: number;
-  date: string;
-  product_id: number;
-  amount: number;
-  description: string;
+  gross_amount: number; // تم التعديل ليطابق قاعدة البيانات
 }
 
 export interface FactPipeline {
@@ -46,4 +30,20 @@ export interface FactPipeline {
   quarter: number;
   year: number;
   status: string;
+}
+export interface FactTarget {
+  id?: number;
+  product_id: number;
+  year: number;
+  annual_target: number;
+ }
+export interface FactCost {
+  id?: number;
+  date: string;
+  year: number;
+  month: number;
+  amount: number;
+  product_id?: number;
+  client_id?: number;
+  description?: string;
 }

@@ -1,7 +1,7 @@
 import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ExcelService } from '../../services/data.service';
+import { DataService } from '../../services/data.service'; // تم تغيير المسار والاسم
 import { FactPipeline } from '../../models/data.models';
 
 @Component({
@@ -28,18 +28,18 @@ import { FactPipeline } from '../../models/data.models';
                 </tr>
             </thead>
             <tbody class="text-sm text-gray-600">
-                @for (pipe of excelService.pipelines(); track $index) {
+                @for (pipe of dataService.pipelines(); track pipe.id) {
                     <tr class="border-b border-gray-50 hover:bg-gray-50">
-                        <td class="py-4 font-bold">{{ excelService.getClientName(pipe.Client_ID) }}</td>
-                        <td class="py-4">{{ excelService.getProductName(pipe.Product_ID) }}</td>
-                        <td class="py-4">{{ pipe.Target_Amount | currency }}</td>
+                        <td class="py-4 font-bold">{{ dataService.getClientName(pipe.client_id) }}</td>
+                        <td class="py-4">{{ dataService.getProductName(pipe.product_id) }}</td>
+                        <td class="py-4">{{ pipe.target_amount | currency }}</td>
                         <td class="py-4">
-                            <span class="bg-indigo-50 text-indigo-700 px-2 py-1 rounded text-xs font-bold mr-1"> {{ pipe.Quarter }}</span>
-                            <span class="text-gray-400 text-xs">{{ pipe.Year }}</span>
+                            <span class="bg-indigo-50 text-indigo-700 px-2 py-1 rounded text-xs font-bold mr-1"> {{ pipe.quarter }}</span>
+                            <span class="text-gray-400 text-xs">{{ pipe.year }}</span>
                         </td>
                         <td class="py-4">
-                            <span [class]="getStatusColor(pipe.Status)" class="px-3 py-1 rounded text-xs font-medium">
-                                {{ pipe.Status }}
+                            <span [class]="getStatusColor(pipe.status)" class="px-3 py-1 rounded text-xs font-medium">
+                                {{ pipe.status }}
                             </span>
                         </td>
                     </tr>
@@ -61,32 +61,32 @@ import { FactPipeline } from '../../models/data.models';
                 <div class="space-y-4">
                     <div>
                         <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Client</label>
-                        <select [(ngModel)]="newItem.Client_ID" class="w-full bg-gray-50 border border-gray-200 p-3 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none">
+                        <select [(ngModel)]="newItem.client_id" class="w-full bg-gray-50 border border-gray-200 p-3 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none">
                              <option [ngValue]="null" disabled>Select Client</option>
-                             @for (c of excelService.clients(); track c.Client_ID) {
-                                <option [value]="c.Client_ID">{{ c.Client_Name }}</option>
+                             @for (c of dataService.clients(); track c.client_id) {
+                                <option [value]="c.client_id">{{ c.client_name }}</option>
                              }
                         </select>
                     </div>
 
                     <div>
                         <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Product</label>
-                        <select [(ngModel)]="newItem.Product_ID" class="w-full bg-gray-50 border border-gray-200 p-3 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none">
-                             @for (p of excelService.products(); track p.Product_ID) {
-                                <option [value]="p.Product_ID">{{ p.Product_Name }}</option>
+                        <select [(ngModel)]="newItem.product_id" class="w-full bg-gray-50 border border-gray-200 p-3 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none">
+                             @for (p of dataService.products(); track p.product_id) {
+                                <option [value]="p.product_id">{{ p.product_name }}</option>
                              }
                         </select>
                     </div>
 
                     <div>
                         <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Target Amount</label>
-                        <input type="number" [(ngModel)]="newItem.Target_Amount" class="w-full bg-gray-50 border border-gray-200 p-3 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none">
+                        <input type="number" [(ngModel)]="newItem.target_amount" class="w-full bg-gray-50 border border-gray-200 p-3 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none">
                     </div>
 
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Quarter</label>
-                            <select [(ngModel)]="newItem.Quarter" class="w-full bg-gray-50 border border-gray-200 p-3 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none">
+                            <select [(ngModel)]="newItem.quarter" class="w-full bg-gray-50 border border-gray-200 p-3 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none">
                                 <option [ngValue]="1">Q1 (Jan-Mar)</option>
                                 <option [ngValue]="2">Q2 (Apr-Jun)</option>
                                 <option [ngValue]="3">Q3 (Jul-Sep)</option>
@@ -95,16 +95,16 @@ import { FactPipeline } from '../../models/data.models';
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Year</label>
-                            <input type="number" [(ngModel)]="newItem.Year" class="w-full bg-gray-50 border border-gray-200 p-3 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none">
+                            <input type="number" [(ngModel)]="newItem.year" class="w-full bg-gray-50 border border-gray-200 p-3 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none">
                         </div>
                     </div>
 
                     <div>
                         <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Status</label>
-                        <select [(ngModel)]="newItem.Status" class="w-full bg-gray-50 border border-gray-200 p-3 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none">
+                        <select [(ngModel)]="newItem.status" class="w-full bg-gray-50 border border-gray-200 p-3 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none">
                             <option value="Pending">Pending</option>
                             <option value="Done">Done</option>
-                            <option value="Complitaed">Completed</option>
+                            <option value="Completed">Completed</option>
                         </select>
                     </div>
                 </div>
@@ -119,26 +119,51 @@ import { FactPipeline } from '../../models/data.models';
     `
 })
 export class PipelineManagerComponent {
-    excelService = inject(ExcelService);
+    public dataService = inject(DataService); // تحديث الخدمة
     showModal = false;
 
+    // تهيئة كائن جديد بأسماء الحقول الصغيرة
     newItem: FactPipeline = {
-        Product_ID: 1, Client_ID: 1, Target_Amount: 0, Quarter: 1, Year: 2026, Status: 'Pending'
+        product_id: 1,
+        client_id: 1,
+        target_amount: 0,
+        quarter: 1,
+        year: 2026,
+        status: 'Pending'
     };
 
     getStatusColor(status: string) {
         switch(status) {
             case 'Done': return 'bg-green-100 text-green-700';
             case 'Pending': return 'bg-orange-100 text-orange-700';
-            case 'Complitaed': return 'bg-blue-100 text-blue-700';
+            case 'Completed': return 'bg-blue-100 text-blue-700';
             default: return 'bg-gray-100 text-gray-700';
         }
     }
 
-    save() {
-        this.excelService.addPipeline({...this.newItem});
-        this.showModal = false;
-        // إعادة تعيين القيم الافتراضية
-        this.newItem = { Product_ID: 1, Client_ID: 1, Target_Amount: 0, Quarter: 1, Year: 2026, Status: 'Pending' };
+    async save() {
+        // نفترض وجود دالة addPipeline في DataService مشابهة لـ addRevenue
+        // إذا لم تكن موجودة، تأكد من إضافتها في خدمة البيانات
+        const { data, error } = await (this.dataService as any).supabase
+            .from('fact_pipeline')
+            .insert([{ ...this.newItem }])
+            .select();
+
+        if (data) {
+            this.dataService.pipelines.update(v => [data[0], ...v]);
+            this.showModal = false;
+            // إعادة تعيين القيم الافتراضية
+            this.newItem = {
+                product_id: 1,
+                client_id: 1,
+                target_amount: 0,
+                quarter: 1,
+                year: 2026,
+                status: 'Pending'
+            };
+        } else if (error) {
+            console.error('Error saving pipeline:', error);
+            alert('Failed to save pipeline item.');
+        }
     }
 }

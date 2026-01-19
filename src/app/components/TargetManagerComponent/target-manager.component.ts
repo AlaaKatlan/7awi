@@ -1,8 +1,8 @@
-import { Component, inject, signal, computed } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { ExcelService } from '../../services/data.service';
-import { FactTarget } from '../../models/data.models';
+import { Component, computed, inject, signal } from "@angular/core";
+import { FactTarget } from "../../models/data.models";
+import { DataService } from "../../services/data.service";
+import { FormsModule } from "@angular/forms";
+import { CommonModule } from "@angular/common";
 
 @Component({
   selector: 'app-target-manager',
@@ -13,7 +13,7 @@ import { FactTarget } from '../../models/data.models';
         <div class="flex justify-between items-center mb-6">
             <h2 class="text-xl font-bold text-gray-800">Target Goals Management</h2>
             <div class="flex gap-4">
-                 <select [(ngModel)]="selectedYear" class="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                 <select [ngModel]="selectedYear()" (ngModelChange)="selectedYear.set($event)" class="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
                     <option [ngValue]="null">All Years</option>
                     <option [ngValue]="2024">2024</option>
                     <option [ngValue]="2025">2025</option>
@@ -27,20 +27,16 @@ import { FactTarget } from '../../models/data.models';
             <thead class="bg-gray-50 text-xs text-gray-500 uppercase">
                 <tr>
                     <th class="p-4">Product</th>
-                    <th class="p-4">Country</th>
                     <th class="p-4">Year</th>
                     <th class="p-4 text-right">Target Amount</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-100 text-sm">
-                @for (item of filteredTargets(); track $index) {
+                @for (item of filteredTargets(); track item.id) {
                     <tr class="hover:bg-blue-50">
-                        <td class="p-4 font-bold">{{ excelService.getProductName(item.Product_ID) }}</td>
-                        <td class="p-4">
-                             <span [class]="item.Country === 'UAE' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'" class="px-2 py-1 rounded text-xs font-bold">{{ item.Country }}</span>
-                        </td>
-                        <td class="p-4">{{ item.Year }}</td>
-                        <td class="p-4 text-right font-bold text-hawy-blue">{{ item.Target_Amount | currency:'USD':'symbol':'1.0-0' }}</td>
+                        <td class="p-4 font-bold">{{ dataService.getProductName(item.product_id) }}</td>
+                        <td class="p-4">{{ item.year }}</td>
+                        <td class="p-4 text-right font-bold text-hawy-blue">{{ item.annual_target | currency:'AED ':'symbol':'1.0-0' }}</td>
                     </tr>
                 }
             </tbody>
@@ -54,28 +50,19 @@ import { FactTarget } from '../../models/data.models';
                 <div class="space-y-4">
                     <div>
                         <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Product</label>
-                        <select [(ngModel)]="newItem.Product_ID" class="w-full p-3 bg-gray-50 rounded-lg border-0 focus:ring-2 focus:ring-hawy-blue">
-                             @for (p of excelService.products(); track p.Product_ID) {
-                                <option [value]="p.Product_ID">{{ p.Product_Name }}</option>
+                        <select [(ngModel)]="newItem.product_id" class="w-full p-3 bg-gray-50 rounded-lg border-0 focus:ring-2 focus:ring-hawy-blue">
+                             @for (p of dataService.products(); track p.product_id) {
+                                <option [value]="p.product_id">{{ p.product_name }}</option>
                              }
                         </select>
                     </div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Country</label>
-                            <select [(ngModel)]="newItem.Country" class="w-full p-3 bg-gray-50 rounded-lg">
-                                <option value="UAE">UAE</option>
-                                <option value="KSA">KSA</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Year</label>
-                            <input type="number" [(ngModel)]="newItem.Year" class="w-full p-3 bg-gray-50 rounded-lg">
-                        </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Year</label>
+                        <input type="number" [(ngModel)]="newItem.year" class="w-full p-3 bg-gray-50 rounded-lg border-0">
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Target Amount</label>
-                        <input type="number" [(ngModel)]="newItem.Target_Amount" class="w-full p-3 bg-gray-50 rounded-lg focus:ring-2 focus:ring-hawy-blue">
+                        <input type="number" [(ngModel)]="newItem.annual_target" class="w-full p-3 bg-gray-50 rounded-lg border-0 focus:ring-2 focus:ring-hawy-blue">
                     </div>
                 </div>
                 <div class="mt-6 flex justify-end gap-3">
@@ -88,23 +75,32 @@ import { FactTarget } from '../../models/data.models';
   `
 })
 export class TargetManagerComponent {
-  excelService = inject(ExcelService);
+  public dataService = inject(DataService);
   showModal = false;
-  selectedYear = signal<number|null>(null);
+  selectedYear = signal<number|null>(2026); // عرض 2026 كإعداد افتراضي
 
-  newItem: FactTarget = { Product_ID: 1, Country: 'UAE', Year: 2026, Target_Amount: 0 };
+  // البنية المحدثة بدون country
+  newItem: FactTarget = { product_id: 1, year: 2026, annual_target: 0 };
 
   filteredTargets = computed(() => {
-    let data = this.excelService.targets();
-    if (this.selectedYear()) {
-        data = data.filter(t => t.Year === this.selectedYear());
-    }
-    return data;
+    const data = this.dataService.targets();
+    const year = this.selectedYear();
+    if (!year) return data;
+    return data.filter(t => t.year === year);
   });
 
-  openModal() { this.newItem = { Product_ID: 1, Country: 'UAE', Year: 2026, Target_Amount: 0 }; this.showModal = true; }
-  save() {
-    this.excelService.addTarget({...this.newItem});
-    this.showModal = false;
+  openModal() {
+    this.newItem = { product_id: 1, year: 2026, annual_target: 0 };
+    this.showModal = true;
+  }
+
+  async save() {
+    const { data, error } = await this.dataService.addTarget({ ...this.newItem });
+    if (data) {
+      this.showModal = false;
+    } else if (error) {
+      console.error('Error:', error);
+      alert('Failed to save.');
+    }
   }
 }
