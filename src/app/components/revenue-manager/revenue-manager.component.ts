@@ -16,7 +16,7 @@ import { FactRevenue } from '../../models/data.models';
         </div>
         <div class="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-green-500">
             <h3 class="text-gray-400 text-sm font-medium uppercase">Total Gross (Filtered)</h3>
-            <p class="text-3xl font-bold text-gray-800 mt-2">{{ totalGross() | currency:'AED ':'symbol':'1.0-0' }}</p>
+            <p class="text-3xl font-bold text-gray-800 mt-2">{{ totalGross() | currency:'$ ':'symbol':'1.0-0' }}</p>
         </div>
     </div>
 
@@ -71,7 +71,7 @@ import { FactRevenue } from '../../models/data.models';
 
         <div class="mt-4 flex justify-end">
              <button (click)="openModal()" class="bg-hawy-blue hover:bg-hawy-dark text-white px-6 py-2 rounded-lg shadow-md transition flex items-center text-sm font-bold">
-                <span class="material-icons mr-2 text-base">add</span> Add Revenue
+                <span class="material-icons mr-2 text-base">add</span> Add Booking Oreder
             </button>
         </div>
     </div>
@@ -105,7 +105,7 @@ import { FactRevenue } from '../../models/data.models';
                                     {{ item.country }}
                                 </span>
                             </td>
-                            <td class="p-5 text-right font-mono font-bold text-gray-900">{{ item.gross_amount | currency:'AED ':'symbol':'1.0-0' }}</td>
+                            <td class="p-5 text-right font-mono font-bold text-gray-900">{{ item.gross_amount | currency:'$ ':'symbol':'1.0-0' }}</td>
                             <td class="p-5 text-center">
                                 <button (click)="editItem(item)" class="text-gray-400 hover:text-hawy-blue transition">
                                     <span class="material-icons text-base">edit</span>

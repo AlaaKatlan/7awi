@@ -9,65 +9,108 @@ import { CommonModule } from "@angular/common";
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="bg-white rounded-2xl shadow-sm p-6">
-        <div class="flex justify-between items-center mb-6">
-            <h2 class="text-xl font-bold text-gray-800">Target Goals Management</h2>
-            <div class="flex gap-4">
-                 <select [ngModel]="selectedYear()" (ngModelChange)="selectedYear.set($event)" class="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-                    <option [ngValue]="null">All Years</option>
-                    <option [ngValue]="2024">2024</option>
-                    <option [ngValue]="2025">2025</option>
-                    <option [ngValue]="2026">2026</option>
-                 </select>
-                 <button (click)="openModal()" class="bg-hawy-blue text-white px-5 py-2 rounded-lg hover:bg-hawy-dark transition">+ Add Target</button>
-            </div>
-        </div>
+    <div class="p-6 bg-[#f8fafc] min-h-screen">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <div class="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-[#1e3a8a]">
+              <h3 class="text-gray-400 text-sm font-medium uppercase">Active Targets</h3>
+              <p class="text-3xl font-black text-gray-800 mt-2">{{ filteredTargets().length }}</p>
+          </div>
+          <div class="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-amber-500">
+              <h3 class="text-gray-400 text-sm font-medium uppercase">Total Yearly target</h3>
+              <p class="text-3xl font-black text-gray-800 mt-2">{{ totalTargetAmount() | currency:'USD ':'symbol':'1.0-0' }}</p>
+          </div>
+      </div>
 
-        <table class="w-full text-left">
-            <thead class="bg-gray-50 text-xs text-gray-500 uppercase">
-                <tr>
-                    <th class="p-4">Product</th>
-                    <th class="p-4">Year</th>
-                    <th class="p-4 text-right">Target Amount</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100 text-sm">
-                @for (item of filteredTargets(); track item.id) {
-                    <tr class="hover:bg-blue-50">
-                        <td class="p-4 font-bold">{{ dataService.getProductName(item.product_id) }}</td>
-                        <td class="p-4">{{ item.year }}</td>
-                        <td class="p-4 text-right font-bold text-hawy-blue">{{ item.annual_target | currency:'AED ':'symbol':'1.0-0' }}</td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+      <div class="bg-white p-4 rounded-xl shadow-sm mb-6 border border-gray-100 flex flex-wrap gap-4 items-end">
+          <div class="flex-1 min-w-[200px]">
+              <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Search Product</label>
+              <input type="text" [ngModel]="searchText()" (ngModelChange)="searchText.set($event)" placeholder="Search..."
+                     class="w-full bg-slate-50 border-0 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#1e3a8a] outline-none">
+          </div>
+          <div class="w-48">
+              <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Fiscal Year</label>
+              <select [ngModel]="selectedYear()" (ngModelChange)="selectedYear.set($event)" class="w-full bg-slate-50 border-0 rounded-lg px-3 py-2 outline-none">
+                  <option [ngValue]="null">All Years</option>
+                  <option [ngValue]="2024">2024</option>
+                  <option [ngValue]="2025">2025</option>
+                  <option [ngValue]="2026">2026</option>
+              </select>
+          </div>
+          <button (click)="openModal()" class="bg-[#1e3a8a] text-white px-6 py-2 rounded-lg font-bold shadow-md hover:bg-blue-900 transition">+ Add Target</button>
+      </div>
+
+      <div class="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100">
+          <table class="w-full text-left border-collapse">
+              <thead class="bg-slate-50 text-[10px] text-gray-400 font-black uppercase tracking-widest border-b border-slate-100">
+                  <tr>
+                      <th class="p-5">Product Name</th>
+                      <th class="p-5 text-center">Year</th>
+                      <th class="p-5 text-right">Annual Target</th>
+                      <th class="p-5 text-center">Actions</th>
+                  </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-50 text-sm">
+                  @for (item of filteredTargets(); track item.id) {
+                      <tr class="hover:bg-blue-50/50 transition duration-150">
+                          <td class="p-5 font-bold text-slate-700">{{ dataService.getProductName(item.product_id) }}</td>
+                          <td class="p-5 text-center">
+                            <span class="bg-slate-100 px-3 py-1 rounded-full text-xs font-bold text-slate-600">{{ item.year }}</span>
+                          </td>
+                          <td class="p-5 text-right font-black text-[#1e3a8a]">{{ item.annual_target | currency:'USD ':'symbol':'1.0-0' }}</td>
+                          <td class="p-5 text-center">
+                              <button (click)="editItem(item)" class="text-slate-400 hover:text-[#1e3a8a] transition">
+                                  <span class="material-icons text-base">edit</span>
+                              </button>
+                          </td>
+                      </tr>
+                  }
+                  @empty {
+                      <tr>
+                        <td colspan="4" class="p-10 text-center text-slate-400 italic">No targets found.</td>
+                      </tr>
+                  }
+              </tbody>
+          </table>
+      </div>
     </div>
 
     @if (showModal) {
-        <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
-            <div class="bg-white p-8 rounded-2xl w-full max-w-md shadow-2xl">
-                <h3 class="font-bold text-xl mb-4">Set New Target</h3>
+        <div class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div class="bg-white p-8 rounded-[2rem] w-full max-w-md shadow-2xl animate-fade-in">
+                <div class="flex justify-between items-center mb-6">
+                  <h3 class="font-black text-xl text-slate-800 uppercase tracking-tight">
+                    {{ isEditMode ? 'Update Target' : 'New Target' }}
+                  </h3>
+                  <button (click)="showModal=false" class="text-slate-400 hover:text-rose-500 transition">
+                    <span class="material-icons">close</span>
+                  </button>
+                </div>
+
                 <div class="space-y-4">
                     <div>
-                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Product</label>
-                        <select [(ngModel)]="newItem.product_id" class="w-full p-3 bg-gray-50 rounded-lg border-0 focus:ring-2 focus:ring-hawy-blue">
+                        <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Product</label>
+                        <select [(ngModel)]="currentItem.product_id" class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a]">
                              @for (p of dataService.products(); track p.product_id) {
                                 <option [value]="p.product_id">{{ p.product_name }}</option>
                              }
                         </select>
                     </div>
-                    <div>
-                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Year</label>
-                        <input type="number" [(ngModel)]="newItem.year" class="w-full p-3 bg-gray-50 rounded-lg border-0">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Target Amount</label>
-                        <input type="number" [(ngModel)]="newItem.annual_target" class="w-full p-3 bg-gray-50 rounded-lg border-0 focus:ring-2 focus:ring-hawy-blue">
+                    <div class="grid grid-cols-2 gap-4">
+                      <div>
+                          <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Year</label>
+                          <input type="number" [(ngModel)]="currentItem.year" class="w-full p-3 bg-slate-50 rounded-xl border-0 focus:ring-2 focus:ring-[#1e3a8a] outline-none">
+                      </div>
+                      <div>
+                          <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Value ($)</label>
+                          <input type="number" [(ngModel)]="currentItem.annual_target" class="w-full p-3 bg-slate-50 rounded-xl border-0 font-bold focus:ring-2 focus:ring-[#1e3a8a] outline-none">
+                      </div>
                     </div>
                 </div>
-                <div class="mt-6 flex justify-end gap-3">
-                    <button (click)="showModal=false" class="px-4 py-2 text-gray-500">Cancel</button>
-                    <button (click)="save()" class="px-6 py-2 bg-hawy-blue text-white rounded-lg">Save</button>
+                <div class="mt-8 flex gap-3">
+                    <button (click)="showModal=false" class="flex-1 py-3 text-slate-400 font-bold uppercase text-[10px] tracking-widest hover:bg-slate-50 rounded-xl transition">Cancel</button>
+                    <button (click)="save()" class="flex-[2] py-3 bg-[#1e3a8a] text-white rounded-xl font-black shadow-lg shadow-blue-200 uppercase text-[10px] tracking-widest hover:bg-blue-900 transition">
+                      {{ isEditMode ? 'Update target' : 'Save target' }}
+                    </button>
                 </div>
             </div>
         </div>
@@ -76,31 +119,55 @@ import { CommonModule } from "@angular/common";
 })
 export class TargetManagerComponent {
   public dataService = inject(DataService);
-  showModal = false;
-  selectedYear = signal<number|null>(2026); // عرض 2026 كإعداد افتراضي
 
-  // البنية المحدثة بدون country
-  newItem: FactTarget = { product_id: 1, year: 2026, annual_target: 0 };
+  showModal = false;
+  isEditMode = false;
+  searchText = signal('');
+  selectedYear = signal<number | null>(2025);
+
+  // الكائن الحالي المستخدم في النموذج (إما جديد أو قيد التعديل)
+  currentItem: FactTarget = { product_id: 1, year: 2025, annual_target: 0 };
 
   filteredTargets = computed(() => {
-    const data = this.dataService.targets();
-    const year = this.selectedYear();
-    if (!year) return data;
-    return data.filter(t => t.year === year);
+    let data = this.dataService.targets();
+    if (this.selectedYear()) data = data.filter(t => t.year === this.selectedYear());
+
+    const text = this.searchText().toLowerCase();
+    if (text) {
+      data = data.filter(t =>
+        this.dataService.getProductName(t.product_id).toLowerCase().includes(text)
+      );
+    }
+    return data;
   });
 
+  totalTargetAmount = computed(() =>
+    this.filteredTargets().reduce((sum, item) => sum + (Number(item.annual_target) || 0), 0)
+  );
+
   openModal() {
-    this.newItem = { product_id: 1, year: 2026, annual_target: 0 };
+    this.isEditMode = false;
+    this.currentItem = { product_id: 1, year: 2025, annual_target: 0 };
+    this.showModal = true;
+  }
+
+  editItem(item: FactTarget) {
+    this.isEditMode = true;
+    this.currentItem = { ...item }; // نأخذ نسخة لعدم تعديل الأصل مباشرة قبل الحفظ
     this.showModal = true;
   }
 
   async save() {
-    const { data, error } = await this.dataService.addTarget({ ...this.newItem });
-    if (data) {
-      this.showModal = false;
-    } else if (error) {
-      console.error('Error:', error);
-      alert('Failed to save.');
+    if (this.isEditMode) {
+      // استدعاء دالة التحديث في الـ Service
+      const { data, error } = await this.dataService.updateTarget(this.currentItem);
+      if (data) this.showModal = false;
+      else if (error) alert('Error updating target');
+    } else {
+      // استدعاء دالة الإضافة
+      const { data, error } = await this.dataService.addTarget(this.currentItem);
+      if (data) this.showModal = false;
+      else if (error) alert('Error adding target');
     }
   }
 }

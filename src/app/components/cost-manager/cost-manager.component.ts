@@ -31,8 +31,8 @@ import { DataService } from '../../services/data.service';
                 @for (item of dataService.costs(); track item.id) {
                     <tr class="hover:bg-red-50 transition">
                         <td class="p-4 font-mono text-gray-600">
-                          {{ item.date | date: 'dd/MM/yyyy' }}
-                          <div class="text-[10px] text-gray-400">{{ item.year }} - M{{ item.month }}</div>
+                          {{ item.date | date: 'MMM-yyyy' }}
+                          <!-- <div class="text-[10px] text-gray-400">{{ item.year }} - M{{ item.month }}</div> -->
                         </td>
                         <td class="p-4 font-bold">{{ dataService.getClientName(item.client_id!) }}</td>
                         <td class="p-4">
@@ -40,7 +40,7 @@ import { DataService } from '../../services/data.service';
                             {{ dataService.getProductName(item.product_id!) }}
                           </span>
                         </td>
-                        <td class="p-4 text-right font-bold text-red-600">{{ item.amount | currency:'AED ':'symbol':'1.0-0' }}</td>
+                        <td class="p-4 text-right font-bold text-red-600">{{ item.amount | currency:'$ ':'symbol':'1.0-0' }}</td>
                         <td class="p-4 text-center">
                             <button (click)="editItem(item)" class="text-blue-600 hover:text-blue-800 font-medium text-xs uppercase cursor-pointer">
                                 Edit

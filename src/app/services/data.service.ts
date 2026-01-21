@@ -25,39 +25,30 @@ export class DataService {
   // جلب البيانات الأولية عند تشغيل التطبيق
   async fetchInitialData() {
     try {
-      // 1. جلب الإيرادات
       const { data: rev } = await this.supabase.from('fact_revenue').select('*');
       if (rev) this.revenues.set(rev);
 
-      // 2. جلب المنتجات
       const { data: prod } = await this.supabase.from('dim_product').select('*');
       if (prod) this.products.set(prod);
 
-      // 3. جلب العملاء
       const { data: cli } = await this.supabase.from('dim_client').select('*');
       if (cli) this.clients.set(cli);
 
-      // 4. جلب التكاليف
       const { data: cst } = await this.supabase.from('fact_cost').select('*');
       if (cst) this.costs.set(cst);
 
-      // 5. جلب الـ Pipeline
       const { data: pipe } = await this.supabase.from('fact_pipeline').select('*');
       if (pipe) this.pipelines.set(pipe);
 
-      // 6. --- الإصلاح هنا: جلب بيانات التارجت ---
       const { data: targ } = await this.supabase.from('fact_target_annual').select('*');
-      if (targ) {
-        this.targets.set(targ);
-        console.log('Targets fetched successfully:', targ);
-      }
+      if (targ) this.targets.set(targ);
 
     } catch (error) {
       console.error('Error fetching data:', error);
     }
   }
 
-  // دوال الإضافة (CRUD)
+  // --- دوال الإضافة (Create) ---
   async addRevenue(item: FactRevenue) {
     const { data, error } = await this.supabase.from('fact_revenue').insert([item]).select();
     if (data) this.revenues.update(v => [data[0], ...v]);
@@ -76,8 +67,30 @@ export class DataService {
     return { data, error };
   }
 
+  // --- دوال التحديث (Update) ---
+
+  // 1. تحديث التارجت (حل المشكلة المطلوبة)
+  async updateTarget(item: FactTarget) {
+    if (!item.id) return { data: null, error: 'No ID provided' };
+    const { data, error } = await this.supabase
+      .from('fact_target_annual')
+      .update({
+        product_id: item.product_id,
+        year: item.year,
+        annual_target: item.annual_target
+      })
+      .eq('id', item.id)
+      .select();
+
+    if (data) {
+      this.targets.update(v => v.map(t => t.id === item.id ? data[0] : t));
+    }
+    return { data, error };
+  }
+
+  // 2. تحديث التكاليف
   async updateCost(item: FactCost) {
-    if (!item.id) return;
+    if (!item.id) return { data: null, error: 'No ID provided' };
     const { data, error } = await this.supabase
       .from('fact_cost')
       .update({
@@ -98,7 +111,27 @@ export class DataService {
     return { data, error };
   }
 
-  // خرائط مساعدة للتحويل من ID إلى Name
+  // 3. تحديث الإيرادات
+  async updateRevenue(item: FactRevenue) {
+    if (!item.id) return { data: null, error: 'No ID provided' };
+    const { data, error } = await this.supabase
+      .from('fact_revenue')
+      .update({
+        date: item.date,
+        product_id: item.product_id,
+        country: item.country,
+        gross_amount: item.gross_amount
+      })
+      .eq('id', item.id)
+      .select();
+
+    if (data) {
+      this.revenues.update(v => v.map(r => r.id === item.id ? data[0] : r));
+    }
+    return { data, error };
+  }
+
+  // --- مساعدة استخراج الأسماء ---
   productsMap = computed(() => {
     const map = new Map<number, string>();
     this.products().forEach(p => map.set(p.product_id, p.product_name));
@@ -110,22 +143,7 @@ export class DataService {
     this.clients().forEach(c => map.set(c.client_id, c.client_name));
     return map;
   });
-async updateRevenue(item: FactRevenue) {
-  const { data, error } = await this.supabase
-    .from('fact_revenue')
-    .update({
-      date: item.date,
-      product_id: item.product_id,
-      country: item.country,
-      gross_amount: item.gross_amount
-    })
-    .eq('id', item.id)
-    .select();
 
-  if (data) {
-    this.revenues.update(v => v.map(r => r.id === item.id ? data[0] : r));
-  }
-}
   getProductName(id: number): string { return this.productsMap().get(id) || `Product ${id}`; }
   getClientName(id: number): string { return this.clientsMap().get(id) || `Client ${id}`; }
 }

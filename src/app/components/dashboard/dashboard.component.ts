@@ -11,10 +11,11 @@ import Chart from 'chart.js/auto';
   imports: [CommonModule, FormsModule],
   template: `
     <div class="p-6 bg-[#f8fafc] min-h-screen font-sans text-slate-800">
+
       <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-        <h1 class="text-2xl font-black tracking-tight text-slate-900 uppercase">Financial Center</h1>
+        <h1 class="text-2xl font-black tracking-tight text-slate-900 uppercase italic">Financial Command Center</h1>
         <div class="flex items-center gap-3 bg-white p-2 rounded-2xl shadow-sm border border-slate-100">
-          <span class="text-[10px] font-black text-slate-400 ml-3 uppercase">Year Selection</span>
+          <span class="text-[10px] font-black text-slate-400 ml-3 uppercase tracking-widest">Fiscal Year</span>
           <select [ngModel]="selectedYear()" (ngModelChange)="onYearChange($event)"
                   class="bg-slate-50 border-0 rounded-xl px-4 py-2 font-bold text-blue-600 outline-none focus:ring-2 focus:ring-blue-500 transition-all cursor-pointer">
             @for (year of yearsList(); track year) {
@@ -31,7 +32,7 @@ import Chart from 'chart.js/auto';
             <span class="text-[10px] font-black bg-blue-100 text-blue-700 px-2 py-1 rounded-lg uppercase">Gross</span>
           </div>
           <h3 class="text-slate-400 text-xs font-bold uppercase tracking-wider">Total Revenue</h3>
-          <div class="text-2xl font-black mt-1">{{ stats().revenue | currency:'AED ':'symbol':'1.0-0' }}</div>
+          <div class="text-2xl font-black mt-1">{{ stats().revenue | currency:'$ ':'symbol':'1.0-0' }}</div>
         </div>
 
         <div class="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 group hover:border-rose-500 transition-all duration-300">
@@ -40,7 +41,7 @@ import Chart from 'chart.js/auto';
             <span class="text-[10px] font-black bg-rose-100 text-rose-700 px-2 py-1 rounded-lg uppercase">Expenses</span>
           </div>
           <h3 class="text-slate-400 text-xs font-bold uppercase tracking-wider">Total Costs</h3>
-          <div class="text-2xl font-black mt-1">{{ stats().cost | currency:'AED ':'symbol':'1.0-0' }}</div>
+          <div class="text-2xl font-black mt-1">{{ stats().cost | currency:'$ ':'symbol':'1.0-0' }}</div>
         </div>
 
         <div class="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 group hover:border-emerald-500 transition-all duration-300">
@@ -49,7 +50,7 @@ import Chart from 'chart.js/auto';
             <span class="text-[10px] font-black bg-emerald-100 text-emerald-700 px-2 py-1 rounded-lg uppercase">Net</span>
           </div>
           <h3 class="text-slate-400 text-xs font-bold uppercase tracking-wider">Net Profit</h3>
-          <div class="text-2xl font-black" [class.text-rose-600]="stats().profit < 0">{{ stats().profit | currency:'AED ':'symbol':'1.0-0' }}</div>
+          <div class="text-2xl font-black" [class.text-rose-600]="stats().profit < 0">{{ stats().profit | currency:'$ ':'symbol':'1.0-0' }}</div>
         </div>
 
         <div class="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 group hover:border-amber-500 transition-all duration-300">
@@ -64,7 +65,7 @@ import Chart from 'chart.js/auto';
 
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-12">
         <div class="lg:col-span-8 bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
-           <h3 class="font-black text-slate-800 mb-6 flex items-center gap-2 italic uppercase text-sm tracking-widest"><span class="w-2 h-6 bg-blue-600 rounded-full"></span> Cash Flow</h3>
+           <h3 class="font-black text-slate-800 mb-6 flex items-center gap-2 italic uppercase text-sm tracking-widest"><span class="w-2 h-6 bg-blue-600 rounded-full"></span> Monthly Performance</h3>
            <div class="h-[300px]"><canvas id="mainChart"></canvas></div>
         </div>
 
@@ -94,7 +95,7 @@ import Chart from 'chart.js/auto';
           <table class="w-full text-left border-collapse">
             <thead>
               <tr class="bg-slate-50 text-slate-400 uppercase text-[10px] font-black tracking-widest border-b border-slate-100">
-                <th class="p-5 sticky left-0 bg-slate-50 z-10">Category / Product</th>
+                <th class="p-5 sticky left-0 bg-slate-50 z-10 min-w-[180px]">Category / Product</th>
                 @for (m of monthNames; track m) {
                   <th class="p-3 text-center">{{ m }}</th>
                 }
@@ -217,24 +218,48 @@ export class DashboardComponent implements AfterViewInit {
   }
 
   private initCharts() {
+    // 1. Line Chart
     this.charts.main = new Chart('mainChart', {
       type: 'line',
       data: this.getMainChartData(),
       options: { responsive: true, maintainAspectRatio: false }
     });
+
+    // 2. Donut Chart (Fixed Mix)
     this.charts.donut = new Chart('productProfitChart', {
       type: 'doughnut',
       data: this.getDonutData(),
-      options: { responsive: true, maintainAspectRatio: false, cutout: '75%' }
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '75%',
+        plugins: {
+          legend: { position: 'bottom', labels: { usePointStyle: true, font: { size: 10 } } }
+        }
+      }
     });
+
+    // 3. Performance Bar Chart (The Fix)
     this.charts.targetVsActual = new Chart('targetVsActualChart', {
       type: 'bar',
       data: this.getTargetVsActualData(),
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { position: 'bottom' } },
-        scales: { y: { beginAtZero: true } }
+        plugins: {
+          legend: { position: 'bottom' },
+          tooltip: {
+             callbacks: {
+               label: (c) => `${c.dataset.label}: ${c.raw?.toLocaleString()} AED`
+             }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: { callback: (v) => v.toLocaleString() }
+          }
+        }
       }
     });
   }
@@ -257,17 +282,19 @@ export class DashboardComponent implements AfterViewInit {
   }
 
   private getDonutData() {
-    const activeData = this.summaryData().filter(p => p.total > 0);
+    const data = this.summaryData().filter(p => p.total > 0).sort((a,b) => b.total - a.total);
     return {
-      labels: activeData.map(p => p.name),
+      labels: data.map(p => p.name),
       datasets: [{
-        data: activeData.map(p => p.total),
-        backgroundColor: ['#1e3a8a', '#2563eb', '#60a5fa', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6']
+        data: data.map(p => p.total),
+        backgroundColor: ['#1e3a8a', '#2563eb', '#60a5fa', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6'],
+        borderWidth: 2
       }]
     };
   }
 
   private getTargetVsActualData() {
+    // تصفية المنتجات التي تملك إيرادات أو أهداف للسنة المختارة لضمان بقاء الشارت نظيفاً
     const data = this.summaryData().filter(p => p.total > 0 || p.target > 0);
     return {
       labels: data.map(p => p.name),
@@ -275,16 +302,18 @@ export class DashboardComponent implements AfterViewInit {
         {
           label: 'Annual Target',
           data: data.map(p => p.target),
-          backgroundColor: 'rgba(245, 158, 11, 0.2)',
+          backgroundColor: 'rgba(245, 158, 11, 0.25)', // لون برتقالي شفاف (تارغت)
           borderColor: '#f59e0b',
           borderWidth: 1,
-          borderRadius: 8
+          borderRadius: 6,
+          barPercentage: 0.8
         },
         {
           label: 'Actual Revenue',
           data: data.map(p => p.total),
-          backgroundColor: '#2563eb',
-          borderRadius: 8
+          backgroundColor: '#2563eb', // لون أزرق صريح (إيراد محقق)
+          borderRadius: 6,
+          barPercentage: 0.8
         }
       ]
     };
