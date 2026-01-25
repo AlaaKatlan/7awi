@@ -1,0 +1,168 @@
+<div class="p-4 bg-[#f8fafc] min-h-screen">
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+      <div class="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-[#1e3a8a]">
+          <h3 class="text-gray-400 text-sm font-medium uppercase">Total Transactions</h3>
+          <p class="text-3xl font-black text-gray-800 mt-2">{{ filteredRevenues().length }}</p>
+      </div>
+      <div class="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-green-500">
+          <h3 class="text-gray-400 text-sm font-medium uppercase">Total Gross (Filtered)</h3>
+          <p class="text-3xl font-black text-gray-800 mt-2">{{ totalGross() | currency:'USD ':'symbol':'1.0-0' }}</p>
+      </div>
+  </div>
+
+  <div class="bg-white p-6 rounded-xl shadow-sm mb-6 border border-gray-100">
+      <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 items-end">
+          <div class="lg:col-span-2">
+              <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Search</label>
+              <input type="text" [ngModel]="searchText()" (ngModelChange)="searchText.set($event)" placeholder="Search anything..."
+                     class="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#1e3a8a] outline-none transition text-sm">
+          </div>
+
+          <div>
+              <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Product</label>
+              <select [ngModel]="filterProduct()" (ngModelChange)="filterProduct.set($event)" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 outline-none text-sm focus:ring-2 focus:ring-[#1e3a8a]">
+                  <option [ngValue]="null">All Products</option>
+                  @for (p of dataService.products(); track p.product_id) {
+                      <option [ngValue]="p.product_id">{{ p.product_name }}</option>
+                  }
+              </select>
+          </div>
+
+          <div>
+              <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Month</label>
+              <select [ngModel]="filterMonth()" (ngModelChange)="filterMonth.set($event)" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 outline-none text-sm focus:ring-2 focus:ring-[#1e3a8a]">
+                  <option [ngValue]="null">All Months</option>
+                  @for (m of months; track m.value) {
+                      <option [ngValue]="m.value">{{ m.name }}</option>
+                  }
+              </select>
+          </div>
+
+          <div>
+              <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Year</label>
+              <select [ngModel]="filterYear()" (ngModelChange)="filterYear.set($event)" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 outline-none text-sm focus:ring-2 focus:ring-[#1e3a8a]">
+                  <option [ngValue]="null">All Years</option>
+                  @for (year of yearsList(); track year) {
+                    <option [ngValue]="year">{{ year }}</option>
+                  }
+              </select>
+          </div>
+
+          <div>
+              <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Country</label>
+              <select [ngModel]="filterCountry()" (ngModelChange)="filterCountry.set($event)" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 outline-none text-sm focus:ring-2 focus:ring-[#1e3a8a]">
+                  <option value="ALL">All Countries</option>
+                  <option value="UAE">UAE</option>
+                  <option value="KSA">KSA</option>
+              </select>
+          </div>
+      </div>
+
+      <div class="mt-4 flex justify-end">
+           <button (click)="openModal()" class="bg-[#1e3a8a] hover:bg-blue-900 text-white px-6 py-2 rounded-lg shadow-md transition flex items-center text-sm font-bold">
+              <span class="material-icons mr-2 text-base">add</span> Add Booking Order
+          </button>
+      </div>
+  </div>
+
+  <div class="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100">
+      <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+              <thead class="bg-slate-50 text-gray-400 uppercase text-[10px] font-black tracking-widest border-b border-slate-100">
+                  <tr>
+                      <th class="p-5">Date</th>
+                      <th class="p-5">Product</th>
+                      <th class="p-5">Country</th>
+                      <th class="p-5 text-right">Gross Amount</th>
+                      <th class="p-5 text-center">Action</th>
+                  </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100 text-sm text-gray-700">
+                  @for (item of filteredRevenues(); track item.id) {
+                      <tr class="hover:bg-blue-50/50 transition duration-150">
+                          <td class="p-5">
+                              <div class="font-black text-slate-800">{{ item.date | date: 'MMM yyyy' }}</div>
+                              <div class="text-[10px] text-gray-400">{{ item.date | date: 'dd/MM/yyyy' }}</div>
+                          </td>
+                          <td class="p-5">
+                              <span class="bg-blue-50 text-[#1e3a8a] px-3 py-1 rounded-full text-[11px] font-black uppercase">
+                                  {{ dataService.getProductName(item.product_id) }}
+                              </span>
+                          </td>
+                          <td class="p-5">
+                              <span [class]="item.country === 'UAE' ? 'text-green-600' : 'text-orange-600'" class="text-xs font-black">
+                                  {{ item.country }}
+                              </span>
+                          </td>
+                          <td class="p-5 text-right font-black text-slate-900 text-base">{{ item.gross_amount | currency:'USD ':'symbol':'1.0-0' }}</td>
+                          <td class="p-5 text-center">
+                              <button (click)="editItem(item)" class="text-gray-300 hover:text-[#1e3a8a] transition">
+                                  <span class="material-icons text-base">edit</span>
+                              </button>
+                          </td>
+                      </tr>
+                  }
+              </tbody>
+          </table>
+      </div>
+  </div>
+</div>
+
+@if (showModal) {
+    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-lg rounded-[2rem] shadow-2xl p-8 animate-fade-in">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-black text-slate-800 uppercase tracking-tight">{{ isEditMode ? 'Update Entry' : 'New Booking Order' }}</h2>
+                <button (click)="closeModal()" class="text-gray-400 hover:text-rose-500 transition"><span class="material-icons">close</span></button>
+            </div>
+
+            <div class="space-y-5">
+                <div>
+                    <label class="block text-[10px] font-black text-gray-400 uppercase mb-2">Booking Period (Month & Year)</label>
+                    <div class="grid grid-cols-2 gap-4">
+                        <select [(ngModel)]="modalMonth" class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none text-sm font-bold focus:ring-2 focus:ring-[#1e3a8a]">
+                            @for (m of months; track m.value) {
+                                <option [ngValue]="m.value">{{ m.name }}</option>
+                            }
+                        </select>
+                        <select [(ngModel)]="modalYear" class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none text-sm font-bold focus:ring-2 focus:ring-[#1e3a8a]">
+                            @for (year of yearsList(); track year) {
+                                <option [ngValue]="year">{{ year }}</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-[10px] font-black text-gray-400 uppercase mb-2">Product Category</label>
+                    <select [(ngModel)]="currentItem.product_id" class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none font-bold focus:ring-2 focus:ring-[#1e3a8a]">
+                        @for (prod of dataService.products(); track prod.product_id) {
+                            <option [value]="prod.product_id">{{ prod.product_name }}</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                      <label class="block text-[10px] font-black text-gray-400 uppercase mb-2">Region/Country</label>
+                      <select [(ngModel)]="currentItem.country" class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none font-bold focus:ring-2 focus:ring-[#1e3a8a]">
+                          <option value="UAE">UAE</option>
+                          <option value="KSA">KSA</option>
+                      </select>
+                  </div>
+                  <div>
+                      <label class="block text-[10px] font-black text-gray-400 uppercase mb-2">Gross Amount ($)</label>
+                      <input [(ngModel)]="currentItem.gross_amount" type="number" class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none font-black text-lg text-[#1e3a8a]">
+                  </div>
+                </div>
+            </div>
+
+            <div class="mt-8 flex gap-3">
+                <button (click)="closeModal()" class="flex-1 py-3 rounded-xl text-gray-400 font-bold hover:bg-slate-50 transition uppercase text-xs">Cancel</button>
+                <button (click)="save()" class="flex-[2] py-3 rounded-xl bg-[#1e3a8a] text-white font-black shadow-lg shadow-blue-200 hover:bg-blue-900 transition uppercase text-xs">
+                    {{ isEditMode ? 'Update Now' : 'Confirm & Save' }}
+                </button>
+            </div>
+        </div>
+    </div>
+}
