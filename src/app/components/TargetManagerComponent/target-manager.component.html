@@ -5,7 +5,7 @@
       <p class="text-3xl font-black text-gray-800 mt-2">{{ filteredTargets().length }}</p>
     </div>
     <div class="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-amber-500">
-      <h3 class="text-gray-400 text-sm font-medium uppercase">Total Yearly target</h3>
+      <h3 class="text-gray-400 text-sm font-medium uppercase">Total Scope Target</h3>
       <p class="text-3xl font-black text-gray-800 mt-2">{{ totalTargetAmount() | currency:'USD ':'symbol':'1.0-0' }}</p>
     </div>
   </div>
@@ -16,18 +16,34 @@
       <input type="text" [ngModel]="searchText()" (ngModelChange)="searchText.set($event)" placeholder="Search..."
         class="w-full bg-slate-50 border-0 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#1e3a8a] outline-none">
     </div>
-    <div class="w-48">
+
+    <div class="w-32">
       <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Fiscal Year</label>
       <select [ngModel]="selectedYear()" (ngModelChange)="selectedYear.set($event)"
-        class="w-full bg-slate-50 border-0 rounded-lg px-3 py-2 outline-none">
+        class="w-full bg-slate-50 border-0 rounded-lg px-3 py-2 outline-none cursor-pointer">
         <option [ngValue]="null">All Years</option>
         @for (year of yearsList(); track year) {
           <option [ngValue]="year">{{ year }}</option>
         }
       </select>
     </div>
+
+    <div class="w-44">
+      <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Quarterly Scope</label>
+      <select [ngModel]="selectedQuarter()" (ngModelChange)="selectedQuarter.set($event)"
+        class="w-full bg-slate-50 border-0 rounded-lg px-3 py-2 outline-none cursor-pointer">
+        <option [ngValue]="null">Full Year / Annual</option>
+        <option [ngValue]="1">Q1 (Jan - Mar)</option>
+        <option [ngValue]="2">Q2 (Apr - Jun)</option>
+        <option [ngValue]="3">Q3 (Jul - Sep)</option>
+        <option [ngValue]="4">Q4 (Oct - Dec)</option>
+      </select>
+    </div>
+
     <button (click)="openModal()"
-      class="bg-[#1e3a8a] text-white px-6 py-2 rounded-lg font-bold shadow-md hover:bg-blue-900 transition">+ Add Target</button>
+      class="bg-[#1e3a8a] text-white px-6 py-2 rounded-lg font-bold shadow-md hover:bg-blue-900 transition flex items-center gap-2">
+      <span class="material-icons text-sm">add</span> Add Target
+    </button>
   </div>
 
   <div class="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100">
@@ -36,7 +52,8 @@
         <tr>
           <th class="p-5">Product Name</th>
           <th class="p-5 text-center">Year</th>
-          <th class="p-5 text-right">Annual Target</th>
+          <th class="p-5 text-center">Period</th>
+          <th class="p-5 text-right">Target Value</th>
           <th class="p-5 text-center">Actions</th>
         </tr>
       </thead>
@@ -47,9 +64,15 @@
           <td class="p-5 text-center">
             <span class="bg-slate-100 px-3 py-1 rounded-full text-xs font-bold text-slate-600">{{ item.year }}</span>
           </td>
+          <td class="p-5 text-center">
+            <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase"
+                  [ngClass]="item.quarter ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-500'">
+              {{ item.quarter ? 'Q' + item.quarter : 'Annual' }}
+            </span>
+          </td>
           <td class="p-5 text-right font-black text-[#1e3a8a]">{{ item.annual_target | currency:'USD ':'symbol':'1.0-0' }}</td>
           <td class="p-5 text-center">
-            <button (click)="editItem(item)" class="text-slate-400 hover:text-[#1e3a8a] transition">
+            <button (click)="editItem(item)" class="text-slate-400 hover:text-[#1e3a8a] transition p-2">
               <span class="material-icons text-base">edit</span>
             </button>
           </td>
@@ -57,7 +80,7 @@
         }
         @empty {
         <tr>
-          <td colspan="4" class="p-10 text-center text-slate-400 italic">No targets found.</td>
+          <td colspan="5" class="p-10 text-center text-slate-400 italic">No targets found matching current criteria.</td>
         </tr>
         }
       </tbody>
@@ -66,8 +89,8 @@
 </div>
 
 @if (showModal) {
-<div class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-  <div class="bg-white p-8 rounded-[2rem] w-full max-w-md shadow-2xl animate-fade-in">
+<div class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+  <div class="bg-white p-8 rounded-[2rem] w-full max-w-lg shadow-2xl">
     <div class="flex justify-between items-center mb-6">
       <h3 class="font-black text-xl text-slate-800 uppercase tracking-tight">
         {{ isEditMode ? 'Update Target' : 'New Target' }}
@@ -81,13 +104,14 @@
       <div>
         <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Product</label>
         <select [(ngModel)]="currentItem.product_id"
-          class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a]">
+          class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a] cursor-pointer">
           @for (p of dataService.products(); track p.product_id) {
           <option [value]="p.product_id">{{ p.product_name }}</option>
           }
         </select>
       </div>
-      <div class="grid grid-cols-2 gap-4">
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Year</label>
           <select [(ngModel)]="currentItem.year"
@@ -97,6 +121,19 @@
             }
           </select>
         </div>
+
+        <div>
+          <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Quarter</label>
+          <select [(ngModel)]="currentItem.quarter"
+            class="w-full p-3 bg-slate-50 rounded-xl border-0 focus:ring-2 focus:ring-[#1e3a8a] outline-none cursor-pointer">
+            <option [ngValue]="null">Annual</option>
+            <option [ngValue]="1">Q1</option>
+            <option [ngValue]="2">Q2</option>
+            <option [ngValue]="3">Q3</option>
+            <option [ngValue]="4">Q4</option>
+          </select>
+        </div>
+
         <div>
           <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Value ($)</label>
           <input type="number" [(ngModel)]="currentItem.annual_target"
@@ -104,12 +141,13 @@
         </div>
       </div>
     </div>
+
     <div class="mt-8 flex gap-3">
       <button (click)="showModal=false"
         class="flex-1 py-3 text-slate-400 font-bold uppercase text-[10px] tracking-widest hover:bg-slate-50 rounded-xl transition">Cancel</button>
       <button (click)="save()"
         class="flex-[2] py-3 bg-[#1e3a8a] text-white rounded-xl font-black shadow-lg shadow-blue-200 uppercase text-[10px] tracking-widest hover:bg-blue-900 transition">
-        {{ isEditMode ? 'Update target' : 'Save target' }}
+        {{ isEditMode ? 'Update Target' : 'Save Target' }}
       </button>
     </div>
   </div>

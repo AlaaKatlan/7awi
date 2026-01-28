@@ -2,6 +2,7 @@ export interface DimProduct {
   product_id: number;
   product_name: string;
   category?: string;
+  department_id?: number;
 }
 
 export interface DimClient {
@@ -33,10 +34,11 @@ export interface FactPipeline {
 }
 export interface FactTarget {
   id?: number;
-  product_id: number;
   year: number;
+  product_id: number;
   annual_target: number;
- }
+ quarter?: number | null;
+}
 export interface FactCost {
   id?: number;
   date: string;
@@ -46,4 +48,20 @@ export interface FactCost {
   product_id?: number;
   client_id?: number;
   description?: string;
+}
+export interface DimDepartment {
+  department_id: number;
+  department_name: string;
+}
+
+export interface DimEmployee {
+  employee_id: number;
+  name: string;
+  salary: number;
+  salary_aed: number;
+  contract: string;
+  office: string;
+  start_date: string;
+  end_date: string | null;
+  department_id: number;
 }

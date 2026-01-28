@@ -1,7 +1,7 @@
 import { Injectable, signal, computed } from '@angular/core';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { environment } from '../environments/environment';
-import { DimClient, DimProduct, FactPipeline, FactRevenue, FactTarget, FactCost } from '../models/data.models';
+import { DimClient, DimProduct, FactPipeline, FactRevenue, FactTarget, FactCost, DimDepartment, DimEmployee } from '../models/data.models';
 
 @Injectable({
   providedIn: 'root'
@@ -16,7 +16,8 @@ export class DataService {
   clients = signal<DimClient[]>([]);
   targets = signal<FactTarget[]>([]);
   costs = signal<FactCost[]>([]);
-
+  departments = signal<DimDepartment[]>([]);
+  employees = signal<DimEmployee[]>([]);
   constructor() {
     this.supabase = createClient(environment.supabaseUrl, environment.supabaseKey);
     this.fetchInitialData();
@@ -42,6 +43,12 @@ export class DataService {
 
       const { data: targ } = await this.supabase.from('fact_target_annual').select('*');
       if (targ) this.targets.set(targ);
+
+      const { data: dept } = await this.supabase.from('dim_department').select('*');
+      if (dept) this.departments.set(dept);
+
+      const { data: empl } = await this.supabase.from('dim_employee').select('*');
+      if (empl) this.employees.set(empl);
 
     } catch (error) {
       console.error('Error fetching data:', error);
