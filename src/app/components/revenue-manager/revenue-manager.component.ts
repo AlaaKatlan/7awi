@@ -20,7 +20,6 @@ export class RevenueManagerComponent {
   filterMonth = signal<number | null>(null);
   filterProduct = signal<number | null>(null);
   filterCountry = signal('ALL');
-  filterClient = signal<number | null>(null);
 
   showModal = false;
   isEditMode = false;
@@ -60,10 +59,6 @@ export class RevenueManagerComponent {
       data = data.filter(r => r.product_id === this.filterProduct());
     }
 
-    if (this.filterClient()) {
-      data = data.filter(r => r.client_id === this.filterClient());
-    }
-
     if (this.filterCountry() !== 'ALL') {
       data = data.filter(r => r.country === this.filterCountry());
     }
@@ -72,8 +67,7 @@ export class RevenueManagerComponent {
     if (text) {
       data = data.filter(r =>
         this.dataService.getProductName(r.product_id).toLowerCase().includes(text) ||
-        (r.order_number?.toLowerCase().includes(text)) ||
-        (r.client_id && this.dataService.getClientName(r.client_id).toLowerCase().includes(text))
+        (r.order_number?.toLowerCase().includes(text))
       );
     }
 
@@ -88,11 +82,9 @@ export class RevenueManagerComponent {
     return {
       date: '',
       product_id: this.dataService.products()[0]?.product_id || 1,
-      client_id: undefined,
       country: 'UAE',
       gross_amount: 0,
-      order_number: '',
-      notes: ''
+      order_number: ''
     };
   }
 

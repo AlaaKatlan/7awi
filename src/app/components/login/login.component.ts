@@ -7,11 +7,11 @@ import { AuthService } from '../../services/auth.service';
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [CommonModule, FormsModule,  ],
+  imports: [CommonModule, FormsModule, RouterLink],
   template: `
     <div class="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center p-4">
       <div class="absolute inset-0 bg-[url('data:image/svg+xml,...')] opacity-5"></div>
-
+      
       <div class="relative w-full max-w-md">
         <!-- Logo & Title -->
         <div class="text-center mb-8">
@@ -44,9 +44,9 @@ import { AuthService } from '../../services/auth.service';
             @if (isSignUp()) {
               <div>
                 <label class="block text-xs font-bold text-blue-200/70 uppercase tracking-wider mb-2">Full Name</label>
-                <input
-                  type="text"
-                  [(ngModel)]="fullName"
+                <input 
+                  type="text" 
+                  [(ngModel)]="fullName" 
                   name="fullName"
                   placeholder="Enter your full name"
                   class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
@@ -56,9 +56,9 @@ import { AuthService } from '../../services/auth.service';
 
             <div>
               <label class="block text-xs font-bold text-blue-200/70 uppercase tracking-wider mb-2">Email Address</label>
-              <input
-                type="email"
-                [(ngModel)]="email"
+              <input 
+                type="email" 
+                [(ngModel)]="email" 
                 name="email"
                 placeholder="Enter your email"
                 class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
@@ -67,9 +67,9 @@ import { AuthService } from '../../services/auth.service';
 
             <div>
               <label class="block text-xs font-bold text-blue-200/70 uppercase tracking-wider mb-2">Password</label>
-              <input
-                type="password"
-                [(ngModel)]="password"
+              <input 
+                type="password" 
+                [(ngModel)]="password" 
                 name="password"
                 placeholder="Enter your password"
                 class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
@@ -85,8 +85,8 @@ import { AuthService } from '../../services/auth.service';
               </div>
             }
 
-            <button
-              type="submit"
+            <button 
+              type="submit" 
               [disabled]="loading()"
               class="w-full py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white font-bold rounded-xl shadow-lg shadow-blue-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
               @if (loading()) {
@@ -127,7 +127,7 @@ export class LoginComponent {
   email = '';
   password = '';
   fullName = '';
-
+  
   isSignUp = signal(false);
   loading = signal(false);
   errorMessage = signal('');

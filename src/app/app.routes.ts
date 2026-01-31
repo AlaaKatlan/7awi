@@ -26,7 +26,7 @@ export const routes: Routes = [
       },
       {
         path: 'target',
-        loadComponent: () => import('./components/TargetManagerComponent/target-manager.component').then(m => m.TargetManagerComponent)
+        loadComponent: () => import('./components/target manager/target-manager.component').then(m => m.TargetManagerComponent)
       },
       {
         path: 'cost',

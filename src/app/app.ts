@@ -6,11 +6,11 @@ import { PipelineManagerComponent } from './components/pipeline-manager/pipeline
 import { CostManagerComponent } from './components/cost-manager/cost-manager.component';
 import { DataService } from './services/data.service';
 import { AuthService } from './services/auth.service';
-import { TargetManagerComponent } from './components/TargetManagerComponent/target-manager.component';
-import { DashboardComponent } from './components/dashboard/dashboard.component';
+ import { DashboardComponent } from './components/dashboard/dashboard.component';
 import { ClientManagerComponent } from './components/client-manager/client-manager.component';
 import { EmployeeManagerComponent } from './components/employee-manager/employee-manager.component';
 import { SalaryManagerComponent } from './components/salary-manager/salary-manager.component';
+import { TargetManagerComponent } from './components/target manager/target-manager.component';
 
 @Component({
   selector: 'app-root',
@@ -135,7 +135,7 @@ import { SalaryManagerComponent } from './components/salary-manager/salary-manag
               <p class="text-[10px] text-slate-400 uppercase">{{ authService.userProfile()?.role || 'User' }}</p>
             </div>
           </div>
-          <button (click)="logout()" 
+          <button (click)="logout()"
                   [title]="!sidebarOpen ? 'Logout' : ''"
                   class="w-full flex items-center justify-center gap-2 px-4 py-2 text-rose-500 hover:bg-rose-50 rounded-xl transition font-medium">
             <span class="material-icons text-sm">logout</span>
@@ -143,10 +143,10 @@ import { SalaryManagerComponent } from './components/salary-manager/salary-manag
           </button>
         </div>
 
-        <div *ngIf="sidebarOpen" class="p-4 bg-blue-50 border-t border-gray-100 text-center transition-opacity duration-300">
+        <!-- <div *ngIf="sidebarOpen" class="p-4 bg-blue-50 border-t border-gray-100 text-center transition-opacity duration-300">
             <p class="text-xs text-hawy-blue font-bold uppercase tracking-widest">Live System</p>
             <p class="text-[10px] text-gray-400 mt-1">Connected to Supabase DB</p>
-        </div>
+        </div> -->
       </aside>
 
       <!-- Toggle Button -->
@@ -201,7 +201,7 @@ import { SalaryManagerComponent } from './components/salary-manager/salary-manag
 export class AppComponent {
   activeTab: 'dashboard' | 'revenue' | 'pipeline' | 'target' | 'cost' | 'clients' | 'employees' | 'salaries' = 'dashboard';
   sidebarOpen = true;
-  
+
   dataService = inject(DataService);
   authService = inject(AuthService);
   private router = inject(Router);
