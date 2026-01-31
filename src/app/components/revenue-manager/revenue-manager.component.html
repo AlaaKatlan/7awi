@@ -20,7 +20,7 @@
 
           <div>
               <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Product</label>
-              <select [ngModel]="filterProduct()" (ngModelChange)="filterProduct.set($event)" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 outline-none text-sm focus:ring-2 focus:ring-[#1e3a8a]">
+              <select [ngModel]="filterProduct()" (ngModelChange)="filterProduct.set($event)" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 outline-none text-sm focus:ring-2 focus:ring-[#1e3a8a] cursor-pointer">
                   <option [ngValue]="null">All Products</option>
                   @for (p of dataService.products(); track p.product_id) {
                       <option [ngValue]="p.product_id">{{ p.product_name }}</option>
@@ -30,7 +30,7 @@
 
           <div>
               <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Month</label>
-              <select [ngModel]="filterMonth()" (ngModelChange)="filterMonth.set($event)" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 outline-none text-sm focus:ring-2 focus:ring-[#1e3a8a]">
+              <select [ngModel]="filterMonth()" (ngModelChange)="filterMonth.set($event)" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 outline-none text-sm focus:ring-2 focus:ring-[#1e3a8a] cursor-pointer">
                   <option [ngValue]="null">All Months</option>
                   @for (m of months; track m.value) {
                       <option [ngValue]="m.value">{{ m.name }}</option>
@@ -40,7 +40,7 @@
 
           <div>
               <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Year</label>
-              <select [ngModel]="filterYear()" (ngModelChange)="filterYear.set($event)" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 outline-none text-sm focus:ring-2 focus:ring-[#1e3a8a]">
+              <select [ngModel]="filterYear()" (ngModelChange)="filterYear.set($event)" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 outline-none text-sm focus:ring-2 focus:ring-[#1e3a8a] cursor-pointer">
                   <option [ngValue]="null">All Years</option>
                   @for (year of yearsList(); track year) {
                     <option [ngValue]="year">{{ year }}</option>
@@ -50,10 +50,12 @@
 
           <div>
               <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Country</label>
-              <select [ngModel]="filterCountry()" (ngModelChange)="filterCountry.set($event)" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 outline-none text-sm focus:ring-2 focus:ring-[#1e3a8a]">
+              <select [ngModel]="filterCountry()" (ngModelChange)="filterCountry.set($event)" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 outline-none text-sm focus:ring-2 focus:ring-[#1e3a8a] cursor-pointer">
                   <option value="ALL">All Countries</option>
                   <option value="UAE">UAE</option>
                   <option value="KSA">KSA</option>
+                  <option value="SYR">SYR</option>
+                  <option value="JOR">JOR</option>
               </select>
           </div>
       </div>
@@ -72,9 +74,8 @@
                   <tr>
                       <th class="p-5">Order #</th>
                       <th class="p-5">Date</th>
-                      <th class="p-5">Product</th>
-                      <th class="p-5">Country</th>
-                      <th class="p-5 text-right">Gross Amount</th>
+                      <th class="p-5">Product</th> <th class="p-5">Country</th>
+                      <th class="p-5 text-right">Total Value</th> <th class="p-5 text-right">Gross Amount</th>
                       <th class="p-5 text-center">Action</th>
                   </tr>
               </thead>
@@ -104,7 +105,12 @@
                                   {{ item.country }}
                               </span>
                           </td>
-                          <td class="p-5 text-right font-black text-slate-900 text-base">{{ item.gross_amount | currency:'USD ':'symbol':'1.0-0' }}</td>
+                          <td class="p-5 text-right font-bold text-slate-500">
+                              {{ (item.total_value || 0) | currency:'USD ':'symbol':'1.0-0' }}
+                          </td>
+                          <td class="p-5 text-right font-black text-slate-900 text-base">
+                              {{ item.gross_amount | currency:'USD ':'symbol':'1.0-0' }}
+                          </td>
                           <td class="p-5 text-center">
                               <button (click)="editItem(item)" class="text-gray-300 hover:text-[#1e3a8a] transition">
                                   <span class="material-icons text-base">edit</span>
@@ -127,22 +133,34 @@
             </div>
 
             <div class="space-y-5">
-                <!-- Order Number (auto-generated) -->
                 <div>
                     <label class="block text-[10px] font-black text-gray-400 uppercase mb-2">Order Number</label>
                     <div class="flex items-center gap-2">
-                        <input [(ngModel)]="currentItem.order_number" type="text" 
-                               class="flex-1 p-3 bg-slate-100 rounded-xl border-0 outline-none font-mono text-slate-600"
-                               [readonly]="!isEditMode"
+                        <input [(ngModel)]="currentItem.order_number" type="text"
+                               class="flex-1 p-3 bg-slate-100 rounded-xl border-0 outline-none font-mono text-slate-600 font-bold"
+                               [readonly]="true"
                                placeholder="Auto-generated">
-                        @if (!isEditMode) {
-                            <span class="text-[10px] text-slate-400 italic">Auto-generated</span>
-                        }
+                        <span class="text-[10px] text-slate-400 italic">Auto-generated</span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-[10px] font-black text-gray-400 uppercase mb-2">Lead</label>
+                        <select [(ngModel)]="currentItem.lead_id" class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none font-bold focus:ring-2 focus:ring-[#1e3a8a]">
+                            <option *ngFor="let emp of employees()" [value]="emp.employee_id">{{ emp.name }}</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-black text-gray-400 uppercase mb-2">Owner</label>
+                        <select [(ngModel)]="currentItem.owner_id" class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none font-bold focus:ring-2 focus:ring-[#1e3a8a]">
+                            <option *ngFor="let emp of employees()" [value]="emp.employee_id">{{ emp.name }}</option>
+                        </select>
                     </div>
                 </div>
 
                 <div>
-                    <label class="block text-[10px] font-black text-gray-400 uppercase mb-2">Booking Period (Month & Year)</label>
+                    <label class="block text-[10px] font-black text-gray-400 uppercase mb-2">Booking Period</label>
                     <div class="grid grid-cols-2 gap-4">
                         <select [(ngModel)]="modalMonth" class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none text-sm font-bold focus:ring-2 focus:ring-[#1e3a8a]">
                             @for (m of months; track m.value) {
@@ -157,34 +175,43 @@
                     </div>
                 </div>
 
-                <div>
-                    <label class="block text-[10px] font-black text-gray-400 uppercase mb-2">Product Category</label>
-                    <select [(ngModel)]="currentItem.product_id" class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none font-bold focus:ring-2 focus:ring-[#1e3a8a]">
-                        @for (prod of dataService.products(); track prod.product_id) {
-                            <option [value]="prod.product_id">{{ prod.product_name }}</option>
-                        }
-                    </select>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-[10px] font-black text-gray-400 uppercase mb-2">Product Category</label>
+                        <select [(ngModel)]="currentItem.product_id" (change)="updateBookingOrder()" class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none font-bold focus:ring-2 focus:ring-[#1e3a8a]">
+                            @for (prod of products(); track prod.product_id) {
+                                <option [value]="prod.product_id">{{ prod.product_name }}</option>
+                            }
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-black text-gray-400 uppercase mb-2">Region/Country</label>
+                        <select [(ngModel)]="currentItem.country" (change)="updateBookingOrder()" class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none font-bold focus:ring-2 focus:ring-[#1e3a8a]">
+                            <option value="UAE">UAE</option>
+                            <option value="KSA">KSA</option>
+                            <option value="SYR">SYR</option>
+                            <option value="JOR">JOR</option>
+                        </select>
+                    </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-4">
-                  <div>
-                      <label class="block text-[10px] font-black text-gray-400 uppercase mb-2">Region/Country</label>
-                      <select [(ngModel)]="currentItem.country" class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none font-bold focus:ring-2 focus:ring-[#1e3a8a]">
-                          <option value="UAE">UAE</option>
-                          <option value="KSA">KSA</option>
-                      </select>
-                  </div>
-                  <div>
-                      <label class="block text-[10px] font-black text-gray-400 uppercase mb-2">Gross Amount ($)</label>
-                      <input [(ngModel)]="currentItem.gross_amount" type="number" class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none font-black text-lg text-[#1e3a8a]">
-                  </div>
+                    <div>
+                        <label class="block text-[10px] font-black text-gray-400 uppercase mb-2">Total Value ($)</label>
+                        <input [(ngModel)]="currentItem.total_value" type="number" class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none font-black text-lg text-gray-600">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-black text-gray-400 uppercase mb-2">Actual Value ($)</label>
+                        <input [(ngModel)]="currentItem.gross_amount" type="number" class="w-full p-3 bg-green-50 rounded-xl border-0 outline-none font-black text-lg text-green-700 focus:ring-2 focus:ring-green-500">
+                    </div>
                 </div>
             </div>
 
             <div class="mt-8 flex gap-3">
                 <button (click)="closeModal()" class="flex-1 py-3 rounded-xl text-gray-400 font-bold hover:bg-slate-50 transition uppercase text-xs">Cancel</button>
-                <button (click)="save()" class="flex-[2] py-3 rounded-xl bg-[#1e3a8a] text-white font-black shadow-lg shadow-blue-200 hover:bg-blue-900 transition uppercase text-xs">
-                    {{ isEditMode ? 'Update Now' : 'Confirm & Save' }}
+                <button (click)="save()" [disabled]="loading()" class="flex-[2] py-3 rounded-xl bg-[#1e3a8a] text-white font-black shadow-lg shadow-blue-200 hover:bg-blue-900 transition uppercase text-xs flex justify-center items-center gap-2">
+                    <span *ngIf="loading()" class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
+                    <span *ngIf="!loading()">{{ isEditMode ? 'Update Now' : 'Confirm & Save' }}</span>
                 </button>
             </div>
         </div>

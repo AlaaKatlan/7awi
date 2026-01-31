@@ -116,14 +116,22 @@ export class AuthService {
   }
 
   // --- Sign Out ---
-  async signOut(): Promise<void> {
-    await this.supabase.auth.signOut();
+async signOut(): Promise<void> {
+    // 1. الانتقال فوراً لصفحة الدخول لعدم تأخير المستخدم
+    this.router.navigate(['/login']);
+
+    // 2. تفريغ البيانات محلياً
     this.currentUser.set(null);
     this.session.set(null);
     this.userProfile.set(null);
-    this.router.navigate(['/login']);
-  }
 
+    // 3. إرسال طلب الخروج للسيرفر (في الخلفية)
+    try {
+      await this.supabase.auth.signOut();
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  }
   // --- Sign Up ---
   async signUp(email: string, password: string, fullName: string): Promise<{ success: boolean; error?: string }> {
     try {

@@ -14,51 +14,59 @@ import { FactRevenue } from '../../models/data.models';
 export class RevenueManagerComponent {
   dataService = inject(DataService);
 
-  // Filters Signals
+  // Filters
   searchText = signal('');
   filterYear = signal<number | null>(new Date().getFullYear());
   filterMonth = signal<number | null>(null);
   filterProduct = signal<number | null>(null);
   filterCountry = signal('ALL');
 
+  // UI State
   showModal = false;
   isEditMode = false;
+  loading = signal(false);
 
-  // Modal specific variables
-  modalMonth = new Date().getMonth();
-  modalYear = new Date().getFullYear();
+  // Lists
+  employees = this.dataService.employees;
+  products = this.dataService.products;
 
   months = [
-    { name: 'January', value: 0 }, { name: 'February', value: 1 }, { name: 'March', value: 2 },
-    { name: 'April', value: 3 }, { name: 'May', value: 4 }, { name: 'June', value: 5 },
-    { name: 'July', value: 6 }, { name: 'August', value: 7 }, { name: 'September', value: 8 },
-    { name: 'October', value: 9 }, { name: 'November', value: 10 }, { name: 'December', value: 11 }
+    { name: 'January', value: 1 }, { name: 'February', value: 2 }, { name: 'March', value: 3 },
+    { name: 'April', value: 4 }, { name: 'May', value: 5 }, { name: 'June', value: 6 },
+    { name: 'July', value: 7 }, { name: 'August', value: 8 }, { name: 'September', value: 9 },
+    { name: 'October', value: 10 }, { name: 'November', value: 11 }, { name: 'December', value: 12 }
   ];
 
-  // Dynamic years list from database
   yearsList = computed(() => {
-    const data = this.dataService.revenues();
-    const currentYear = new Date().getFullYear();
-    const dbYears = data.map(r => new Date(r.date).getFullYear());
-    const allYears = Array.from(new Set([...dbYears, currentYear]));
-    return allYears.sort((a, b) => b - a);
+    const years = new Set(this.dataService.revenues().map(r => new Date(r.date).getFullYear()));
+    years.add(new Date().getFullYear());
+    return Array.from(years).sort((a, b) => b - a);
   });
 
+  // Modal Fields
+  modalMonth = new Date().getMonth() + 1;
+  modalYear = new Date().getFullYear();
+
+  currentItem: Partial<FactRevenue> = this.getEmptyRevenue();
+
+  // Filter Logic
   filteredRevenues = computed(() => {
     let data = this.dataService.revenues();
 
+    // فلتر السنة
     if (this.filterYear()) {
       data = data.filter(r => new Date(r.date).getFullYear() === this.filterYear());
     }
-
-    if (this.filterMonth() !== null) {
-      data = data.filter(r => new Date(r.date).getMonth() === this.filterMonth());
+    // فلتر الشهر
+    if (this.filterMonth()) {
+      data = data.filter(r => new Date(r.date).getMonth() + 1 === this.filterMonth());
     }
-
+    // فلتر المنتج (تم إصلاحه)
     if (this.filterProduct()) {
-      data = data.filter(r => r.product_id === this.filterProduct());
+      // استخدام == للمقارنة المرنة بين النص والرقم
+      data = data.filter(r => r.product_id == this.filterProduct());
     }
-
+    // فلتر الدولة
     if (this.filterCountry() !== 'ALL') {
       data = data.filter(r => r.country === this.filterCountry());
     }
@@ -66,8 +74,8 @@ export class RevenueManagerComponent {
     const text = this.searchText().toLowerCase();
     if (text) {
       data = data.filter(r =>
-        this.dataService.getProductName(r.product_id).toLowerCase().includes(text) ||
-        (r.order_number?.toLowerCase().includes(text))
+        (r.order_number?.toLowerCase().includes(text)) ||
+        (r.country.toLowerCase().includes(text))
       );
     }
 
@@ -78,33 +86,32 @@ export class RevenueManagerComponent {
     return this.filteredRevenues().reduce((sum, item) => sum + (Number(item.gross_amount) || 0), 0);
   });
 
-  getEmptyRevenue(): FactRevenue {
+  getEmptyRevenue(): Partial<FactRevenue> {
+    const today = new Date();
     return {
-      date: '',
-      product_id: this.dataService.products()[0]?.product_id || 1,
+      date: today.toISOString().split('T')[0],
+      product_id: this.products()[0]?.product_id || 1,
       country: 'UAE',
       gross_amount: 0,
-      order_number: ''
+      total_value: 0,
+      order_number: 'Generating...',
+      lead_id: this.employees()[0]?.employee_id,
+      owner_id: this.employees()[0]?.employee_id
     };
   }
 
-  async openModal() {
+  openModal() {
     this.isEditMode = false;
     this.currentItem = this.getEmptyRevenue();
-    this.modalMonth = new Date().getMonth();
-    this.modalYear = new Date().getFullYear();
-    
-    // Auto-generate order number
-    this.currentItem.order_number = await this.dataService.generateOrderNumber();
-    
     this.showModal = true;
+    this.updateBookingOrder();
   }
 
   editItem(item: FactRevenue) {
     this.isEditMode = true;
     this.currentItem = { ...item };
     const d = new Date(item.date);
-    this.modalMonth = d.getMonth();
+    this.modalMonth = d.getMonth() + 1;
     this.modalYear = d.getFullYear();
     this.showModal = true;
   }
@@ -113,17 +120,37 @@ export class RevenueManagerComponent {
     this.showModal = false;
   }
 
-  currentItem: FactRevenue = this.getEmptyRevenue();
+  updateBookingOrder() {
+    if (!this.isEditMode && this.currentItem.country && this.currentItem.product_id) {
+      this.currentItem.order_number = this.dataService.generateBookingRef(
+        this.currentItem.country,
+        Number(this.currentItem.product_id)
+      );
+    }
+  }
 
   async save() {
-    const monthStr = (this.modalMonth + 1).toString().padStart(2, '0');
+    this.loading.set(true);
+    const monthStr = this.modalMonth.toString().padStart(2, '0');
     this.currentItem.date = `${this.modalYear}-${monthStr}-01`;
 
-    if (this.isEditMode) {
-      await this.dataService.updateRevenue(this.currentItem);
-    } else {
-      await this.dataService.addRevenue(this.currentItem);
+    try {
+      let result;
+      if (this.isEditMode) {
+        result = await this.dataService.updateRevenue(this.currentItem);
+      } else {
+        result = await this.dataService.addRevenue(this.currentItem);
+      }
+
+      if (result.success) {
+        this.closeModal();
+      } else {
+        alert('Error: ' + result.error);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      this.loading.set(false);
     }
-    this.closeModal();
   }
 }

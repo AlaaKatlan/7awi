@@ -1,104 +1,212 @@
 import { Injectable, signal, computed } from '@angular/core';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { environment } from '../environments/environment';
-import { DimClient, DimProduct, FactPipeline, FactRevenue, FactTarget, FactCost } from '../models/data.models';
+import {
+  FactRevenue,
+  FactPipeline,
+  FactTarget,
+  FactCost,
+  DimClient,
+  DimEmployee,
+  FactSalary,
+  DimProduct
+} from '../models/data.models';
 
 @Injectable({
   providedIn: 'root'
 })
-export class DataService {
+export class SupabaseService {
   private supabase: SupabaseClient;
 
+  // Signals
   revenues = signal<FactRevenue[]>([]);
   pipelines = signal<FactPipeline[]>([]);
-  products = signal<DimProduct[]>([]);
-  clients = signal<DimClient[]>([]);
-  targets = signal<FactTarget[]>([]); // هذا الـ Signal موجود ولكن لا يتم تعبئته
+  targets = signal<FactTarget[]>([]);
   costs = signal<FactCost[]>([]);
+  clients = signal<DimClient[]>([]);
+  employees = signal<DimEmployee[]>([]);
+  salaries = signal<FactSalary[]>([]);
+  products = signal<DimProduct[]>([]);
 
   constructor() {
     this.supabase = createClient(environment.supabaseUrl, environment.supabaseKey);
-    this.fetchInitialData();
+    this.loadAllData();
   }
 
-  async fetchInitialData() {
-    // 1. جلب الإيرادات
-    const { data: rev } = await this.supabase.from('fact_revenue').select('*');
-    if (rev) this.revenues.set(rev);
-
-    // 2. جلب المنتجات
-    const { data: prod } = await this.supabase.from('dim_product').select('*');
-    if (prod) this.products.set(prod);
-
-    // 3. جلب العملاء
-    const { data: cli } = await this.supabase.from('dim_client').select('*');
-    if (cli) this.clients.set(cli);
-
-    // 4. جلب التكاليف
-    const { data: cst } = await this.supabase.from('fact_cost').select('*');
-    if (cst) this.costs.set(cst);
-
-    // 5. جلب الـ Pipeline
-    const { data: pipe } = await this.supabase.from('fact_pipeline').select('*');
-    if (pipe) this.pipelines.set(pipe);
-
-    // --- الحل هنا: جلب بيانات الأهداف (Targets) ---
-    const { data: targ } = await this.supabase.from('fact_target_annual').select('*');
-    if (targ) {
-      console.log('Targets loaded from DB:', targ); // للتأكد في Console المتصفح
-      this.targets.set(targ);
-    }
+  async loadAllData() {
+    this.getRevenues();
+    this.getPipelines();
+    this.getTargets();
+    this.getCosts();
+    this.getClients();
+    this.getEmployees();
+    this.getSalaries();
+    this.getProducts();
   }
 
-  // دالة إضافة هدف جديد
-  async addTarget(item: FactTarget) {
-    const { data, error } = await this.supabase.from('fact_target_annual').insert([item]).select();
-    if (data) {
-      this.targets.update(v => [data[0], ...v]);
-    }
-    return { data, error };
+  // --- Products ---
+  async getProducts() {
+    const { data, error } = await this.supabase.from('dim_product').select('*');
+    if (!error && data) this.products.set(data);
   }
 
-  // دالة إضافة تكلفة (تأكد من شمول الحقول الجديدة)
-  async addCost(item: FactCost) {
-    const { data, error } = await this.supabase.from('fact_cost').insert([item]).select();
-    if (data) this.costs.update(v => [data[0], ...v]);
-    return { data, error };
-  }
-
-  // تحديث تكلفة موجودة
-  async updateCost(item: FactCost) {
-    if (!item.id) return;
+  // --- REVENUE ---
+  async getRevenues() {
+    // جلب البيانات وترتيبها
     const { data, error } = await this.supabase
-      .from('fact_cost')
-      .update(item)
-      .eq('id', item.id)
-      .select();
-    if (data) {
-      this.costs.update(v => v.map(c => c.id === item.id ? data[0] : c));
+      .from('fact_revenue')
+      .select('*')
+      .order('date', { ascending: false }); // لاحظ: العمود اسمه date في قاعدتك
+
+    if (!error && data) {
+      // تحويل البيانات القادمة من السيرفر لتتوافق مع المودل في الفرونت إند
+      const mappedData = data.map((item: any) => ({
+        ...item,
+        date_key: item.date,           // توحيد الاسم
+        revenue_amount: item.gross_amount, // توحيد الاسم
+        booking_order: item.order_number   // توحيد الاسم
+      }));
+      this.revenues.set(mappedData);
     }
-    return { data, error };
+  }
+// 2. دالة توليد رقم الطلب الجديدة
+  // Format: [Country2Char]-[ProductCode]-[Increment]
+  generateBookingRef(country: string, productId: number): string {
+    // A. Country Code (First 2 chars uppercase)
+    const countryCode = (country || 'UA').substring(0, 2).toUpperCase();
+
+    // B. Product Code
+    const product = this.products().find(p => p.product_id == productId);
+    const prodCode = product?.product_code || 'GEN';
+
+    // C. Incremental Number
+    // نعتمد على عدد الإيرادات الحالية + 1 (يمكن جعلها أدق عبر السيرفر لكن هذا يكفي حالياً)
+    const nextId = this.revenues().length + 1;
+    const increment = nextId.toString().padStart(4, '0'); // 0001
+
+    return `${countryCode}-${prodCode}-${increment}`;
   }
 
-  // دوال الإضافة الأخرى...
-  async addRevenue(item: FactRevenue) {
-    const { data } = await this.supabase.from('fact_revenue').insert([item]).select();
-    if (data) this.revenues.update(v => [data[0], ...v]);
+  // 3. تحديث دالة إضافة الإيراد لتشمل الحقول الجديدة
+  async addRevenue(item: any): Promise<{ success: boolean; error?: string }> {
+    try {
+      const dbPayload = {
+        date: item.date_key,
+        gross_amount: item.gross_amount, // Actual Value
+        total_value: item.total_value,   // Total Value
+        order_number: item.booking_order,
+        product_id: item.product_id,
+        country: item.country,
+        lead_id: item.lead_id,
+        owner_id: item.owner_id
+      };
+
+      const { data, error } = await this.supabase
+        .from('fact_revenue')
+        .insert([dbPayload])
+        .select();
+
+      if (error) return { success: false, error: error.message };
+
+      if (data) {
+        // تحديث الواجهة
+        const newItem = {
+           ...item,
+           id: data[0].id,
+           // Mapping values back for UI
+           date_key: data[0].date,
+           gross_amount: data[0].gross_amount,
+           total_value: data[0].total_value,
+           booking_order: data[0].order_number
+        };
+        this.revenues.update(v => [newItem, ...v]);
+        return { success: true };
+      }
+      return { success: false, error: 'No data returned' };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
   }
 
-  // الخرائط المساعدة
-  productsMap = computed(() => {
-    const map = new Map<number, string>();
-    this.products().forEach(p => map.set(p.product_id, p.product_name));
-    return map;
-  });
+  // --- PIPELINE ---
+  async getPipelines() {
+    const { data, error } = await this.supabase.from('fact_pipeline').select('*');
+    if (!error && data) this.pipelines.set(data);
+  }
 
-  clientsMap = computed(() => {
-    const map = new Map<number, string>();
-    this.clients().forEach(c => map.set(c.client_id, c.client_name));
-    return map;
-  });
+  async addPipeline(item: Partial<FactPipeline>): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { id, ...payload } = item as any;
+      const { data, error } = await this.supabase.from('fact_pipeline').insert([payload]).select();
+      if (error) return { success: false, error: error.message };
+      if (data) {
+        this.pipelines.update(v => [data[0], ...v]);
+        return { success: true };
+      }
+      return { success: false, error: 'No data returned' };
+    } catch (err: any) { return { success: false, error: err.message }; }
+  }
 
-  getProductName(id: number): string { return this.productsMap().get(id) || `Product ${id}`; }
-  getClientName(id: number): string { return this.clientsMap().get(id) || `Client ${id}`; }
+  // --- TARGETS ---
+  async getTargets() {
+    const { data, error } = await this.supabase.from('fact_target_annual').select('*');
+    if (!error && data) this.targets.set(data);
+  }
+
+  async addTarget(item: Partial<FactTarget>): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { id, ...payload } = item as any;
+      const { data, error } = await this.supabase.from('fact_target_annual').insert([payload]).select();
+      if (error) return { success: false, error: error.message };
+      if (data) {
+        this.targets.update(v => [data[0], ...v]);
+        return { success: true };
+      }
+      return { success: false, error: 'No data returned' };
+    } catch (e: any) { return { success: false, error: e.message }; }
+  }
+
+  // --- COSTS ---
+  async getCosts() {
+    const { data, error } = await this.supabase.from('fact_cost').select('*');
+    if (!error && data) this.costs.set(data);
+  }
+
+  async addCost(item: Partial<FactCost>): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { id, ...payload } = item as any;
+      const { data, error } = await this.supabase.from('fact_cost').insert([payload]).select();
+      if (error) return { success: false, error: error.message };
+      if (data) {
+        this.costs.update(v => [data[0], ...v]);
+        return { success: true };
+      }
+      return { success: false, error: 'No data returned' };
+    } catch (e: any) { return { success: false, error: e.message }; }
+  }
+
+  // --- CLIENTS ---
+  async getClients() {
+    const { data, error } = await this.supabase.from('dim_client').select('*');
+    if (!error && data) this.clients.set(data);
+  }
+
+  // --- EMPLOYEES ---
+  // async getEmployees() {
+  //   const { data, error } = await this.supabase.from('dim_employee').select('*');
+  //   if (!error && data) this.employees.set(data);
+  // }
+// 1. تحديث جلب الموظفين ليكون مرتب أبجدياً
+  async getEmployees() {
+    const { data, error } = await this.supabase
+      .from('dim_employee')
+      .select('*')
+      .order('name', { ascending: true }); // ترتيب أبجدي
+    if (!error && data) this.employees.set(data);
+  }
+  // --- SALARIES ---
+  async getSalaries() {
+    const { data, error } = await this.supabase.from('fact_salary').select('*');
+    if (!error && data) this.salaries.set(data);
+  }
 }

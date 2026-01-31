@@ -1,21 +1,18 @@
-// =============================================
-// Dimension Tables
-// =============================================
-
 export interface DimProduct {
   product_id: number;
   product_name: string;
   category?: string;
   department_id?: number;
+  product_code?: string; // الكود الجديد للمنتج
 }
 
 export interface DimClient {
   client_id: number;
   client_name: string;
   country: string;
-  contact_person?: string;      // NEW: Main contact person name
-  contact_email?: string;       // NEW: Contact email
-  contact_phone?: string;       // NEW: Contact phone
+  contact_person?: string;
+  contact_email?: string;
+  contact_phone?: string;
   created_at?: string;
 }
 
@@ -35,26 +32,27 @@ export interface DimEmployee {
   start_date: string;
   end_date: string | null;
   department_id: number;
-  email?: string;               // NEW: Employee email
-  phone?: string;               // NEW: Employee phone
+  email?: string;
+  phone?: string;
   created_at?: string;
 }
 
-// =============================================
-// Fact Tables
-// =============================================
-
 export interface FactRevenue {
   id?: number;
-  date: string;
+  date: string;          // رجعناها date عشان ما تضرب الداشبورد
   year?: number;
   month?: number;
   product_id: number;
-  client_id?: number;           // NEW: Link to client
+  client_id?: number;
   country: string;
   gross_amount: number;
-  order_number?: string;        // NEW: Order/Invoice number
-  notes?: string;               // NEW: Optional notes
+  // الحقول الجديدة المطلوبة
+  total_value?: number;
+  order_number?: string; // رجعناها order_number
+  lead_id?: number;
+  owner_id?: number;
+  booking_order?: string; // حقل احتياطي للعرض اذا لزم
+  notes?: string;
 }
 
 export interface FactPipeline {
@@ -86,25 +84,20 @@ export interface FactCost {
   description?: string;
 }
 
-// NEW: Monthly Salary Records
 export interface FactSalary {
   id?: number;
   employee_id: number;
   year: number;
   month: number;
-  base_salary: number;          // Base monthly salary
-  bonus?: number;               // Optional bonus
-  deductions?: number;          // Optional deductions
-  net_salary: number;           // Final net salary
-  payment_date?: string;        // Date of payment
+  base_salary: number;
+  bonus?: number;
+  deductions?: number;
+  net_salary: number;
+  payment_date?: string;
   status: 'pending' | 'paid' | 'cancelled';
   notes?: string;
   created_at?: string;
 }
-
-// =============================================
-// Auth Types
-// =============================================
 
 export interface UserProfile {
   id: string;

@@ -66,7 +66,7 @@ import { SalaryManagerComponent } from '../salary-manager/salary-manager.compone
              [title]="!sidebarOpen ? 'Revenue' : ''"
              class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
              <span class="material-icons" [class.mr-3]="sidebarOpen">attach_money</span>
-             <span *ngIf="sidebarOpen">Revenue</span>
+             <span *ngIf="sidebarOpen">BO / Revenue</span>
           </button>
 
           <button (click)="activeTab = 'pipeline'"
