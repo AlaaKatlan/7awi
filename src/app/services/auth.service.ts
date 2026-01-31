@@ -1,15 +1,13 @@
-import { Injectable, signal, computed, inject } from '@angular/core';
+import { Injectable, signal, computed } from '@angular/core';
 import { createClient, SupabaseClient, User, Session } from '@supabase/supabase-js';
 import { environment } from '../environments/environment';
 import { UserProfile } from '../models/data.models';
-import { Router } from '@angular/router';
 
 @Injectable({
   providedIn: 'root'
 })
 export class AuthService {
   private supabase: SupabaseClient;
-  private router = inject(Router);
 
   // Auth state signals
   currentUser = signal<User | null>(null);
@@ -42,14 +40,14 @@ export class AuthService {
       this.supabase.auth.onAuthStateChange(async (event, session) => {
         console.log('Auth state changed:', event);
         
-        if (session) {
-          this.session.set(session);
-          this.currentUser.set(session.user);
-          await this.loadUserProfile(session.user.id);
-        } else {
+        if (event === 'SIGNED_OUT') {
           this.session.set(null);
           this.currentUser.set(null);
           this.userProfile.set(null);
+        } else if (session) {
+          this.session.set(session);
+          this.currentUser.set(session.user);
+          await this.loadUserProfile(session.user.id);
         }
       });
     } catch (error) {
@@ -69,6 +67,17 @@ export class AuthService {
 
       if (data && !error) {
         this.userProfile.set(data as UserProfile);
+      } else {
+        // If no profile exists, create a basic one from user data
+        const user = this.currentUser();
+        if (user) {
+          this.userProfile.set({
+            id: user.id,
+            email: user.email || '',
+            full_name: user.user_metadata?.['full_name'] || '',
+            role: 'viewer'
+          });
+        }
       }
     } catch (error) {
       console.error('Error loading user profile:', error);
@@ -119,7 +128,7 @@ export class AuthService {
   // Sign Out
   async signOut(): Promise<void> {
     await this.supabase.auth.signOut();
-    this.router.navigate(['/login']);
+    // Signals will be cleared by onAuthStateChange listener
   }
 
   // Reset Password

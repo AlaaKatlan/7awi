@@ -1,16 +1,15 @@
 import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule],
   template: `
     <div class="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center p-4">
-      <div class="absolute inset-0 bg-[url('data:image/svg+xml,...')] opacity-5"></div>
+      <div class="absolute inset-0 opacity-5"></div>
       
       <div class="relative w-full max-w-md">
         <!-- Logo & Title -->
@@ -122,7 +121,6 @@ import { AuthService } from '../../services/auth.service';
 })
 export class LoginComponent {
   private authService = inject(AuthService);
-  private router = inject(Router);
 
   email = '';
   password = '';
@@ -148,15 +146,18 @@ export class LoginComponent {
       if (this.isSignUp()) {
         const result = await this.authService.signUp(this.email, this.password, this.fullName);
         if (result.success) {
-          this.successMessage.set('Account created! Please check your email to verify your account.');
+          this.successMessage.set('Account created! Please check your email to verify your account, or try signing in.');
           this.isSignUp.set(false);
+          // Clear form
+          this.fullName = '';
         } else {
           this.errorMessage.set(result.error || 'Failed to create account');
         }
       } else {
         const result = await this.authService.signIn(this.email, this.password);
         if (result.success) {
-          this.router.navigate(['/']);
+          // Auth state change will be handled by AuthService
+          // The App component will automatically show main layout
         } else {
           this.errorMessage.set(result.error || 'Invalid email or password');
         }

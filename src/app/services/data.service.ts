@@ -63,8 +63,12 @@ export class DataService {
     if (data) this.products.set(data);
   }
 
+  // Clients sorted alphabetically
   private async fetchClients() {
-    const { data } = await this.supabase.from('dim_client').select('*').order('client_name');
+    const { data } = await this.supabase
+      .from('dim_client')
+      .select('*')
+      .order('client_name', { ascending: true });
     if (data) this.clients.set(data);
   }
 
@@ -111,7 +115,11 @@ export class DataService {
       .from('dim_client')
       .insert([item])
       .select();
-    if (data) this.clients.update(v => [...v, data[0]].sort((a, b) => a.client_name.localeCompare(b.client_name)));
+    if (data) {
+      this.clients.update(v => [...v, data[0]].sort((a, b) => 
+        a.client_name.localeCompare(b.client_name)
+      ));
+    }
     return { data, error };
   }
 
@@ -129,7 +137,10 @@ export class DataService {
       .eq('client_id', item.client_id)
       .select();
     if (data) {
-      this.clients.update(v => v.map(c => c.client_id === item.client_id ? data[0] : c));
+      this.clients.update(v => 
+        v.map(c => c.client_id === item.client_id ? data[0] : c)
+         .sort((a, b) => a.client_name.localeCompare(b.client_name))
+      );
     }
     return { data, error };
   }
@@ -193,7 +204,7 @@ export class DataService {
   }
 
   // =============================================
-  // Revenue CRUD Operations (Updated with order_number)
+  // Revenue CRUD Operations
   // =============================================
   async addRevenue(item: FactRevenue) {
     const { data, error } = await this.supabase
@@ -211,11 +222,9 @@ export class DataService {
       .update({
         date: item.date,
         product_id: item.product_id,
-        client_id: item.client_id,
         country: item.country,
         gross_amount: item.gross_amount,
-        order_number: item.order_number,
-        notes: item.notes
+        order_number: item.order_number
       })
       .eq('id', item.id)
       .select();
@@ -241,7 +250,6 @@ export class DataService {
     const year = new Date().getFullYear();
     const prefix = `ORD-${year}-`;
     
-    // Get the latest order number for this year
     const { data } = await this.supabase
       .from('fact_revenue')
       .select('order_number')
@@ -345,7 +353,7 @@ export class DataService {
   }
 
   // =============================================
-  // Other CRUD Operations (Cost, Target, Pipeline)
+  // Other CRUD Operations
   // =============================================
   async addCost(item: FactCost) {
     const { data, error } = await this.supabase.from('fact_cost').insert([item]).select();
