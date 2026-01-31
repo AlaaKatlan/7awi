@@ -1,58 +1,74 @@
-import { Injectable, signal, computed } from '@angular/core';
+import { Injectable, signal, computed, inject } from '@angular/core';
 import { createClient, SupabaseClient, User, Session } from '@supabase/supabase-js';
 import { environment } from '../environments/environment';
 import { UserProfile } from '../models/data.models';
+import { Router } from '@angular/router';
 
 @Injectable({
   providedIn: 'root'
 })
 export class AuthService {
   private supabase: SupabaseClient;
+  private router = inject(Router);
 
   // Auth state signals
   currentUser = signal<User | null>(null);
   userProfile = signal<UserProfile | null>(null);
   session = signal<Session | null>(null);
-  loading = signal(true);
+  loading = signal(true); // يبدأ بحالة تحميل لمنع التوجيه الخاطئ
 
-  // Computed
+  // Computed Values
   isAuthenticated = computed(() => !!this.currentUser());
   isAdmin = computed(() => this.userProfile()?.role === 'admin');
   isManager = computed(() => ['admin', 'manager'].includes(this.userProfile()?.role || ''));
 
   constructor() {
-    this.supabase = createClient(environment.supabaseUrl, environment.supabaseKey);
+    // 1. إعداد العميل مع خيارات حفظ الجلسة
+    this.supabase = createClient(environment.supabaseUrl, environment.supabaseKey, {
+      auth: {
+        persistSession: true,       // ضروري لحفظ الدخول عند التحديث
+        autoRefreshToken: true,     // تجديد التوكن تلقائياً
+        detectSessionInUrl: true    // ضروري لروابط استعادة كلمة المرور
+      }
+    });
+
     this.initializeAuth();
   }
 
   private async initializeAuth() {
     try {
-      // Get current session
+      // 2. محاولة استرجاع الجلسة المخزنة فوراً
       const { data: { session } } = await this.supabase.auth.getSession();
-      
+
       if (session) {
         this.session.set(session);
         this.currentUser.set(session.user);
-        await this.loadUserProfile(session.user.id);
+        // تحميل البروفايل في الخلفية
+        this.loadUserProfile(session.user.id);
       }
 
-      // Listen for auth changes
+      // 3. الاستماع لأي تغييرات (تسجيل دخول/خروج)
       this.supabase.auth.onAuthStateChange(async (event, session) => {
         console.log('Auth state changed:', event);
-        
-        if (event === 'SIGNED_OUT') {
+
+        if (session) {
+          this.session.set(session);
+          this.currentUser.set(session.user);
+          // تحميل البروفايل عند تغير الجلسة
+          if (!this.userProfile()) {
+             await this.loadUserProfile(session.user.id);
+          }
+        } else {
+          // تفريغ البيانات عند تسجيل الخروج
           this.session.set(null);
           this.currentUser.set(null);
           this.userProfile.set(null);
-        } else if (session) {
-          this.session.set(session);
-          this.currentUser.set(session.user);
-          await this.loadUserProfile(session.user.id);
         }
       });
     } catch (error) {
       console.error('Auth initialization error:', error);
     } finally {
+      // 4. إيقاف حالة التحميل للسماح للتطبيق بالعمل
       this.loading.set(false);
     }
   }
@@ -67,24 +83,48 @@ export class AuthService {
 
       if (data && !error) {
         this.userProfile.set(data as UserProfile);
-      } else {
-        // If no profile exists, create a basic one from user data
-        const user = this.currentUser();
-        if (user) {
-          this.userProfile.set({
-            id: user.id,
-            email: user.email || '',
-            full_name: user.user_metadata?.['full_name'] || '',
-            role: 'viewer'
-          });
-        }
       }
     } catch (error) {
       console.error('Error loading user profile:', error);
     }
   }
 
-  // Sign Up
+  // --- Sign In ---
+  async signIn(email: string, password: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { data, error } = await this.supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      // 5. تحديث الحالة يدوياً وفوراً (Fix Race Condition)
+      if (data.session && data.user) {
+        this.session.set(data.session);
+        this.currentUser.set(data.user);
+        // تحميل البروفايل اختياري هنا ولكن مفضل
+        await this.loadUserProfile(data.user.id);
+      }
+
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  // --- Sign Out ---
+  async signOut(): Promise<void> {
+    await this.supabase.auth.signOut();
+    this.currentUser.set(null);
+    this.session.set(null);
+    this.userProfile.set(null);
+    this.router.navigate(['/login']);
+  }
+
+  // --- Sign Up ---
   async signUp(email: string, password: string, fullName: string): Promise<{ success: boolean; error?: string }> {
     try {
       const { data, error } = await this.supabase.auth.signUp({
@@ -97,75 +137,42 @@ export class AuthService {
         }
       });
 
-      if (error) {
-        return { success: false, error: error.message };
-      }
-
+      if (error) return { success: false, error: error.message };
       return { success: true };
     } catch (error: any) {
       return { success: false, error: error.message };
     }
   }
 
-  // Sign In
-  async signIn(email: string, password: string): Promise<{ success: boolean; error?: string }> {
-    try {
-      const { data, error } = await this.supabase.auth.signInWithPassword({
-        email,
-        password
-      });
-
-      if (error) {
-        return { success: false, error: error.message };
-      }
-
-      return { success: true };
-    } catch (error: any) {
-      return { success: false, error: error.message };
-    }
-  }
-
-  // Sign Out
-  async signOut(): Promise<void> {
-    await this.supabase.auth.signOut();
-    // Signals will be cleared by onAuthStateChange listener
-  }
-
-  // Reset Password
+  // --- Reset Password ---
   async resetPassword(email: string): Promise<{ success: boolean; error?: string }> {
     try {
       const { error } = await this.supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`
       });
 
-      if (error) {
-        return { success: false, error: error.message };
-      }
-
+      if (error) return { success: false, error: error.message };
       return { success: true };
     } catch (error: any) {
       return { success: false, error: error.message };
     }
   }
 
-  // Update Password
+  // --- Update Password ---
   async updatePassword(newPassword: string): Promise<{ success: boolean; error?: string }> {
     try {
       const { error } = await this.supabase.auth.updateUser({
         password: newPassword
       });
 
-      if (error) {
-        return { success: false, error: error.message };
-      }
-
+      if (error) return { success: false, error: error.message };
       return { success: true };
     } catch (error: any) {
       return { success: false, error: error.message };
     }
   }
 
-  // Get Supabase client for other services
+  // Helper
   getClient(): SupabaseClient {
     return this.supabase;
   }
