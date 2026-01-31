@@ -11,10 +11,11 @@
   </div>
 
   <div class="bg-white p-6 rounded-xl shadow-sm mb-6 border border-gray-100">
-      <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 items-end">
+      <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-7 gap-4 items-end">
           <div class="lg:col-span-2">
               <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Search</label>
-              <input type="text" [ngModel]="searchText()" (ngModelChange)="searchText.set($event)" placeholder="Search anything..."
+              <input type="text" [ngModel]="searchText()" (ngModelChange)="searchText.set($event)" 
+                     placeholder="Search by order #, product, client..."
                      class="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#1e3a8a] outline-none transition text-sm">
           </div>
 
@@ -24,6 +25,16 @@
                   <option [ngValue]="null">All Products</option>
                   @for (p of dataService.products(); track p.product_id) {
                       <option [ngValue]="p.product_id">{{ p.product_name }}</option>
+                  }
+              </select>
+          </div>
+
+          <div>
+              <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Client</label>
+              <select [ngModel]="filterClient()" (ngModelChange)="filterClient.set($event)" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 outline-none text-sm focus:ring-2 focus:ring-[#1e3a8a]">
+                  <option [ngValue]="null">All Clients</option>
+                  @for (c of dataService.clients(); track c.client_id) {
+                      <option [ngValue]="c.client_id">{{ c.client_name }}</option>
                   }
               </select>
           </div>
@@ -70,7 +81,9 @@
           <table class="w-full text-left border-collapse">
               <thead class="bg-slate-50 text-gray-400 uppercase text-[10px] font-black tracking-widest border-b border-slate-100">
                   <tr>
+                      <th class="p-5">Order #</th>
                       <th class="p-5">Date</th>
+                      <th class="p-5">Client</th>
                       <th class="p-5">Product</th>
                       <th class="p-5">Country</th>
                       <th class="p-5 text-right">Gross Amount</th>
@@ -81,8 +94,24 @@
                   @for (item of filteredRevenues(); track item.id) {
                       <tr class="hover:bg-blue-50/50 transition duration-150">
                           <td class="p-5">
+                              @if (item.order_number) {
+                                  <span class="font-mono text-xs bg-slate-100 px-2 py-1 rounded text-slate-600">
+                                      {{ item.order_number }}
+                                  </span>
+                              } @else {
+                                  <span class="text-slate-300 text-xs">—</span>
+                              }
+                          </td>
+                          <td class="p-5">
                               <div class="font-black text-slate-800">{{ item.date | date: 'MMM yyyy' }}</div>
                               <div class="text-[10px] text-gray-400">{{ item.date | date: 'dd/MM/yyyy' }}</div>
+                          </td>
+                          <td class="p-5">
+                              @if (item.client_id) {
+                                  <span class="font-medium text-slate-700">{{ dataService.getClientName(item.client_id) }}</span>
+                              } @else {
+                                  <span class="text-slate-300">—</span>
+                              }
                           </td>
                           <td class="p-5">
                               <span class="bg-blue-50 text-[#1e3a8a] px-3 py-1 rounded-full text-[11px] font-black uppercase">
@@ -117,6 +146,20 @@
             </div>
 
             <div class="space-y-5">
+                <!-- Order Number (auto-generated) -->
+                <div>
+                    <label class="block text-[10px] font-black text-gray-400 uppercase mb-2">Order Number</label>
+                    <div class="flex items-center gap-2">
+                        <input [(ngModel)]="currentItem.order_number" type="text" 
+                               class="flex-1 p-3 bg-slate-100 rounded-xl border-0 outline-none font-mono text-slate-600"
+                               [readonly]="!isEditMode"
+                               placeholder="Auto-generated">
+                        @if (!isEditMode) {
+                            <span class="text-[10px] text-slate-400 italic">Auto-generated</span>
+                        }
+                    </div>
+                </div>
+
                 <div>
                     <label class="block text-[10px] font-black text-gray-400 uppercase mb-2">Booking Period (Month & Year)</label>
                     <div class="grid grid-cols-2 gap-4">
@@ -131,6 +174,16 @@
                             }
                         </select>
                     </div>
+                </div>
+
+                <div>
+                    <label class="block text-[10px] font-black text-gray-400 uppercase mb-2">Client (Optional)</label>
+                    <select [(ngModel)]="currentItem.client_id" class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none font-bold focus:ring-2 focus:ring-[#1e3a8a]">
+                        <option [ngValue]="undefined">— No Client Selected —</option>
+                        @for (client of dataService.clients(); track client.client_id) {
+                            <option [value]="client.client_id">{{ client.client_name }}</option>
+                        }
+                    </select>
                 </div>
 
                 <div>
@@ -154,6 +207,13 @@
                       <label class="block text-[10px] font-black text-gray-400 uppercase mb-2">Gross Amount ($)</label>
                       <input [(ngModel)]="currentItem.gross_amount" type="number" class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none font-black text-lg text-[#1e3a8a]">
                   </div>
+                </div>
+
+                <div>
+                    <label class="block text-[10px] font-black text-gray-400 uppercase mb-2">Notes (Optional)</label>
+                    <textarea [(ngModel)]="currentItem.notes" rows="2"
+                              class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a]"
+                              placeholder="Any additional notes..."></textarea>
                 </div>
             </div>
 

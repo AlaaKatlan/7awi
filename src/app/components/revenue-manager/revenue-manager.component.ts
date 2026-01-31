@@ -20,11 +20,12 @@ export class RevenueManagerComponent {
   filterMonth = signal<number | null>(null);
   filterProduct = signal<number | null>(null);
   filterCountry = signal('ALL');
+  filterClient = signal<number | null>(null);
 
   showModal = false;
   isEditMode = false;
 
-  // متغيرات مخصصة للمودال
+  // Modal specific variables
   modalMonth = new Date().getMonth();
   modalYear = new Date().getFullYear();
 
@@ -35,7 +36,7 @@ export class RevenueManagerComponent {
     { name: 'October', value: 9 }, { name: 'November', value: 10 }, { name: 'December', value: 11 }
   ];
 
-  // استخراج السنوات ديناميكياً من قاعدة البيانات
+  // Dynamic years list from database
   yearsList = computed(() => {
     const data = this.dataService.revenues();
     const currentYear = new Date().getFullYear();
@@ -59,6 +60,10 @@ export class RevenueManagerComponent {
       data = data.filter(r => r.product_id === this.filterProduct());
     }
 
+    if (this.filterClient()) {
+      data = data.filter(r => r.client_id === this.filterClient());
+    }
+
     if (this.filterCountry() !== 'ALL') {
       data = data.filter(r => r.country === this.filterCountry());
     }
@@ -66,7 +71,9 @@ export class RevenueManagerComponent {
     const text = this.searchText().toLowerCase();
     if (text) {
       data = data.filter(r =>
-        this.dataService.getProductName(r.product_id).toLowerCase().includes(text)
+        this.dataService.getProductName(r.product_id).toLowerCase().includes(text) ||
+        (r.order_number?.toLowerCase().includes(text)) ||
+        (r.client_id && this.dataService.getClientName(r.client_id).toLowerCase().includes(text))
       );
     }
 
@@ -80,17 +87,24 @@ export class RevenueManagerComponent {
   getEmptyRevenue(): FactRevenue {
     return {
       date: '',
-      product_id: 1,
+      product_id: this.dataService.products()[0]?.product_id || 1,
+      client_id: undefined,
       country: 'UAE',
-      gross_amount: 0
+      gross_amount: 0,
+      order_number: '',
+      notes: ''
     };
   }
 
-  openModal() {
+  async openModal() {
     this.isEditMode = false;
     this.currentItem = this.getEmptyRevenue();
     this.modalMonth = new Date().getMonth();
     this.modalYear = new Date().getFullYear();
+    
+    // Auto-generate order number
+    this.currentItem.order_number = await this.dataService.generateOrderNumber();
+    
     this.showModal = true;
   }
 
@@ -114,7 +128,7 @@ export class RevenueManagerComponent {
     this.currentItem.date = `${this.modalYear}-${monthStr}-01`;
 
     if (this.isEditMode) {
-      await (this.dataService as any).updateRevenue(this.currentItem);
+      await this.dataService.updateRevenue(this.currentItem);
     } else {
       await this.dataService.addRevenue(this.currentItem);
     }
