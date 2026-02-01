@@ -15,7 +15,7 @@ export class AuthService {
   currentUser = signal<User | null>(null);
   userProfile = signal<UserProfile | null>(null);
   session = signal<Session | null>(null);
-  loading = signal(true); // يبدأ بحالة تحميل لمنع التوجيه الخاطئ
+  loading = signal(true);
 
   // Computed Values
   isAuthenticated = computed(() => !!this.currentUser());
@@ -23,52 +23,61 @@ export class AuthService {
   isManager = computed(() => ['admin', 'manager'].includes(this.userProfile()?.role || ''));
 
   constructor() {
-    // 1. إعداد العميل مع خيارات حفظ الجلسة
     this.supabase = createClient(environment.supabaseUrl, environment.supabaseKey, {
       auth: {
-        persistSession: true,       // ضروري لحفظ الدخول عند التحديث
-        autoRefreshToken: true,     // تجديد التوكن تلقائياً
-        detectSessionInUrl: true    // ضروري لروابط استعادة كلمة المرور
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true
       }
     });
 
     this.initializeAuth();
   }
 
+  getClient() {
+    return this.supabase;
+  }
+
   private async initializeAuth() {
     try {
-      // 2. محاولة استرجاع الجلسة المخزنة فوراً
+      this.loading.set(true);
+
+      // 1. استرجاع الجلسة الحالية
       const { data: { session } } = await this.supabase.auth.getSession();
 
       if (session) {
         this.session.set(session);
         this.currentUser.set(session.user);
-        // تحميل البروفايل في الخلفية
-        this.loadUserProfile(session.user.id);
+        // جلب البروفايل فوراً
+        await this.loadUserProfile(session.user.id);
       }
 
-      // 3. الاستماع لأي تغييرات (تسجيل دخول/خروج)
+      // 2. الاستماع للتغييرات (تسجيل دخول، خروج، تحديث توكن)
       this.supabase.auth.onAuthStateChange(async (event, session) => {
         console.log('Auth state changed:', event);
 
         if (session) {
           this.session.set(session);
           this.currentUser.set(session.user);
-          // تحميل البروفايل عند تغير الجلسة
-          if (!this.userProfile()) {
-             await this.loadUserProfile(session.user.id);
+
+          // تحديث البروفايل عند تسجيل الدخول
+          if (event === 'SIGNED_IN' || !this.userProfile()) {
+            await this.loadUserProfile(session.user.id);
           }
+
         } else {
-          // تفريغ البيانات عند تسجيل الخروج
+          // تفريغ البيانات عند الخروج
           this.session.set(null);
           this.currentUser.set(null);
           this.userProfile.set(null);
         }
+
+        this.loading.set(false);
       });
+
     } catch (error) {
       console.error('Auth initialization error:', error);
     } finally {
-      // 4. إيقاف حالة التحميل للسماح للتطبيق بالعمل
       this.loading.set(false);
     }
   }
@@ -81,11 +90,13 @@ export class AuthService {
         .eq('id', userId)
         .single();
 
-      if (data && !error) {
+      if (data) {
         this.userProfile.set(data as UserProfile);
+      } else if (error) {
+        console.warn('Could not load profile:', error.message);
       }
-    } catch (error) {
-      console.error('Error loading user profile:', error);
+    } catch (err) {
+      console.error('Unexpected error loading profile:', err);
     }
   }
 
@@ -101,11 +112,10 @@ export class AuthService {
         return { success: false, error: error.message };
       }
 
-      // 5. تحديث الحالة يدوياً وفوراً (Fix Race Condition)
       if (data.session && data.user) {
         this.session.set(data.session);
         this.currentUser.set(data.user);
-        // تحميل البروفايل اختياري هنا ولكن مفضل
+        // جلب البروفايل فوراً لضمان ظهور الاسم
         await this.loadUserProfile(data.user.id);
       }
 
@@ -115,9 +125,9 @@ export class AuthService {
     }
   }
 
-  // --- Sign Out ---
-async signOut(): Promise<void> {
-    // 1. الانتقال فوراً لصفحة الدخول لعدم تأخير المستخدم
+  // --- Sign Out (Optimistic) ---
+  async signOut(): Promise<void> {
+    // 1. الانتقال فوراً لصفحة الدخول (UI First)
     this.router.navigate(['/login']);
 
     // 2. تفريغ البيانات محلياً
@@ -125,13 +135,14 @@ async signOut(): Promise<void> {
     this.session.set(null);
     this.userProfile.set(null);
 
-    // 3. إرسال طلب الخروج للسيرفر (في الخلفية)
+    // 3. إرسال طلب الخروج للسيرفر في الخلفية
     try {
       await this.supabase.auth.signOut();
     } catch (error) {
       console.error('Error signing out:', error);
     }
   }
+
   // --- Sign Up ---
   async signUp(email: string, password: string, fullName: string): Promise<{ success: boolean; error?: string }> {
     try {
@@ -146,6 +157,7 @@ async signOut(): Promise<void> {
       });
 
       if (error) return { success: false, error: error.message };
+
       return { success: true };
     } catch (error: any) {
       return { success: false, error: error.message };
@@ -178,10 +190,5 @@ async signOut(): Promise<void> {
     } catch (error: any) {
       return { success: false, error: error.message };
     }
-  }
-
-  // Helper
-  getClient(): SupabaseClient {
-    return this.supabase;
   }
 }

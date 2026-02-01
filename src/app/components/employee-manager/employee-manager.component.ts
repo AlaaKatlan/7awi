@@ -10,7 +10,6 @@ import { DimEmployee } from '../../models/data.models';
   imports: [CommonModule, FormsModule],
   template: `
     <div class="p-6 bg-[#f8fafc] min-h-screen">
-      <!-- Stats Cards -->
       <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <div class="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-[#1e3a8a]">
           <h3 class="text-gray-400 text-sm font-medium uppercase">Active Employees</h3>
@@ -21,7 +20,7 @@ import { DimEmployee } from '../../models/data.models';
           <p class="text-3xl font-black text-gray-800 mt-2">{{ totalPayroll() | currency:'USD':'symbol':'1.0-0' }}</p>
         </div>
         <div class="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-amber-500">
-          <h3 class="text-gray-400 text-sm font-medium uppercase">Full-Time</h3>
+          <h3 class="text-gray-400 text-sm font-medium uppercase">Full Time</h3>
           <p class="text-3xl font-black text-gray-800 mt-2">{{ fullTimeCount() }}</p>
         </div>
         <div class="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-purple-500">
@@ -30,11 +29,10 @@ import { DimEmployee } from '../../models/data.models';
         </div>
       </div>
 
-      <!-- Filters & Actions -->
       <div class="bg-white p-4 rounded-xl shadow-sm mb-6 border border-gray-100 flex flex-wrap gap-4 items-end">
         <div class="flex-1 min-w-[250px]">
           <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Search Employees</label>
-          <input type="text" [ngModel]="searchText()" (ngModelChange)="searchText.set($event)" 
+          <input type="text" [ngModel]="searchText()" (ngModelChange)="searchText.set($event)"
                  placeholder="Search by name, email..."
                  class="w-full bg-slate-50 border-0 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#1e3a8a] outline-none">
         </div>
@@ -55,10 +53,9 @@ import { DimEmployee } from '../../models/data.models';
           <select [ngModel]="filterContract()" (ngModelChange)="filterContract.set($event)"
                   class="w-full bg-slate-50 border-0 rounded-lg px-3 py-2 outline-none cursor-pointer">
             <option value="ALL">All Types</option>
-            <option value="Full-time">Full-time</option>
-            <option value="Part-time">Part-time</option>
-            <option value="Contract">Contract</option>
-            <option value="Freelance">Freelance</option>
+            <option value="Full Time Contractor">Full-time</option>
+            <option value="Part Time Contractor">Part-time</option>
+             <option value="Permanent">Permanent</option>
           </select>
         </div>
 
@@ -78,11 +75,9 @@ import { DimEmployee } from '../../models/data.models';
         </button>
       </div>
 
-      <!-- Employees Grid -->
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         @for (emp of filteredEmployees(); track emp.employee_id) {
           <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-lg transition-all duration-300 group">
-            <!-- Header -->
             <div class="p-6 border-b border-gray-50">
               <div class="flex items-start justify-between">
                 <div class="flex items-center gap-4">
@@ -101,7 +96,6 @@ import { DimEmployee } from '../../models/data.models';
               </div>
             </div>
 
-            <!-- Details -->
             <div class="p-6 space-y-3">
               <div class="flex justify-between items-center">
                 <span class="text-[10px] text-slate-400 uppercase font-bold">Salary (USD)</span>
@@ -133,7 +127,6 @@ import { DimEmployee } from '../../models/data.models';
               }
             </div>
 
-            <!-- Actions -->
             <div class="px-6 py-4 bg-slate-50 flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
               <button (click)="editEmployee(emp)" class="p-2 hover:bg-white rounded-lg transition">
                 <span class="material-icons text-slate-400 hover:text-[#1e3a8a]">edit</span>
@@ -152,7 +145,6 @@ import { DimEmployee } from '../../models/data.models';
       </div>
     </div>
 
-    <!-- Add/Edit Modal -->
     @if (showModal) {
       <div class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
         <div class="bg-white p-8 rounded-[2rem] w-full max-w-2xl shadow-2xl my-8">
@@ -166,7 +158,6 @@ import { DimEmployee } from '../../models/data.models';
           </div>
 
           <div class="space-y-4">
-            <!-- Basic Info -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Full Name *</label>
@@ -185,7 +176,6 @@ import { DimEmployee } from '../../models/data.models';
               </div>
             </div>
 
-            <!-- Contact Info -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Email</label>
@@ -201,7 +191,6 @@ import { DimEmployee } from '../../models/data.models';
               </div>
             </div>
 
-            <!-- Employment Details -->
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
                 <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Salary (USD) *</label>
@@ -217,10 +206,9 @@ import { DimEmployee } from '../../models/data.models';
                 <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Contract Type</label>
                 <select [(ngModel)]="currentEmployee.contract"
                         class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a] cursor-pointer">
-                  <option value="Full-time">Full-time</option>
-                  <option value="Part-time">Part-time</option>
-                  <option value="Contract">Contract</option>
-                  <option value="Freelance">Freelance</option>
+                  <option value="Full Time Contractor">Full-time Contractor</option>
+                  <option value="Part Time Contractor">Part-time Contractor</option>
+                  <option value="Permanent">Permanent</option>
                 </select>
               </div>
               <div>
@@ -234,7 +222,6 @@ import { DimEmployee } from '../../models/data.models';
               </div>
             </div>
 
-            <!-- Dates -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Start Date *</label>
@@ -263,7 +250,6 @@ import { DimEmployee } from '../../models/data.models';
       </div>
     }
 
-    <!-- Delete Confirmation Modal -->
     @if (showDeleteModal) {
       <div class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
         <div class="bg-white p-8 rounded-[2rem] w-full max-w-md shadow-2xl text-center">
@@ -272,7 +258,7 @@ import { DimEmployee } from '../../models/data.models';
           </div>
           <h3 class="font-black text-xl text-slate-800 mb-2">Delete Employee?</h3>
           <p class="text-slate-500 mb-6">
-            Are you sure you want to delete <strong>{{ employeeToDelete?.name }}</strong>? 
+            Are you sure you want to delete <strong>{{ employeeToDelete?.name }}</strong>?
             This will also delete all related salary records.
           </p>
           <div class="flex gap-3">
@@ -365,6 +351,7 @@ export class EmployeeManagerComponent {
   }
 
   editEmployee(emp: DimEmployee) {
+    console.log('Editing:', emp); // Debug log
     this.isEditMode = true;
     this.currentEmployee = { ...emp };
     this.showModal = true;
@@ -381,31 +368,49 @@ export class EmployeeManagerComponent {
   }
 
   async save() {
-    if (!this.currentEmployee.name.trim() || !this.currentEmployee.salary) return;
+    console.log('Saving employee:', this.currentEmployee); // Debug log
 
-    if (this.isEditMode) {
-      const { error } = await this.dataService.updateEmployee(this.currentEmployee);
-      if (error) {
-        alert('Error updating employee: ' + error);
-        return;
-      }
-    } else {
-      const { error } = await this.dataService.addEmployee(this.currentEmployee);
-      if (error) {
-        alert('Error adding employee: ' + error);
-        return;
-      }
+    // Validation
+    if (!this.currentEmployee.name.trim()) {
+      alert('Employee Name is required');
+      return;
+    }
+    if (!this.currentEmployee.salary) {
+      alert('Salary is required');
+      return;
     }
 
-    this.closeModal();
+    try {
+      let result;
+      if (this.isEditMode) {
+        result = await this.dataService.updateEmployee(this.currentEmployee);
+      } else {
+        result = await this.dataService.addEmployee(this.currentEmployee);
+      }
+
+      console.log('Save result:', result); // Debug log
+
+      if (result.success) {
+        this.closeModal();
+      } else {
+        alert('Error saving employee: ' + result.error);
+      }
+    } catch (error) {
+      console.error('Unexpected error:', error);
+      alert('An unexpected error occurred.');
+    }
   }
 
   async deleteEmployee() {
     if (!this.employeeToDelete) return;
 
-    const { error } = await this.dataService.deleteEmployee(this.employeeToDelete.employee_id);
-    if (error) {
-      alert('Error deleting employee: ' + error);
+    try {
+      const { error } = await this.dataService.deleteEmployee(this.employeeToDelete.employee_id);
+      if (error) {
+        alert('Error deleting employee: ' + error);
+      }
+    } catch (error) {
+      console.error('Delete error:', error);
     }
 
     this.showDeleteModal = false;

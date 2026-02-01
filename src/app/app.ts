@@ -12,22 +12,38 @@ import { MainLayoutComponent } from './components/main-layout/main-layout.compon
   imports: [CommonModule, LoginComponent, MainLayoutComponent],
   template: `
     <!-- Loading Screen -->
-    @if (authService.loading()) {
-      <div class="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center">
-        <div class="text-center">
-          <div class="inline-flex items-center justify-center w-20 h-20 bg-white/10 backdrop-blur-xl rounded-3xl mb-4 border border-white/20 animate-pulse">
-            <span class="text-4xl font-black text-white">7</span>
-          </div>
-          <p class="text-blue-200/70 mt-4">Loading...</p>
+@if (authService.loading()) {
+  <div class="min-h-screen bg-white flex flex-col items-center justify-center z-50 relative overflow-hidden">
+
+    <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-indigo-600"></div>
+
+    <div class="flex flex-col items-center p-8 animate-fade-in">
+
+      <div class="relative mb-8">
+        <div class="absolute inset-0 bg-blue-50 rounded-full animate-ping opacity-75"></div>
+
+        <div class="relative z-10 w-24 h-24 bg-white rounded-full shadow-lg flex items-center justify-center p-4 border border-slate-50">
+          <img src="assets/7awi_Logo.jpg" alt="7awi Logo" class="w-full h-full object-contain">
         </div>
       </div>
-    }
-    
+
+      <div class="flex flex-col items-center gap-3">
+        <div class="w-6 h-6 border-2 border-slate-100 border-t-blue-600 rounded-full animate-spin"></div>
+
+        <div class="text-center">
+           <h3 class="text-slate-900 font-bold text-xl tracking-tight">7awi System</h3>
+           <p class="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">Loading Data...</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+}
     <!-- Login Screen -->
     @else if (!authService.isAuthenticated()) {
       <app-login></app-login>
     }
-    
+
     <!-- Main Application -->
     @else {
       <app-main-layout></app-main-layout>

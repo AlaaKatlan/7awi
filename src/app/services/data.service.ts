@@ -90,11 +90,10 @@ export class DataService {
     if (data) this.salaries.set(data);
   }
 
-  // --- Helper Methods (هام جداً: تم استخدام == بدلاً من === لضمان المطابقة) ---
+  // --- Helper Methods ---
 
   getClientName(id: number | undefined): string {
     if (!id) return '-';
-    // == تسمح بمقارنة النص مع الرقم
     return this.clients().find(c => c.client_id == id)?.client_name || 'Unknown';
   }
 
@@ -110,8 +109,8 @@ export class DataService {
 
   getProductName(id: number | undefined): string {
     if (!id) return '-';
-    // التعديل هنا: == بدلاً من ===
-return this.products().find(p => p.product_id == id)?.product_name || `Product ${id}`;  }
+    return this.products().find(p => p.product_id == id)?.product_name || `Product ${id}`;
+  }
 
   // --- Logic Methods ---
   generateBookingRef(country: string, productId: number): string {
@@ -181,12 +180,25 @@ return this.products().find(p => p.product_id == id)?.product_name || `Product $
     if (data) this.employees.update(v => [data[0], ...v]);
     return { success: !error, error: error?.message, data };
   }
-  async updateEmployee(item: Partial<DimEmployee>) {
-    const { employee_id, ...payload } = item;
-    const { data, error } = await this.supabase.from('dim_employee').update(payload).eq('employee_id', employee_id).select();
-    if (data) this.employees.update(v => v.map(e => e.employee_id === employee_id ? data[0] : e));
-    return { success: !error, error: error?.message, data };
-  }
+async updateEmployee(item: Partial<DimEmployee>) {
+    // نستبعد المعرف من البيانات المرسلة للتحديث
+    const { employee_id, ...payload } = item;
+   
+    const { data, error } = await this.supabase
+      .from('dim_employee')
+      .update(payload)
+      .eq('employee_id', employee_id)
+      .select(); // مهم جداً: select() يعيد الصف المحدث
+
+    if (data && data.length > 0) {
+      // تحديث الـ Signal محلياً ليعكس التغيير فوراً في الواجهة
+      this.employees.update(currentList =>
+        currentList.map(e => e.employee_id === employee_id ? data[0] : e)
+      );
+    }
+
+    return { success: !error, error: error?.message, data };
+  }
   async deleteEmployee(id: number) {
     const { error } = await this.supabase.from('dim_employee').delete().eq('employee_id', id);
     if (!error) this.employees.update(v => v.filter(e => e.employee_id !== id));
