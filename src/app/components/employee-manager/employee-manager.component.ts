@@ -55,7 +55,7 @@ import { DimEmployee } from '../../models/data.models';
             <option value="ALL">All Types</option>
             <option value="Full Time Contractor">Full-time</option>
             <option value="Part Time Contractor">Part-time</option>
-             <option value="Permanent">Permanent</option>
+            <option value="Permanent">Permanent</option>
           </select>
         </div>
 
@@ -241,9 +241,15 @@ import { DimEmployee } from '../../models/data.models';
                     class="flex-1 py-3 text-slate-400 font-bold uppercase text-[10px] tracking-widest hover:bg-slate-50 rounded-xl transition">
               Cancel
             </button>
-            <button (click)="save()" [disabled]="!currentEmployee.name || !currentEmployee.salary"
-                    class="flex-[2] py-3 bg-[#1e3a8a] text-white rounded-xl font-black shadow-lg shadow-blue-200 uppercase text-[10px] tracking-widest hover:bg-blue-900 transition disabled:opacity-50 disabled:cursor-not-allowed">
-              {{ isEditMode ? 'Update Employee' : 'Save Employee' }}
+            <button (click)="save()"
+                    [disabled]="!currentEmployee.name || !currentEmployee.salary || saving()"
+                    class="flex-[2] py-3 bg-[#1e3a8a] text-white rounded-xl font-black shadow-lg shadow-blue-200 uppercase text-[10px] tracking-widest hover:bg-blue-900 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+              @if (saving()) {
+                <span class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
+                <span>Saving...</span>
+              } @else {
+                <span>{{ isEditMode ? 'Update Employee' : 'Save Employee' }}</span>
+              }
             </button>
           </div>
         </div>
@@ -283,6 +289,7 @@ export class EmployeeManagerComponent {
   filterDepartment = signal<number | null>(null);
   filterContract = signal('ALL');
   filterStatus = signal('active');
+  saving = signal(false);
 
   showModal = false;
   showDeleteModal = false;
@@ -294,24 +301,20 @@ export class EmployeeManagerComponent {
   filteredEmployees = computed(() => {
     let data = this.dataService.employees();
 
-    // Filter by status
     if (this.filterStatus() === 'active') {
       data = data.filter(e => !e.end_date);
     } else if (this.filterStatus() === 'inactive') {
       data = data.filter(e => !!e.end_date);
     }
 
-    // Filter by department
     if (this.filterDepartment() !== null) {
       data = data.filter(e => e.department_id === this.filterDepartment());
     }
 
-    // Filter by contract type
     if (this.filterContract() !== 'ALL') {
       data = data.filter(e => e.contract === this.filterContract());
     }
 
-    // Search filter
     const text = this.searchText().toLowerCase();
     if (text) {
       data = data.filter(e =>
@@ -325,7 +328,7 @@ export class EmployeeManagerComponent {
 
   activeEmployeesCount = computed(() => this.dataService.employees().filter(e => !e.end_date).length);
   totalPayroll = computed(() => this.dataService.employees().filter(e => !e.end_date).reduce((sum, e) => sum + Number(e.salary), 0));
-  fullTimeCount = computed(() => this.dataService.employees().filter(e => !e.end_date && e.contract === 'Full-time').length);
+  fullTimeCount = computed(() => this.dataService.employees().filter(e => !e.end_date && (e.contract === 'Full Time Contractor' || e.contract === 'Permanent')).length);
   departmentsCount = computed(() => new Set(this.dataService.employees().map(e => e.department_id)).size);
 
   getEmptyEmployee(): DimEmployee {
@@ -334,7 +337,7 @@ export class EmployeeManagerComponent {
       name: '',
       salary: 0,
       salary_aed: 0,
-      contract: 'Full-time',
+      contract: 'Full Time Contractor',
       office: 'UAE',
       start_date: new Date().toISOString().split('T')[0],
       end_date: null,
@@ -351,9 +354,22 @@ export class EmployeeManagerComponent {
   }
 
   editEmployee(emp: DimEmployee) {
-    console.log('Editing:', emp); // Debug log
+    console.log('Editing employee:', emp);
     this.isEditMode = true;
-    this.currentEmployee = { ...emp };
+    // Deep copy to avoid reference issues
+    this.currentEmployee = {
+      employee_id: emp.employee_id,
+      name: emp.name,
+      salary: emp.salary,
+      salary_aed: emp.salary_aed || 0,
+      contract: emp.contract,
+      office: emp.office,
+      start_date: emp.start_date,
+      end_date: emp.end_date,
+      department_id: emp.department_id,
+      email: emp.email || '',
+      phone: emp.phone || ''
+    };
     this.showModal = true;
   }
 
@@ -368,36 +384,80 @@ export class EmployeeManagerComponent {
   }
 
   async save() {
-    console.log('Saving employee:', this.currentEmployee); // Debug log
+    console.log('=== SAVE CALLED ===');
+    console.log('isEditMode:', this.isEditMode);
+    console.log('currentEmployee:', JSON.stringify(this.currentEmployee, null, 2));
 
     // Validation
-    if (!this.currentEmployee.name.trim()) {
+    if (!this.currentEmployee.name?.trim()) {
       alert('Employee Name is required');
       return;
     }
-    if (!this.currentEmployee.salary) {
-      alert('Salary is required');
+    if (!this.currentEmployee.salary || this.currentEmployee.salary <= 0) {
+      alert('Valid Salary is required');
       return;
     }
 
+    this.saving.set(true);
+
     try {
       let result;
+
       if (this.isEditMode) {
-        result = await this.dataService.updateEmployee(this.currentEmployee);
+        console.log('Calling updateEmployee with ID:', this.currentEmployee.employee_id);
+
+        // Prepare clean payload
+        const updatePayload: Partial<DimEmployee> = {
+          employee_id: this.currentEmployee.employee_id,
+          name: this.currentEmployee.name.trim(),
+          salary: Number(this.currentEmployee.salary),
+          salary_aed: Number(this.currentEmployee.salary_aed) || 0,
+          contract: this.currentEmployee.contract,
+          office: this.currentEmployee.office,
+          start_date: this.currentEmployee.start_date,
+          end_date: this.currentEmployee.end_date || null,
+          department_id: Number(this.currentEmployee.department_id),
+          // email: this.currentEmployee.email?.trim() || null,
+          // phone: this.currentEmployee.phone?.trim() || null
+        };
+
+        console.log('Update payload:', JSON.stringify(updatePayload, null, 2));
+        result = await this.dataService.updateEmployee(updatePayload);
+
       } else {
-        result = await this.dataService.addEmployee(this.currentEmployee);
+        console.log('Calling addEmployee');
+
+        // Prepare clean payload for new employee (without employee_id)
+        const addPayload: Partial<DimEmployee> = {
+          name: this.currentEmployee.name.trim(),
+          salary: Number(this.currentEmployee.salary),
+          salary_aed: Number(this.currentEmployee.salary_aed) || 0,
+          contract: this.currentEmployee.contract,
+          office: this.currentEmployee.office,
+          start_date: this.currentEmployee.start_date,
+          end_date: this.currentEmployee.end_date || null,
+          department_id: Number(this.currentEmployee.department_id),
+          // email: this.currentEmployee.email?.trim() || null,
+          // phone: this.currentEmployee.phone?.trim() || null
+        };
+
+        result = await this.dataService.addEmployee(addPayload);
       }
 
-      console.log('Save result:', result); // Debug log
+      console.log('Save result:', result);
 
       if (result.success) {
+        console.log('Success! Closing modal...');
         this.closeModal();
       } else {
-        alert('Error saving employee: ' + result.error);
+        console.error('Save failed:', result.error);
+        alert('Error saving employee: ' + (result.error || 'Unknown error'));
       }
-    } catch (error) {
-      console.error('Unexpected error:', error);
-      alert('An unexpected error occurred.');
+    } catch (error: any) {
+      console.error('Unexpected error in save:', error);
+      alert('An unexpected error occurred: ' + error.message);
+    } finally {
+      this.saving.set(false);
     }
   }
 
@@ -405,12 +465,13 @@ export class EmployeeManagerComponent {
     if (!this.employeeToDelete) return;
 
     try {
-      const { error } = await this.dataService.deleteEmployee(this.employeeToDelete.employee_id);
-      if (error) {
-        alert('Error deleting employee: ' + error);
+      const result = await this.dataService.deleteEmployee(this.employeeToDelete.employee_id);
+      if (!result.success) {
+        alert('Error deleting employee: ' + result.error);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Delete error:', error);
+      alert('Error deleting employee: ' + error.message);
     }
 
     this.showDeleteModal = false;
