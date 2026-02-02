@@ -30,7 +30,7 @@ import { DimClient } from '../../models/data.models';
       <div class="bg-white p-4 rounded-xl shadow-sm mb-6 border border-gray-100 flex flex-wrap gap-4 items-end">
         <div class="flex-1 min-w-[250px]">
           <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Search Clients</label>
-          <input type="text" [ngModel]="searchText()" (ngModelChange)="searchText.set($event)" 
+          <input type="text" [ngModel]="searchText()" (ngModelChange)="searchText.set($event)"
                  placeholder="Search by name, contact, email..."
                  class="w-full bg-slate-50 border-0 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#1e3a8a] outline-none">
         </div>
@@ -197,7 +197,7 @@ import { DimClient } from '../../models/data.models';
           </div>
           <h3 class="font-black text-xl text-slate-800 mb-2">Delete Client?</h3>
           <p class="text-slate-500 mb-6">
-            Are you sure you want to delete <strong>{{ clientToDelete?.client_name }}</strong>? 
+            Are you sure you want to delete <strong>{{ clientToDelete?.client_name }}</strong>?
             This action cannot be undone.
           </p>
           <div class="flex gap-3">
@@ -220,7 +220,7 @@ export class ClientManagerComponent {
 
   searchText = signal('');
   filterCountry = signal('ALL');
-  
+
   showModal = false;
   showDeleteModal = false;
   isEditMode = false;
@@ -231,10 +231,12 @@ export class ClientManagerComponent {
   filteredClients = computed(() => {
     let data = this.dataService.clients();
 
+    // 1. الفلترة حسب الدولة
     if (this.filterCountry() !== 'ALL') {
       data = data.filter(c => c.country === this.filterCountry());
     }
 
+    // 2. البحث
     const text = this.searchText().toLowerCase();
     if (text) {
       data = data.filter(c =>
@@ -244,7 +246,8 @@ export class ClientManagerComponent {
       );
     }
 
-    return data;
+    // 3. الترتيب الأبجدي (A-Z) - هذا هو الجزء الجديد
+    return data.sort((a, b) => a.client_name.localeCompare(b.client_name));
   });
 
   uaeClientsCount = computed(() => this.dataService.clients().filter(c => c.country === 'UAE').length);

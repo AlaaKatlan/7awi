@@ -86,12 +86,11 @@ export class DataService {
     if (data) this.costs.set(data);
   }
   async fetchSalaries() {
-    const { data } = await this.supabase.from('fact_salary').select('*');
+    const { data } = await this.supabase.from('fact_salary').select('*').order('year', { ascending: false }).order('month', { ascending: false });
     if (data) this.salaries.set(data);
   }
 
   // --- Helper Methods ---
-
   getClientName(id: number | undefined): string {
     if (!id) return '-';
     return this.clients().find(c => c.client_id == id)?.client_name || 'Unknown';
@@ -122,39 +121,111 @@ export class DataService {
     return `${countryCode}-${prodCode}-${increment}`;
   }
 
-  async generateMonthlySalaries(year: number, month: number) {
-    const employees = this.employees();
-    const existing = this.salaries().filter(s => s.year === year && s.month === month);
-    const newSalaries: any[] = [];
-    employees.forEach(emp => {
-      if (!existing.find(s => s.employee_id === emp.employee_id)) {
-        newSalaries.push({
-          employee_id: emp.employee_id,
-          year,
-          month,
-          base_salary: emp.salary,
-          net_salary: emp.salary,
-          status: 'pending'
-        });
+  // =============================================
+  // GENERATE MONTHLY SALARIES - FIXED VERSION V2
+  // =============================================
+  async generateMonthlySalaries(year: number, month: number): Promise<{ success: boolean; error?: any; generated: number }> {
+    console.log('=== generateMonthlySalaries START ===');
+    console.log('Year:', year, 'Month:', month);
+
+    try {
+      // 1. جلب الموظفين النشطين فقط (بدون end_date)
+      const allEmployees = this.employees();
+      const activeEmployees = allEmployees.filter(emp => !emp.end_date);
+
+      console.log('Total employees:', allEmployees.length);
+      console.log('Active employees (no end_date):', activeEmployees.length);
+
+      if (activeEmployees.length === 0) {
+        console.log('No active employees found!');
+        return { success: true, generated: 0 };
       }
-    });
-    let generatedCount = 0;
-    if (newSalaries.length > 0) {
-      const { data, error } = await this.supabase.from('fact_salary').insert(newSalaries).select();
-      if (data) {
-        this.salaries.update(current => [...data, ...current]);
-        generatedCount = data.length;
+
+      // 2. استخدام البيانات المحلية بدلاً من query جديد (أسرع)
+      console.log('Checking existing salaries from local signal...');
+      const localSalaries = this.salaries();
+      const existingForThisMonth = localSalaries.filter(s => s.year === year && s.month === month);
+
+      console.log('Total salaries in signal:', localSalaries.length);
+      console.log('Existing salary records for this month:', existingForThisMonth.length);
+
+      // 3. تحديد الموظفين اللي ما عندهم راتب لهذا الشهر
+      const existingEmployeeIds = new Set(existingForThisMonth.map(s => s.employee_id));
+
+      const employeesNeedingSalary = activeEmployees.filter(
+        emp => !existingEmployeeIds.has(emp.employee_id)
+      );
+
+      console.log('Employees needing salary records:', employeesNeedingSalary.length);
+
+      if (employeesNeedingSalary.length === 0) {
+        console.log('All active employees already have salary records for this period.');
+        return { success: true, generated: 0 };
       }
-      return { success: !error, error, generated: generatedCount };
+
+      // 4. إنشاء سجلات الرواتب الجديدة
+      const newSalaryRecords = employeesNeedingSalary.map(emp => ({
+        employee_id: emp.employee_id,
+        year: year,
+        month: month,
+        base_salary: Number(emp.salary) || 0,
+        bonus: 0,
+        deductions: 0,
+        net_salary: Number(emp.salary) || 0,
+        status: 'pending' as const
+      }));
+
+      console.log('New salary records to insert:', newSalaryRecords.length);
+
+      // 5. إدخال على دفعات (batches) لتجنب timeout - كل 50 سجل
+      const BATCH_SIZE = 50;
+      let totalInserted = 0;
+      const allInsertedData: any[] = [];
+
+      for (let i = 0; i < newSalaryRecords.length; i += BATCH_SIZE) {
+        const batch = newSalaryRecords.slice(i, i + BATCH_SIZE);
+        console.log(`Inserting batch ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(newSalaryRecords.length/BATCH_SIZE)} (${batch.length} records)...`);
+
+        const { data: insertedData, error: insertError } = await this.supabase
+          .from('fact_salary')
+          .insert(batch)
+          .select();
+
+        if (insertError) {
+          console.error('Error inserting batch:', insertError);
+          // Continue with next batch instead of stopping completely
+          continue;
+        }
+
+        if (insertedData) {
+          totalInserted += insertedData.length;
+          allInsertedData.push(...insertedData);
+          console.log(`Batch inserted successfully: ${insertedData.length} records`);
+        }
+      }
+
+      console.log('Total successfully inserted:', totalInserted, 'records');
+
+      // 6. تحديث الـ Signal المحلي
+      if (allInsertedData.length > 0) {
+        this.salaries.update(current => [...allInsertedData, ...current]);
+        console.log('Local salaries signal updated');
+      }
+
+      console.log('=== generateMonthlySalaries END ===');
+      return { success: true, generated: totalInserted };
+
+    } catch (error: any) {
+      console.error('Unexpected error in generateMonthlySalaries:', error);
+      return { success: false, error: error.message, generated: 0 };
     }
-    return { success: true, generated: 0 };
   }
 
-  // --- CRUD Operations ---
-  
   // =============================================
-  // REVENUE
+  // CRUD Operations
   // =============================================
+
+  // --- REVENUE ---
   async addRevenue(item: Partial<FactRevenue>) {
     const payload = {
       date: item.date,
@@ -178,41 +249,34 @@ export class DataService {
     return { success: !error, error: error?.message, data };
   }
 
-  // =============================================
-  // EMPLOYEE - FIXED VERSION
-  // =============================================
+  // --- EMPLOYEE ---
   async addEmployee(item: Partial<DimEmployee>) {
     console.log('[DataService] addEmployee called with:', item);
-    
-    // Remove employee_id if present (auto-generated by DB)
     const { employee_id, created_at, ...payload } = item as any;
-    
+
     const { data, error } = await this.supabase
       .from('dim_employee')
       .insert([payload])
       .select();
-    
+
     console.log('[DataService] addEmployee result - data:', data, 'error:', error);
-    
+
     if (data && data.length > 0) {
       this.employees.update(v => [...v, data[0]].sort((a, b) => a.name.localeCompare(b.name)));
     }
-    
+
     return { success: !error, error: error?.message, data };
   }
 
   async updateEmployee(item: Partial<DimEmployee>) {
     console.log('[DataService] updateEmployee called with:', item);
-    
+
     const { employee_id, created_at, ...payload } = item as any;
-    
+
     if (!employee_id) {
       console.error('[DataService] updateEmployee: No employee_id provided!');
       return { success: false, error: 'No employee_id provided', data: null };
     }
-
-    console.log('[DataService] Updating employee_id:', employee_id);
-    console.log('[DataService] Update payload:', payload);
 
     const { data, error } = await this.supabase
       .from('dim_employee')
@@ -223,64 +287,49 @@ export class DataService {
     console.log('[DataService] updateEmployee result - data:', data, 'error:', error);
 
     if (data && data.length > 0) {
-      // Update local signal
       this.employees.update(currentList =>
         currentList.map(e => e.employee_id === employee_id ? data[0] : e)
       );
-      console.log('[DataService] Local employees signal updated');
     }
 
     return { success: !error, error: error?.message, data };
   }
 
   async deleteEmployee(id: number) {
-    console.log('[DataService] deleteEmployee called with id:', id);
-    
-    const { error } = await this.supabase
-      .from('dim_employee')
-      .delete()
-      .eq('employee_id', id);
-    
-    if (!error) {
-      this.employees.update(v => v.filter(e => e.employee_id !== id));
-    }
-    
+    const { error } = await this.supabase.from('dim_employee').delete().eq('employee_id', id);
+    if (!error) this.employees.update(v => v.filter(e => e.employee_id !== id));
     return { success: !error, error: error?.message };
   }
 
-  // =============================================
-  // CLIENT
-  // =============================================
+  // --- CLIENT ---
   async addClient(item: Partial<DimClient>) {
     const { client_id, created_at, ...payload } = item as any;
     const { data, error } = await this.supabase.from('dim_client').insert([payload]).select();
     if (data) this.clients.update(v => [data[0], ...v]);
     return { success: !error, error: error?.message, data };
   }
-  
+
   async updateClient(item: Partial<DimClient>) {
     const { client_id, created_at, ...payload } = item as any;
     const { data, error } = await this.supabase.from('dim_client').update(payload).eq('client_id', client_id).select();
     if (data) this.clients.update(v => v.map(c => c.client_id === client_id ? data[0] : c));
     return { success: !error, error: error?.message, data };
   }
-  
+
   async deleteClient(id: number) {
     const { error } = await this.supabase.from('dim_client').delete().eq('client_id', id);
     if (!error) this.clients.update(v => v.filter(c => c.client_id !== id));
     return { success: !error, error: error?.message };
   }
 
-  // =============================================
-  // COST
-  // =============================================
+  // --- COST ---
   async addCost(item: Partial<FactCost>) {
     const { id, ...payload } = item as any;
     const { data, error } = await this.supabase.from('fact_cost').insert([payload]).select();
     if (data) this.costs.update(v => [data[0], ...v]);
     return { success: !error, error: error?.message, data };
   }
-  
+
   async updateCost(item: Partial<FactCost>) {
     const { id, ...payload } = item as any;
     const { data, error } = await this.supabase.from('fact_cost').update(payload).eq('id', id).select();
@@ -288,9 +337,7 @@ export class DataService {
     return { success: !error, error: error?.message, data };
   }
 
-  // =============================================
-  // SALARY
-  // =============================================
+  // --- SALARY ---
   async updateSalary(item: Partial<FactSalary>) {
     const { id, created_at, ...payload } = item as any;
     const { data, error } = await this.supabase.from('fact_salary').update(payload).eq('id', id).select();
@@ -298,16 +345,14 @@ export class DataService {
     return { success: !error, error: error?.message, data };
   }
 
-  // =============================================
-  // TARGET
-  // =============================================
+  // --- TARGET ---
   async addTarget(item: Partial<FactTarget>) {
     const { id, ...payload } = item as any;
     const { data, error } = await this.supabase.from('fact_target_annual').insert([payload]).select();
     if (data) this.targets.update(v => [data[0], ...v]);
     return { success: !error, error: error?.message, data };
   }
-  
+
   async updateTarget(item: Partial<FactTarget>) {
     const { id, ...payload } = item as any;
     const { data, error } = await this.supabase.from('fact_target_annual').update(payload).eq('id', id).select();
@@ -315,9 +360,7 @@ export class DataService {
     return { success: !error, error: error?.message, data };
   }
 
-  // =============================================
-  // PIPELINE
-  // =============================================
+  // --- PIPELINE ---
   async addPipeline(item: Partial<FactPipeline>) {
     const { id, ...payload } = item as any;
     const { data, error } = await this.supabase.from('fact_pipeline').insert([payload]).select();
