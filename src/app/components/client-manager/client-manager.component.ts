@@ -44,7 +44,16 @@ import { DimClient } from '../../models/data.models';
             <option value="KSA">KSA</option>
           </select>
         </div>
-
+<div class="w-48">
+          <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Product</label>
+          <select [ngModel]="filterProduct()" (ngModelChange)="filterProduct.set($event)"
+                  class="w-full bg-slate-50 border-0 rounded-lg px-3 py-2 outline-none cursor-pointer">
+            <option [ngValue]="null">All Products</option>
+            @for (prod of dataService.products(); track prod.product_id) {
+              <option [ngValue]="prod.product_id">{{ prod.product_name }}</option>
+            }
+          </select>
+        </div>
         <button (click)="openModal()"
                 class="bg-[#1e3a8a] text-white px-6 py-2 rounded-lg font-bold shadow-md hover:bg-blue-900 transition flex items-center gap-2">
           <span class="material-icons text-sm">add</span> Add Client
@@ -58,6 +67,7 @@ import { DimClient } from '../../models/data.models';
             <tr>
               <th class="p-5">Client Name</th>
               <th class="p-5 text-center">Country</th>
+              <th class="p-5">Product</th>
               <th class="p-5">Lead</th>
               <th class="p-5">Relationship Manager</th>
               <th class="p-5 text-center">Actions</th>
@@ -80,6 +90,15 @@ import { DimClient } from '../../models/data.models';
                     {{ client.country }}
                   </span>
                 </td>
+                <td class="p-5">
+                  @if (client.product_id) {
+                    <span class="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-[10px] font-black uppercase">
+                      {{ dataService.getProductName(client.product_id) }}
+                    </span>
+                  } @else {
+                    <span class="text-slate-300">—</span>
+                  }
+                </td>
                 <td class="p-5 text-slate-600">
                   {{ dataService.getEmployeeName(client.lead_id) }}
                 </td>
@@ -99,7 +118,7 @@ import { DimClient } from '../../models/data.models';
               </tr>
             } @empty {
               <tr>
-                <td colspan="5" class="p-10 text-center text-slate-400 italic">No clients found matching your criteria.</td>
+                <td colspan="6" class="p-10 text-center text-slate-400 italic">No clients found matching your criteria.</td>
               </tr>
             }
           </tbody>
@@ -136,6 +155,18 @@ import { DimClient } from '../../models/data.models';
                       class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a] cursor-pointer">
                 <option value="UAE">UAE</option>
                 <option value="KSA">KSA</option>
+              </select>
+            </div>
+
+            <!-- Product -->
+            <div>
+              <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Product</label>
+              <select [(ngModel)]="currentClient.product_id"
+                      class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a] cursor-pointer">
+                <option [ngValue]="null">— Select Product —</option>
+                @for (prod of dataService.products(); track prod.product_id) {
+                  <option [ngValue]="prod.product_id">{{ prod.product_name }}</option>
+                }
               </select>
             </div>
 
@@ -228,6 +259,7 @@ export class ClientManagerComponent {
   showDeleteModal = false;
   isEditMode = false;
   clientToDelete: DimClient | null = null;
+  filterProduct = signal<number | null>(null); // Signal الجديد
 
   currentClient: DimClient = this.getEmptyClient();
 
@@ -245,7 +277,10 @@ export class ClientManagerComponent {
     if (this.filterCountry() !== 'ALL') {
       data = data.filter(c => c.country === this.filterCountry());
     }
-
+// 2. فلتر المنتج
+    if (this.filterProduct() !== null) {
+      data = data.filter(c => c.product_id === this.filterProduct());
+    }
     // البحث
     const text = this.searchText().toLowerCase();
     if (text) {
@@ -266,6 +301,7 @@ export class ClientManagerComponent {
       client_id: 0,
       client_name: '',
       country: 'UAE',
+      product_id: undefined,
       lead_id: undefined,
       relationship_manager_id: undefined
     };
@@ -283,6 +319,7 @@ export class ClientManagerComponent {
       client_id: client.client_id,
       client_name: client.client_name,
       country: client.country,
+      product_id: client.product_id || undefined,
       lead_id: client.lead_id || undefined,
       relationship_manager_id: client.relationship_manager_id || undefined
     };
@@ -300,35 +337,48 @@ export class ClientManagerComponent {
   }
 
   async save() {
-    if (!this.currentClient.client_name.trim()) return;
+    if (!this.currentClient.client_name.trim()) {
+      alert('Client Name is required');
+      return;
+    }
 
     this.saving.set(true);
 
     try {
-      const payload: Partial<DimClient> = {
+      // تجهيز البيانات: نرسل null إذا كانت القيمة غير موجودة ليقبلها Supabase كقيمة فارغة
+      const payload: any = {
         client_name: this.currentClient.client_name.trim(),
         country: this.currentClient.country,
-        lead_id: this.currentClient.lead_id ? Number(this.currentClient.lead_id) : null as any,
-        relationship_manager_id: this.currentClient.relationship_manager_id ? Number(this.currentClient.relationship_manager_id) : null as any
+        contact_person: '', // تأكدنا من إضافتها
+        contact_email: '',   // تأكدنا من إضافتها
+        contact_phone: '',   // تأكدنا من إضافتها
+        product_id: this.currentClient.product_id ? Number(this.currentClient.product_id) : null,
+        lead_id: this.currentClient.lead_id ? Number(this.currentClient.lead_id) : null,
+        relationship_manager_id: this.currentClient.relationship_manager_id ? Number(this.currentClient.relationship_manager_id) : null
       };
 
       let result;
 
       if (this.isEditMode) {
-        payload.client_id = this.currentClient.client_id;
-        result = await this.dataService.updateClient(payload);
+        // في التحديث نحتاج الـ ID
+        // نستخدم spread operator لدمج الـ payload مع الـ ID
+        result = await this.dataService.updateClient({ client_id: this.currentClient.client_id, ...payload });
       } else {
+        // في الإضافة لا نحتاج ID (يتم توليده تلقائياً)
         result = await this.dataService.addClient(payload);
       }
 
       if (result.success) {
         this.closeModal();
       } else {
-        alert('Error saving client: ' + (result.error || 'Unknown error'));
+        console.error('Save error:', result.error);
+        alert('Failed to save: ' + result.error);
       }
     } catch (error: any) {
-      alert('Error: ' + error.message);
+      console.error('Unexpected error:', error);
+      alert('An unexpected error occurred: ' + error.message);
     } finally {
+      // ضمان إيقاف التحميل في كل الحالات
       this.saving.set(false);
     }
   }

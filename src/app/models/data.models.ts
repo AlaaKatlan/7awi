@@ -10,6 +10,7 @@ export interface DimClient {
   client_id: number;
   client_name: string;
   country: string;
+  product_id?: number;           // Product - تم إضافته
   lead_id?: number;              // Lead - تم إضافته
   relationship_manager_id?: number;  // Relationship Manager - تم إضافته
   created_at?: string;
