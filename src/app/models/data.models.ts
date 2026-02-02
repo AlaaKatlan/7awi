@@ -2,23 +2,16 @@ export interface DimProduct {
   product_id: number;
   product_name: string;
   category?: string;
-  department_id?: number;
-  product_code?: string; // الكود الجديد للمنتج
+  product_code?: string;
+  department_type?: 'Revenue' | 'Cost';
 }
 
 export interface DimClient {
   client_id: number;
   client_name: string;
   country: string;
-  contact_person?: string;
-  contact_email?: string;
-  contact_phone?: string;
-  created_at?: string;
-}
-
-export interface DimDepartment {
-  department_id: number;
-  department_name: string;
+  lead_id?: number;              // Lead - تم إضافته
+  relationship_manager_id?: number;  // Relationship Manager - تم إضافته
   created_at?: string;
 }
 
@@ -31,7 +24,7 @@ export interface DimEmployee {
   office: string;
   start_date: string;
   end_date: string | null;
-  department_id: number;
+  product_id: number;
   email?: string;
   phone?: string;
   created_at?: string;
@@ -39,19 +32,18 @@ export interface DimEmployee {
 
 export interface FactRevenue {
   id?: number;
-  date: string;          // رجعناها date عشان ما تضرب الداشبورد
+  date: string;
   year?: number;
   month?: number;
   product_id: number;
   client_id?: number;
   country: string;
   gross_amount: number;
-  // الحقول الجديدة المطلوبة
   total_value?: number;
-  order_number?: string; // رجعناها order_number
+  order_number?: string;
   lead_id?: number;
   owner_id?: number;
-  booking_order?: string; // حقل احتياطي للعرض اذا لزم
+  booking_order?: string;
   notes?: string;
 }
 
@@ -63,6 +55,9 @@ export interface FactPipeline {
   quarter: number;
   year: number;
   status: string;
+  lead_id?: number;      // Lead - تم إضافته
+  owner_id?: number;     // Owner - تم إضافته
+  created_at?: string;
 }
 
 export interface FactTarget {

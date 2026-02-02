@@ -2,7 +2,7 @@ import { Injectable, signal, inject } from '@angular/core';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { AuthService } from './auth.service';
 import {
-  DimClient, DimProduct, DimDepartment, DimEmployee,
+  DimClient, DimProduct, DimEmployee,
   FactPipeline, FactRevenue, FactTarget, FactCost, FactSalary
 } from '../models/data.models';
 
@@ -16,7 +16,6 @@ export class DataService {
   // Signals
   products = signal<DimProduct[]>([]);
   clients = signal<DimClient[]>([]);
-  departments = signal<DimDepartment[]>([]);
   employees = signal<DimEmployee[]>([]);
   revenues = signal<FactRevenue[]>([]);
   pipelines = signal<FactPipeline[]>([]);
@@ -37,7 +36,6 @@ export class DataService {
       await Promise.all([
         this.fetchProducts(),
         this.fetchClients(),
-        this.fetchDepartments(),
         this.fetchEmployees(),
         this.fetchRevenues(),
         this.fetchPipelines(),
@@ -57,34 +55,37 @@ export class DataService {
     const { data } = await this.supabase.from('dim_product').select('*');
     if (data) this.products.set(data);
   }
+
   async fetchClients() {
     const { data } = await this.supabase.from('dim_client').select('*');
     if (data) this.clients.set(data);
   }
-  async fetchDepartments() {
-    const { data } = await this.supabase.from('dim_department').select('*');
-    if (data) this.departments.set(data);
-  }
+
   async fetchEmployees() {
     const { data } = await this.supabase.from('dim_employee').select('*').order('name', { ascending: true });
     if (data) this.employees.set(data);
   }
+
   async fetchRevenues() {
     const { data } = await this.supabase.from('fact_revenue').select('*').order('date', { ascending: false });
     if (data) this.revenues.set(data);
   }
+
   async fetchPipelines() {
-    const { data } = await this.supabase.from('fact_pipeline').select('*');
+    const { data } = await this.supabase.from('fact_pipeline').select('*').order('created_at', { ascending: false });
     if (data) this.pipelines.set(data);
   }
+
   async fetchTargets() {
     const { data } = await this.supabase.from('fact_target_annual').select('*');
     if (data) this.targets.set(data);
   }
+
   async fetchCosts() {
     const { data } = await this.supabase.from('fact_cost').select('*');
     if (data) this.costs.set(data);
   }
+
   async fetchSalaries() {
     const { data } = await this.supabase.from('fact_salary').select('*').order('year', { ascending: false }).order('month', { ascending: false });
     if (data) this.salaries.set(data);
@@ -94,11 +95,6 @@ export class DataService {
   getClientName(id: number | undefined): string {
     if (!id) return '-';
     return this.clients().find(c => c.client_id == id)?.client_name || 'Unknown';
-  }
-
-  getDepartmentName(id: number | undefined): string {
-    if (!id) return '-';
-    return this.departments().find(d => d.department_id == id)?.department_name || 'Unknown';
   }
 
   getEmployeeName(id: number | undefined): string {
@@ -122,14 +118,13 @@ export class DataService {
   }
 
   // =============================================
-  // GENERATE MONTHLY SALARIES - FIXED VERSION V2
+  // GENERATE MONTHLY SALARIES
   // =============================================
   async generateMonthlySalaries(year: number, month: number): Promise<{ success: boolean; error?: any; generated: number }> {
     console.log('=== generateMonthlySalaries START ===');
     console.log('Year:', year, 'Month:', month);
 
     try {
-      // 1. جلب الموظفين النشطين فقط (بدون end_date)
       const allEmployees = this.employees();
       const activeEmployees = allEmployees.filter(emp => !emp.end_date);
 
@@ -141,7 +136,6 @@ export class DataService {
         return { success: true, generated: 0 };
       }
 
-      // 2. استخدام البيانات المحلية بدلاً من query جديد (أسرع)
       console.log('Checking existing salaries from local signal...');
       const localSalaries = this.salaries();
       const existingForThisMonth = localSalaries.filter(s => s.year === year && s.month === month);
@@ -149,7 +143,6 @@ export class DataService {
       console.log('Total salaries in signal:', localSalaries.length);
       console.log('Existing salary records for this month:', existingForThisMonth.length);
 
-      // 3. تحديد الموظفين اللي ما عندهم راتب لهذا الشهر
       const existingEmployeeIds = new Set(existingForThisMonth.map(s => s.employee_id));
 
       const employeesNeedingSalary = activeEmployees.filter(
@@ -163,7 +156,6 @@ export class DataService {
         return { success: true, generated: 0 };
       }
 
-      // 4. إنشاء سجلات الرواتب الجديدة
       const newSalaryRecords = employeesNeedingSalary.map(emp => ({
         employee_id: emp.employee_id,
         year: year,
@@ -177,7 +169,6 @@ export class DataService {
 
       console.log('New salary records to insert:', newSalaryRecords.length);
 
-      // 5. إدخال على دفعات (batches) لتجنب timeout - كل 50 سجل
       const BATCH_SIZE = 50;
       let totalInserted = 0;
       const allInsertedData: any[] = [];
@@ -193,7 +184,6 @@ export class DataService {
 
         if (insertError) {
           console.error('Error inserting batch:', insertError);
-          // Continue with next batch instead of stopping completely
           continue;
         }
 
@@ -206,7 +196,6 @@ export class DataService {
 
       console.log('Total successfully inserted:', totalInserted, 'records');
 
-      // 6. تحديث الـ Signal المحلي
       if (allInsertedData.length > 0) {
         this.salaries.update(current => [...allInsertedData, ...current]);
         console.log('Local salaries signal updated');
@@ -301,7 +290,7 @@ export class DataService {
     return { success: !error, error: error?.message };
   }
 
-  // --- CLIENT ---
+  // --- CLIENT (معدّل) ---
   async addClient(item: Partial<DimClient>) {
     const { client_id, created_at, ...payload } = item as any;
     const { data, error } = await this.supabase.from('dim_client').insert([payload]).select();
@@ -311,6 +300,11 @@ export class DataService {
 
   async updateClient(item: Partial<DimClient>) {
     const { client_id, created_at, ...payload } = item as any;
+
+    if (!client_id) {
+      return { success: false, error: 'No client_id provided', data: null };
+    }
+
     const { data, error } = await this.supabase.from('dim_client').update(payload).eq('client_id', client_id).select();
     if (data) this.clients.update(v => v.map(c => c.client_id === client_id ? data[0] : c));
     return { success: !error, error: error?.message, data };
@@ -319,6 +313,32 @@ export class DataService {
   async deleteClient(id: number) {
     const { error } = await this.supabase.from('dim_client').delete().eq('client_id', id);
     if (!error) this.clients.update(v => v.filter(c => c.client_id !== id));
+    return { success: !error, error: error?.message };
+  }
+
+  // --- PIPELINE (معدّل - إضافة lead_id و owner_id) ---
+  async addPipeline(item: Partial<FactPipeline>) {
+    const { id, created_at, ...payload } = item as any;
+    const { data, error } = await this.supabase.from('fact_pipeline').insert([payload]).select();
+    if (data) this.pipelines.update(v => [data[0], ...v]);
+    return { success: !error, error: error?.message, data };
+  }
+
+  async updatePipeline(item: Partial<FactPipeline>) {
+    const { id, created_at, ...payload } = item as any;
+
+    if (!id) {
+      return { success: false, error: 'No pipeline id provided', data: null };
+    }
+
+    const { data, error } = await this.supabase.from('fact_pipeline').update(payload).eq('id', id).select();
+    if (data) this.pipelines.update(v => v.map(p => p.id === id ? data[0] : p));
+    return { success: !error, error: error?.message, data };
+  }
+
+  async deletePipeline(id: number) {
+    const { error } = await this.supabase.from('fact_pipeline').delete().eq('id', id);
+    if (!error) this.pipelines.update(v => v.filter(p => p.id !== id));
     return { success: !error, error: error?.message };
   }
 
@@ -357,14 +377,6 @@ export class DataService {
     const { id, ...payload } = item as any;
     const { data, error } = await this.supabase.from('fact_target_annual').update(payload).eq('id', id).select();
     if (data) this.targets.update(v => v.map(t => t.id === id ? data[0] : t));
-    return { success: !error, error: error?.message, data };
-  }
-
-  // --- PIPELINE ---
-  async addPipeline(item: Partial<FactPipeline>) {
-    const { id, ...payload } = item as any;
-    const { data, error } = await this.supabase.from('fact_pipeline').insert([payload]).select();
-    if (data) this.pipelines.update(v => [data[0], ...v]);
     return { success: !error, error: error?.message, data };
   }
 }

@@ -24,8 +24,8 @@ import { DimEmployee } from '../../models/data.models';
           <p class="text-3xl font-black text-gray-800 mt-2">{{ fullTimeCount() }}</p>
         </div>
         <div class="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-purple-500">
-          <h3 class="text-gray-400 text-sm font-medium uppercase">Departments</h3>
-          <p class="text-3xl font-black text-gray-800 mt-2">{{ departmentsCount() }}</p>
+          <h3 class="text-gray-400 text-sm font-medium uppercase">Products</h3>
+          <p class="text-3xl font-black text-gray-800 mt-2">{{ productsCount() }}</p>
         </div>
       </div>
 
@@ -38,12 +38,12 @@ import { DimEmployee } from '../../models/data.models';
         </div>
 
         <div class="w-44">
-          <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Department</label>
-          <select [ngModel]="filterDepartment()" (ngModelChange)="filterDepartment.set($event)"
+          <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Product</label>
+          <select [ngModel]="filterProduct()" (ngModelChange)="filterProduct.set($event)"
                   class="w-full bg-slate-50 border-0 rounded-lg px-3 py-2 outline-none cursor-pointer">
-            <option [ngValue]="null">All Departments</option>
-            @for (dept of dataService.departments(); track dept.department_id) {
-              <option [ngValue]="dept.department_id">{{ dept.department_name }}</option>
+            <option [ngValue]="null">All Products</option>
+            @for (prod of dataService.products(); track prod.product_id) {
+              <option [ngValue]="prod.product_id">{{ prod.product_name }}</option>
             }
           </select>
         </div>
@@ -86,7 +86,7 @@ import { DimEmployee } from '../../models/data.models';
                   </div>
                   <div>
                     <h3 class="font-bold text-slate-800 text-lg">{{ emp.name }}</h3>
-                    <span class="text-xs text-slate-400 font-medium">{{ dataService.getDepartmentName(emp.department_id) }}</span>
+                    <span class="text-xs text-slate-400 font-medium">{{ dataService.getProductName(emp.product_id) }}</span>
                   </div>
                 </div>
                 <span [class]="!emp.end_date ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'"
@@ -166,11 +166,11 @@ import { DimEmployee } from '../../models/data.models';
                        placeholder="Employee name">
               </div>
               <div>
-                <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Department *</label>
-                <select [(ngModel)]="currentEmployee.department_id"
+                <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Product *</label>
+                <select [(ngModel)]="currentEmployee.product_id"
                         class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a] cursor-pointer">
-                  @for (dept of dataService.departments(); track dept.department_id) {
-                    <option [ngValue]="dept.department_id">{{ dept.department_name }}</option>
+                  @for (prod of dataService.products(); track prod.product_id) {
+                    <option [ngValue]="prod.product_id">{{ prod.product_name }}</option>
                   }
                 </select>
               </div>
@@ -286,7 +286,7 @@ export class EmployeeManagerComponent {
   dataService = inject(DataService);
 
   searchText = signal('');
-  filterDepartment = signal<number | null>(null);
+  filterProduct = signal<number | null>(null);  // تم تغييرها من filterDepartment
   filterContract = signal('ALL');
   filterStatus = signal('active');
   saving = signal(false);
@@ -307,8 +307,9 @@ export class EmployeeManagerComponent {
       data = data.filter(e => !!e.end_date);
     }
 
-    if (this.filterDepartment() !== null) {
-      data = data.filter(e => e.department_id === this.filterDepartment());
+    // تم تغييرها من filterDepartment إلى filterProduct
+    if (this.filterProduct() !== null) {
+      data = data.filter(e => e.product_id === this.filterProduct());
     }
 
     if (this.filterContract() !== 'ALL') {
@@ -329,7 +330,8 @@ export class EmployeeManagerComponent {
   activeEmployeesCount = computed(() => this.dataService.employees().filter(e => !e.end_date).length);
   totalPayroll = computed(() => this.dataService.employees().filter(e => !e.end_date).reduce((sum, e) => sum + Number(e.salary), 0));
   fullTimeCount = computed(() => this.dataService.employees().filter(e => !e.end_date && (e.contract === 'Full Time Contractor' || e.contract === 'Permanent')).length);
-  departmentsCount = computed(() => new Set(this.dataService.employees().map(e => e.department_id)).size);
+  // تم تغييرها من departmentsCount إلى productsCount
+  productsCount = computed(() => new Set(this.dataService.employees().map(e => e.product_id)).size);
 
   getEmptyEmployee(): DimEmployee {
     return {
@@ -341,7 +343,7 @@ export class EmployeeManagerComponent {
       office: 'UAE',
       start_date: new Date().toISOString().split('T')[0],
       end_date: null,
-      department_id: this.dataService.departments()[0]?.department_id || 1,
+      product_id: this.dataService.products()[0]?.product_id || 1,  // تم تغييرها
       email: '',
       phone: ''
     };
@@ -356,7 +358,6 @@ export class EmployeeManagerComponent {
   editEmployee(emp: DimEmployee) {
     console.log('Editing employee:', emp);
     this.isEditMode = true;
-    // Deep copy to avoid reference issues
     this.currentEmployee = {
       employee_id: emp.employee_id,
       name: emp.name,
@@ -366,7 +367,7 @@ export class EmployeeManagerComponent {
       office: emp.office,
       start_date: emp.start_date,
       end_date: emp.end_date,
-      department_id: emp.department_id,
+      product_id: emp.product_id,  // تم تغييرها
       email: emp.email || '',
       phone: emp.phone || ''
     };
@@ -388,7 +389,6 @@ export class EmployeeManagerComponent {
     console.log('isEditMode:', this.isEditMode);
     console.log('currentEmployee:', JSON.stringify(this.currentEmployee, null, 2));
 
-    // Validation
     if (!this.currentEmployee.name?.trim()) {
       alert('Employee Name is required');
       return;
@@ -406,7 +406,6 @@ export class EmployeeManagerComponent {
       if (this.isEditMode) {
         console.log('Calling updateEmployee with ID:', this.currentEmployee.employee_id);
 
-        // Prepare clean payload
         const updatePayload: Partial<DimEmployee> = {
           employee_id: this.currentEmployee.employee_id,
           name: this.currentEmployee.name.trim(),
@@ -416,9 +415,7 @@ export class EmployeeManagerComponent {
           office: this.currentEmployee.office,
           start_date: this.currentEmployee.start_date,
           end_date: this.currentEmployee.end_date || null,
-          department_id: Number(this.currentEmployee.department_id),
-          // email: this.currentEmployee.email?.trim() || null,
-          // phone: this.currentEmployee.phone?.trim() || null
+          product_id: Number(this.currentEmployee.product_id),  // تم تغييرها
         };
 
         console.log('Update payload:', JSON.stringify(updatePayload, null, 2));
@@ -427,7 +424,6 @@ export class EmployeeManagerComponent {
       } else {
         console.log('Calling addEmployee');
 
-        // Prepare clean payload for new employee (without employee_id)
         const addPayload: Partial<DimEmployee> = {
           name: this.currentEmployee.name.trim(),
           salary: Number(this.currentEmployee.salary),
@@ -436,9 +432,7 @@ export class EmployeeManagerComponent {
           office: this.currentEmployee.office,
           start_date: this.currentEmployee.start_date,
           end_date: this.currentEmployee.end_date || null,
-          department_id: Number(this.currentEmployee.department_id),
-          // email: this.currentEmployee.email?.trim() || null,
-          // phone: this.currentEmployee.phone?.trim() || null
+          product_id: Number(this.currentEmployee.product_id),  // تم تغييرها
         };
 
         result = await this.dataService.addEmployee(addPayload);

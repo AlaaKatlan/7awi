@@ -2,7 +2,7 @@ import { Component, inject, computed, signal, AfterViewInit } from '@angular/cor
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DataService } from '../../services/data.service';
-import { FactRevenue, FactCost, DimProduct, DimEmployee, DimDepartment } from '../../models/data.models';
+import { FactRevenue, FactCost, DimProduct, DimEmployee } from '../../models/data.models';
 import Chart from 'chart.js/auto';
 
 @Component({
@@ -65,33 +65,47 @@ export class DashboardComponent implements AfterViewInit {
     return breakdown;
   });
 
-  // 3. إحصائيات الأقسام مع الإنتاجية
-  deptStats = computed(() => {
+  // 3. إحصائيات المنتجات مع الإنتاجية (بدلاً من الأقسام)
+  productStats = computed(() => {
     const year = this.selectedYear();
     const currentYear = new Date().getFullYear();
     const currentMonth = new Date().getMonth();
 
-    const depts = this.dataService.departments();
-    const employees = this.dataService.employees();
     const products = this.dataService.products();
+    const employees = this.dataService.employees();
     const revenues = this.dataService.revenues();
 
-    return depts.map(dept => {
-      const deptProductIds = products.filter(p => p.department_id === dept.department_id).map(p => p.product_id);
-      const empCount = employees.filter(e => e.department_id === dept.department_id).length;
-      const totalRev = revenues.filter(r => deptProductIds.includes(r.product_id!) && new Date(r.date).getFullYear() === year).reduce((sum, r) => sum + (Number(r.gross_amount) || 0), 0);
+    return products.map(prod => {
+      // عدد الموظفين في هذا المنتج
+      const empCount = employees.filter(e => e.product_id === prod.product_id && !e.end_date).length;
+      
+      // إيرادات هذا المنتج
+      const totalRev = revenues
+        .filter(r => r.product_id === prod.product_id && new Date(r.date).getFullYear() === year)
+        .reduce((sum, r) => sum + (Number(r.gross_amount) || 0), 0);
+      
       const monthsToCount = year < currentYear ? 12 : (year === currentYear ? currentMonth + 1 : 0);
 
+      // رواتب الموظفين في هذا المنتج
       const totalSalaries = Array.from({ length: monthsToCount }, (_, m) => {
         const d1 = new Date(year, m, 1);
         const d2 = new Date(year, m + 1, 0);
-        return employees.filter(e => e.department_id === dept.department_id && new Date(e.start_date) <= d2 && (!e.end_date || new Date(e.end_date) >= d1)).reduce((sum, e) => sum + (Number(e.salary) || 0), 0);
+        return employees
+          .filter(e => e.product_id === prod.product_id && new Date(e.start_date) <= d2 && (!e.end_date || new Date(e.end_date) >= d1))
+          .reduce((sum, e) => sum + (Number(e.salary) || 0), 0);
       }).reduce((a, b) => a + b, 0);
 
       const profit = totalRev - totalSalaries;
       const productivity = (empCount > 0 && monthsToCount > 0) ? (profit / monthsToCount / empCount) : 0;
 
-      return { name: dept.department_name, empCount, revenue: totalRev, salaries: totalSalaries, profit, productivity };
+      return { 
+        name: prod.product_name, 
+        empCount, 
+        revenue: totalRev, 
+        salaries: totalSalaries, 
+        profit, 
+        productivity 
+      };
     });
   });
 
@@ -144,11 +158,12 @@ export class DashboardComponent implements AfterViewInit {
     this.charts.geo = new Chart('geoChart', { type: 'pie', data: this.getGeoData(), options: { responsive: true, maintainAspectRatio: false } });
     this.charts.profitability = new Chart('profitabilityChart', { type: 'bar', data: this.getProfitabilityData(), options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false } });
     this.charts.allYearsMonthly = new Chart('allYearsMonthlyChart', { type: 'line', data: this.getAllYearsMonthlyData(), options: { responsive: true, maintainAspectRatio: false } });
-    this.charts.deptComparison = new Chart('deptComparisonChart', { type: 'bar', data: this.getDeptComparisonData(), options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } } });
+    // تم تغيير اسم الشارت من deptComparison إلى productComparison
+    this.charts.productComparison = new Chart('productComparisonChart', { type: 'bar', data: this.getProductComparisonData(), options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } } });
     this.charts.salaryType = new Chart('salaryTypeChart', { type: 'doughnut', data: this.getSalaryTypeData(), options: { responsive: true, maintainAspectRatio: false, cutout: '60%', plugins: { legend: { position: 'bottom' } } } });
-    this.charts.productivity = new Chart('deptProductivityChart', {
+    this.charts.productivity = new Chart('productProductivityChart', {
       type: 'bar',
-      data: this.getDeptProductivityData(),
+      data: this.getProductProductivityData(),
       options: {
         responsive: true,
         maintainAspectRatio: false,
@@ -162,7 +177,6 @@ export class DashboardComponent implements AfterViewInit {
   }
 
   private updateCharts() {
-    // ✅ تحديث الشارتات الأساسية
     if (this.charts.main) {
       this.charts.main.data = this.getMainChartData();
       this.charts.main.update();
@@ -198,24 +212,23 @@ export class DashboardComponent implements AfterViewInit {
       this.charts.allYearsMonthly.update();
     }
 
-    // ✅ تحديث شارت مقارنة الأقسام
-    if (this.charts.deptComparison) {
-      this.charts.deptComparison.data = this.getDeptComparisonData();
-      this.charts.deptComparison.update();
+    // تحديث شارت مقارنة المنتجات
+    if (this.charts.productComparison) {
+      this.charts.productComparison.data = this.getProductComparisonData();
+      this.charts.productComparison.update();
     }
 
-    // ✅ تحديث شارت توزيع الرواتب
     if (this.charts.salaryType) {
       this.charts.salaryType.data = this.getSalaryTypeData();
       this.charts.salaryType.update();
     }
 
-    // ✅ تحديث شارت الإنتاجية (مع destroy وإعادة بناء)
+    // تحديث شارت الإنتاجية
     if (this.charts.productivity) {
       this.charts.productivity.destroy();
-      this.charts.productivity = new Chart('deptProductivityChart', {
+      this.charts.productivity = new Chart('productProductivityChart', {
         type: 'bar',
-        data: this.getDeptProductivityData(),
+        data: this.getProductProductivityData(),
         options: {
           responsive: true,
           maintainAspectRatio: false,
@@ -229,7 +242,6 @@ export class DashboardComponent implements AfterViewInit {
     }
   }
 
-  // دالة الشارت تأخذ الليبلز والبيانات من الـ Breakdown الديناميكي مباشرة
   private getSalaryTypeData() {
     const data = this.salaryBreakdown();
     const labels = Object.keys(data);
@@ -242,8 +254,9 @@ export class DashboardComponent implements AfterViewInit {
     };
   }
 
-  private getDeptProductivityData() {
-    const data = this.deptStats().filter(d => d.empCount > 0);
+  // تم تغيير الدالة من getDeptProductivityData إلى getProductProductivityData
+  private getProductProductivityData() {
+    const data = this.productStats().filter(d => d.empCount > 0);
     return {
       labels: data.map(d => d.name),
       datasets: [
@@ -253,8 +266,9 @@ export class DashboardComponent implements AfterViewInit {
     };
   }
 
-  private getDeptComparisonData() {
-    const data = this.deptStats().filter(d => d.revenue > 0 || d.salaries > 0);
+  // تم تغيير الدالة من getDeptComparisonData إلى getProductComparisonData
+  private getProductComparisonData() {
+    const data = this.productStats().filter(d => d.revenue > 0 || d.salaries > 0);
     return {
       labels: data.map(d => d.name),
       datasets: [

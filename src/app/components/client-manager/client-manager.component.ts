@@ -31,7 +31,7 @@ import { DimClient } from '../../models/data.models';
         <div class="flex-1 min-w-[250px]">
           <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Search Clients</label>
           <input type="text" [ngModel]="searchText()" (ngModelChange)="searchText.set($event)"
-                 placeholder="Search by name, contact, email..."
+                 placeholder="Search by name..."
                  class="w-full bg-slate-50 border-0 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#1e3a8a] outline-none">
         </div>
 
@@ -57,10 +57,9 @@ import { DimClient } from '../../models/data.models';
           <thead class="bg-slate-50 text-[10px] text-gray-400 font-black uppercase tracking-widest border-b border-slate-100">
             <tr>
               <th class="p-5">Client Name</th>
-              <th class="p-5">Contact Person</th>
-              <th class="p-5">Email</th>
-              <th class="p-5">Phone</th>
               <th class="p-5 text-center">Country</th>
+              <th class="p-5">Lead</th>
+              <th class="p-5">Relationship Manager</th>
               <th class="p-5 text-center">Actions</th>
             </tr>
           </thead>
@@ -75,22 +74,17 @@ import { DimClient } from '../../models/data.models';
                     <span class="font-bold text-slate-700">{{ client.client_name }}</span>
                   </div>
                 </td>
-                <td class="p-5 text-slate-600">{{ client.contact_person || '—' }}</td>
-                <td class="p-5">
-                  @if (client.contact_email) {
-                    <a [href]="'mailto:' + client.contact_email" class="text-blue-600 hover:underline text-sm">
-                      {{ client.contact_email }}
-                    </a>
-                  } @else {
-                    <span class="text-slate-300">—</span>
-                  }
-                </td>
-                <td class="p-5 text-slate-600 font-mono text-sm">{{ client.contact_phone || '—' }}</td>
                 <td class="p-5 text-center">
                   <span [class]="client.country === 'UAE' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'"
                         class="px-3 py-1 rounded-full text-[10px] font-black uppercase">
                     {{ client.country }}
                   </span>
+                </td>
+                <td class="p-5 text-slate-600">
+                  {{ dataService.getEmployeeName(client.lead_id) }}
+                </td>
+                <td class="p-5 text-slate-600">
+                  {{ dataService.getEmployeeName(client.relationship_manager_id) }}
                 </td>
                 <td class="p-5 text-center">
                   <div class="flex items-center justify-center gap-2">
@@ -105,7 +99,7 @@ import { DimClient } from '../../models/data.models';
               </tr>
             } @empty {
               <tr>
-                <td colspan="6" class="p-10 text-center text-slate-400 italic">No clients found matching your criteria.</td>
+                <td colspan="5" class="p-10 text-center text-slate-400 italic">No clients found matching your criteria.</td>
               </tr>
             }
           </tbody>
@@ -127,6 +121,7 @@ import { DimClient } from '../../models/data.models';
           </div>
 
           <div class="space-y-4">
+            <!-- Client Name -->
             <div>
               <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Client / Company Name *</label>
               <input type="text" [(ngModel)]="currentClient.client_name"
@@ -134,6 +129,7 @@ import { DimClient } from '../../models/data.models';
                      placeholder="Enter client name">
             </div>
 
+            <!-- Country -->
             <div>
               <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Country *</label>
               <select [(ngModel)]="currentClient.country"
@@ -143,32 +139,33 @@ import { DimClient } from '../../models/data.models';
               </select>
             </div>
 
+            <!-- Lead & Relationship Manager -->
             <div class="border-t border-slate-100 pt-4 mt-4">
               <h4 class="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-2">
-                <span class="material-icons text-sm">person</span> Main Contact Person
+                <span class="material-icons text-sm">person</span> Assigned Team
               </h4>
 
-              <div class="space-y-3">
+              <div class="grid grid-cols-2 gap-4">
                 <div>
-                  <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Full Name</label>
-                  <input type="text" [(ngModel)]="currentClient.contact_person"
-                         class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a]"
-                         placeholder="Contact person name">
+                  <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Lead</label>
+                  <select [(ngModel)]="currentClient.lead_id"
+                          class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a] cursor-pointer">
+                    <option [ngValue]="null">— Select Lead —</option>
+                    @for (emp of sortedEmployees(); track emp.employee_id) {
+                      <option [ngValue]="emp.employee_id">{{ emp.name }}</option>
+                    }
+                  </select>
                 </div>
 
-                <div class="grid grid-cols-2 gap-3">
-                  <div>
-                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Email</label>
-                    <input type="email" [(ngModel)]="currentClient.contact_email"
-                           class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a]"
-                           placeholder="email@example.com">
-                  </div>
-                  <div>
-                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Phone</label>
-                    <input type="tel" [(ngModel)]="currentClient.contact_phone"
-                           class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a]"
-                           placeholder="+971 50 000 0000">
-                  </div>
+                <div>
+                  <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Relationship Manager</label>
+                  <select [(ngModel)]="currentClient.relationship_manager_id"
+                          class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a] cursor-pointer">
+                    <option [ngValue]="null">— Select RM —</option>
+                    @for (emp of sortedEmployees(); track emp.employee_id) {
+                      <option [ngValue]="emp.employee_id">{{ emp.name }}</option>
+                    }
+                  </select>
                 </div>
               </div>
             </div>
@@ -179,9 +176,14 @@ import { DimClient } from '../../models/data.models';
                     class="flex-1 py-3 text-slate-400 font-bold uppercase text-[10px] tracking-widest hover:bg-slate-50 rounded-xl transition">
               Cancel
             </button>
-            <button (click)="save()" [disabled]="!currentClient.client_name"
-                    class="flex-[2] py-3 bg-[#1e3a8a] text-white rounded-xl font-black shadow-lg shadow-blue-200 uppercase text-[10px] tracking-widest hover:bg-blue-900 transition disabled:opacity-50 disabled:cursor-not-allowed">
-              {{ isEditMode ? 'Update Client' : 'Save Client' }}
+            <button (click)="save()" [disabled]="!currentClient.client_name || saving()"
+                    class="flex-[2] py-3 bg-[#1e3a8a] text-white rounded-xl font-black shadow-lg shadow-blue-200 uppercase text-[10px] tracking-widest hover:bg-blue-900 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+              @if (saving()) {
+                <span class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
+                <span>Saving...</span>
+              } @else {
+                <span>{{ isEditMode ? 'Update Client' : 'Save Client' }}</span>
+              }
             </button>
           </div>
         </div>
@@ -220,6 +222,7 @@ export class ClientManagerComponent {
 
   searchText = signal('');
   filterCountry = signal('ALL');
+  saving = signal(false);
 
   showModal = false;
   showDeleteModal = false;
@@ -228,25 +231,30 @@ export class ClientManagerComponent {
 
   currentClient: DimClient = this.getEmptyClient();
 
+  // Computed: الموظفين مرتبين أبجدياً
+  sortedEmployees = computed(() => {
+    return this.dataService.employees().filter(e => !e.end_date).slice().sort((a, b) =>
+      a.name.localeCompare(b.name)
+    );
+  });
+
   filteredClients = computed(() => {
     let data = this.dataService.clients();
 
-    // 1. الفلترة حسب الدولة
+    // فلتر الدولة
     if (this.filterCountry() !== 'ALL') {
       data = data.filter(c => c.country === this.filterCountry());
     }
 
-    // 2. البحث
+    // البحث
     const text = this.searchText().toLowerCase();
     if (text) {
       data = data.filter(c =>
-        c.client_name.toLowerCase().includes(text) ||
-        (c.contact_person?.toLowerCase().includes(text)) ||
-        (c.contact_email?.toLowerCase().includes(text))
+        c.client_name.toLowerCase().includes(text)
       );
     }
 
-    // 3. الترتيب الأبجدي (A-Z) - هذا هو الجزء الجديد
+    // الترتيب الأبجدي
     return data.sort((a, b) => a.client_name.localeCompare(b.client_name));
   });
 
@@ -258,9 +266,8 @@ export class ClientManagerComponent {
       client_id: 0,
       client_name: '',
       country: 'UAE',
-      contact_person: '',
-      contact_email: '',
-      contact_phone: ''
+      lead_id: undefined,
+      relationship_manager_id: undefined
     };
   }
 
@@ -272,7 +279,13 @@ export class ClientManagerComponent {
 
   editClient(client: DimClient) {
     this.isEditMode = true;
-    this.currentClient = { ...client };
+    this.currentClient = {
+      client_id: client.client_id,
+      client_name: client.client_name,
+      country: client.country,
+      lead_id: client.lead_id || undefined,
+      relationship_manager_id: client.relationship_manager_id || undefined
+    };
     this.showModal = true;
   }
 
@@ -289,21 +302,35 @@ export class ClientManagerComponent {
   async save() {
     if (!this.currentClient.client_name.trim()) return;
 
-    if (this.isEditMode) {
-      const { error } = await this.dataService.updateClient(this.currentClient);
-      if (error) {
-        alert('Error updating client: ' + error);
-        return;
-      }
-    } else {
-      const { error } = await this.dataService.addClient(this.currentClient);
-      if (error) {
-        alert('Error adding client: ' + error);
-        return;
-      }
-    }
+    this.saving.set(true);
 
-    this.closeModal();
+    try {
+      const payload: Partial<DimClient> = {
+        client_name: this.currentClient.client_name.trim(),
+        country: this.currentClient.country,
+        lead_id: this.currentClient.lead_id ? Number(this.currentClient.lead_id) : null as any,
+        relationship_manager_id: this.currentClient.relationship_manager_id ? Number(this.currentClient.relationship_manager_id) : null as any
+      };
+
+      let result;
+
+      if (this.isEditMode) {
+        payload.client_id = this.currentClient.client_id;
+        result = await this.dataService.updateClient(payload);
+      } else {
+        result = await this.dataService.addClient(payload);
+      }
+
+      if (result.success) {
+        this.closeModal();
+      } else {
+        alert('Error saving client: ' + (result.error || 'Unknown error'));
+      }
+    } catch (error: any) {
+      alert('Error: ' + error.message);
+    } finally {
+      this.saving.set(false);
+    }
   }
 
   async deleteClient() {
