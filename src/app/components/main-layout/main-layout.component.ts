@@ -90,33 +90,36 @@ import { SalaryManagerComponent } from '../salary-manager/salary-manager.compone
               <span *ngIf="sidebarOpen">Costs</span>
           </button>
 
-          <div *ngIf="sidebarOpen" class="pt-4 pb-2">
-            <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">People</span>
-          </div>
+          <!-- ✅ قسم People - يظهر فقط للـ Admin -->
+          <ng-container *ngIf="authService.isAdmin()">
+            <div *ngIf="sidebarOpen" class="pt-4 pb-2">
+              <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">People</span>
+            </div>
 
-          <button (click)="activeTab = 'clients'"
-              [class]="activeTab === 'clients' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
-              [title]="!sidebarOpen ? 'Clients' : ''"
-              class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
-              <span class="material-icons" [class.mr-3]="sidebarOpen">business</span>
-              <span *ngIf="sidebarOpen">Clients</span>
-          </button>
+            <button (click)="activeTab = 'clients'"
+                [class]="activeTab === 'clients' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
+                [title]="!sidebarOpen ? 'Clients' : ''"
+                class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
+                <span class="material-icons" [class.mr-3]="sidebarOpen">business</span>
+                <span *ngIf="sidebarOpen">Clients</span>
+            </button>
 
-          <button (click)="activeTab = 'employees'"
-              [class]="activeTab === 'employees' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
-              [title]="!sidebarOpen ? 'Employees' : ''"
-              class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
-              <span class="material-icons" [class.mr-3]="sidebarOpen">people</span>
-              <span *ngIf="sidebarOpen">Employees</span>
-          </button>
+            <button (click)="activeTab = 'employees'"
+                [class]="activeTab === 'employees' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
+                [title]="!sidebarOpen ? 'Employees' : ''"
+                class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
+                <span class="material-icons" [class.mr-3]="sidebarOpen">people</span>
+                <span *ngIf="sidebarOpen">Employees</span>
+            </button>
 
-          <button (click)="activeTab = 'salaries'"
-              [class]="activeTab === 'salaries' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
-              [title]="!sidebarOpen ? 'Salaries' : ''"
-              class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
-              <span class="material-icons" [class.mr-3]="sidebarOpen">account_balance_wallet</span>
-              <span *ngIf="sidebarOpen">Salaries</span>
-          </button>
+            <button (click)="activeTab = 'salaries'"
+                [class]="activeTab === 'salaries' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
+                [title]="!sidebarOpen ? 'Salaries' : ''"
+                class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
+                <span class="material-icons" [class.mr-3]="sidebarOpen">account_balance_wallet</span>
+                <span *ngIf="sidebarOpen">Salaries</span>
+            </button>
+          </ng-container>
         </nav>
 
         <div class="p-4 border-t border-gray-100">
@@ -165,9 +168,39 @@ import { SalaryManagerComponent } from '../salary-manager/salary-manager.compone
             @case ('pipeline') { <app-pipeline-manager></app-pipeline-manager> }
             @case ('target') { <app-target-manager></app-target-manager> }
             @case ('cost') { <app-cost-manager></app-cost-manager> }
-            @case ('clients') { <app-client-manager></app-client-manager> }
-            @case ('employees') { <app-employee-manager></app-employee-manager> }
-            @case ('salaries') { <app-salary-manager></app-salary-manager> }
+            @case ('clients') {
+              @if (authService.isAdmin()) {
+                <app-client-manager></app-client-manager>
+              } @else {
+                <div class="bg-white rounded-2xl p-12 text-center shadow-sm">
+                  <span class="material-icons text-6xl text-red-200">lock</span>
+                  <h2 class="text-xl font-bold text-slate-700 mt-4">Access Denied</h2>
+                  <p class="text-slate-400 mt-2">You don't have permission to view this page.</p>
+                </div>
+              }
+            }
+            @case ('employees') {
+              @if (authService.isAdmin()) {
+                <app-employee-manager></app-employee-manager>
+              } @else {
+                <div class="bg-white rounded-2xl p-12 text-center shadow-sm">
+                  <span class="material-icons text-6xl text-red-200">lock</span>
+                  <h2 class="text-xl font-bold text-slate-700 mt-4">Access Denied</h2>
+                  <p class="text-slate-400 mt-2">You don't have permission to view this page.</p>
+                </div>
+              }
+            }
+            @case ('salaries') {
+              @if (authService.isAdmin()) {
+                <app-salary-manager></app-salary-manager>
+              } @else {
+                <div class="bg-white rounded-2xl p-12 text-center shadow-sm">
+                  <span class="material-icons text-6xl text-red-200">lock</span>
+                  <h2 class="text-xl font-bold text-slate-700 mt-4">Access Denied</h2>
+                  <p class="text-slate-400 mt-2">You don't have permission to view this page.</p>
+                </div>
+              }
+            }
         }
       </main>
     </div>

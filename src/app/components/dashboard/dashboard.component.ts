@@ -65,7 +65,7 @@ export class DashboardComponent implements AfterViewInit {
     return breakdown;
   });
 
-  // 3. إحصائيات المنتجات مع الإنتاجية (بدلاً من الأقسام)
+  // 3. إحصائيات المنتجات مع الإنتاجية
   productStats = computed(() => {
     const year = this.selectedYear();
     const currentYear = new Date().getFullYear();
@@ -76,17 +76,14 @@ export class DashboardComponent implements AfterViewInit {
     const revenues = this.dataService.revenues();
 
     return products.map(prod => {
-      // عدد الموظفين في هذا المنتج
       const empCount = employees.filter(e => e.product_id === prod.product_id && !e.end_date).length;
 
-      // إيرادات هذا المنتج
       const totalRev = revenues
         .filter(r => r.product_id === prod.product_id && new Date(r.date).getFullYear() === year)
         .reduce((sum, r) => sum + (Number(r.gross_amount) || 0), 0);
 
       const monthsToCount = year < currentYear ? 12 : (year === currentYear ? currentMonth + 1 : 0);
 
-      // رواتب الموظفين في هذا المنتج
       const totalSalaries = Array.from({ length: monthsToCount }, (_, m) => {
         const d1 = new Date(year, m, 1);
         const d2 = new Date(year, m + 1, 0);
@@ -150,17 +147,160 @@ export class DashboardComponent implements AfterViewInit {
     this.updateCharts();
   }
 
+  // ✅ Plugin لإظهار النسب المئوية داخل الـ Pie/Doughnut Charts
+  private percentagePlugin = {
+    id: 'percentagePlugin',
+    afterDatasetsDraw: (chart: any) => {
+      const ctx = chart.ctx;
+      const datasets = chart.data.datasets;
+
+      if (chart.config.type !== 'pie' && chart.config.type !== 'doughnut') return;
+
+      datasets.forEach((dataset: any, datasetIndex: number) => {
+        const meta = chart.getDatasetMeta(datasetIndex);
+        const total = dataset.data.reduce((a: number, b: number) => a + b, 0);
+
+        if (total === 0) return;
+
+        meta.data.forEach((element: any, index: number) => {
+          const value = dataset.data[index];
+          const percentage = ((value / total) * 100).toFixed(1);
+
+          // لا تعرض إذا كانت النسبة صغيرة جداً
+          if (parseFloat(percentage) < 3) return;
+
+          const { x, y } = element.tooltipPosition();
+
+          ctx.save();
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 11px Inter, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+
+          // إضافة ظل للنص ليكون واضح
+          ctx.shadowColor = 'rgba(0,0,0,0.5)';
+          ctx.shadowBlur = 3;
+          ctx.shadowOffsetX = 1;
+          ctx.shadowOffsetY = 1;
+
+          ctx.fillText(`${percentage}%`, x, y);
+          ctx.restore();
+        });
+      });
+    }
+  };
+
   private initCharts() {
-    this.charts.main = new Chart('mainChart', { type: 'line', data: this.getMainChartData(), options: { responsive: true, maintainAspectRatio: false } });
-    this.charts.donut = new Chart('productProfitChart', { type: 'doughnut', data: this.getDonutData(), options: { responsive: true, maintainAspectRatio: false, cutout: '75%', plugins: { legend: { position: 'bottom' } } } });
-    this.charts.targetVsActual = new Chart('targetVsActualChart', { type: 'bar', data: this.getTargetVsActualData(), options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } } });
-    this.charts.multiYear = new Chart('multiYearChart', { type: 'bar', data: this.getMultiYearData(), options: { responsive: true, maintainAspectRatio: false } });
-    this.charts.geo = new Chart('geoChart', { type: 'pie', data: this.getGeoData(), options: { responsive: true, maintainAspectRatio: false } });
-    this.charts.profitability = new Chart('profitabilityChart', { type: 'bar', data: this.getProfitabilityData(), options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false } });
-    this.charts.allYearsMonthly = new Chart('allYearsMonthlyChart', { type: 'line', data: this.getAllYearsMonthlyData(), options: { responsive: true, maintainAspectRatio: false } });
-    // تم تغيير اسم الشارت من deptComparison إلى productComparison
-    this.charts.productComparison = new Chart('productComparisonChart', { type: 'bar', data: this.getProductComparisonData(), options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } } });
-    this.charts.salaryType = new Chart('salaryTypeChart', { type: 'doughnut', data: this.getSalaryTypeData(), options: { responsive: true, maintainAspectRatio: false, cutout: '60%', plugins: { legend: { position: 'bottom' } } } });
+    // تسجيل الـ Plugin
+    Chart.register(this.percentagePlugin);
+
+    this.charts.main = new Chart('mainChart', {
+      type: 'line',
+      data: this.getMainChartData(),
+      options: { responsive: true, maintainAspectRatio: false }
+    });
+
+    // ✅ Doughnut مع نسب مئوية
+    this.charts.donut = new Chart('productProfitChart', {
+      type: 'doughnut',
+      data: this.getDonutData(),
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '60%',
+        plugins: {
+          legend: { position: 'bottom' },
+          tooltip: {
+            callbacks: {
+              label: (context: any) => {
+                const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0);
+                const value = context.raw;
+                const percentage = ((value / total) * 100).toFixed(1);
+                return `${context.label}: $${value.toLocaleString()} (${percentage}%)`;
+              }
+            }
+          }
+        }
+      }
+    });
+
+    this.charts.targetVsActual = new Chart('targetVsActualChart', {
+      type: 'bar',
+      data: this.getTargetVsActualData(),
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+    });
+
+    this.charts.multiYear = new Chart('multiYearChart', {
+      type: 'bar',
+      data: this.getMultiYearData(),
+      options: { responsive: true, maintainAspectRatio: false }
+    });
+
+    // ✅ Pie Chart مع نسب مئوية - Geographical
+    this.charts.geo = new Chart('geoChart', {
+      type: 'pie',
+      data: this.getGeoData(),
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom' },
+          tooltip: {
+            callbacks: {
+              label: (context: any) => {
+                const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0);
+                const value = context.raw;
+                const percentage = ((value / total) * 100).toFixed(1);
+                return `${context.label}: $${value.toLocaleString()} (${percentage}%)`;
+              }
+            }
+          }
+        }
+      }
+    });
+
+    this.charts.profitability = new Chart('profitabilityChart', {
+      type: 'bar',
+      data: this.getProfitabilityData(),
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false }
+    });
+
+    this.charts.allYearsMonthly = new Chart('allYearsMonthlyChart', {
+      type: 'line',
+      data: this.getAllYearsMonthlyData(),
+      options: { responsive: true, maintainAspectRatio: false }
+    });
+
+    this.charts.productComparison = new Chart('productComparisonChart', {
+      type: 'bar',
+      data: this.getProductComparisonData(),
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+    });
+
+    // ✅ Doughnut مع نسب مئوية - Salary
+    this.charts.salaryType = new Chart('salaryTypeChart', {
+      type: 'doughnut',
+      data: this.getSalaryTypeData(),
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '60%',
+        plugins: {
+          legend: { position: 'bottom' },
+          tooltip: {
+            callbacks: {
+              label: (context: any) => {
+                const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0);
+                const value = context.raw;
+                const percentage = ((value / total) * 100).toFixed(1);
+                return `${context.label}: $${value.toLocaleString()} (${percentage}%)`;
+              }
+            }
+          }
+        }
+      }
+    });
+
     this.charts.productivity = new Chart('productProductivityChart', {
       type: 'bar',
       data: this.getProductProductivityData(),
@@ -212,7 +352,6 @@ export class DashboardComponent implements AfterViewInit {
       this.charts.allYearsMonthly.update();
     }
 
-    // تحديث شارت مقارنة المنتجات
     if (this.charts.productComparison) {
       this.charts.productComparison.data = this.getProductComparisonData();
       this.charts.productComparison.update();
@@ -223,7 +362,6 @@ export class DashboardComponent implements AfterViewInit {
       this.charts.salaryType.update();
     }
 
-    // تحديث شارت الإنتاجية
     if (this.charts.productivity) {
       this.charts.productivity.destroy();
       this.charts.productivity = new Chart('productProductivityChart', {
@@ -254,7 +392,6 @@ export class DashboardComponent implements AfterViewInit {
     };
   }
 
-  // تم تغيير الدالة من getDeptProductivityData إلى getProductProductivityData
   private getProductProductivityData() {
     const data = this.productStats().filter(d => d.empCount > 0);
     return {
@@ -266,7 +403,6 @@ export class DashboardComponent implements AfterViewInit {
     };
   }
 
-  // تم تغيير الدالة من getDeptComparisonData إلى getProductComparisonData
   private getProductComparisonData() {
     const data = this.productStats().filter(d => d.revenue > 0 || d.salaries > 0);
     return {
@@ -274,14 +410,48 @@ export class DashboardComponent implements AfterViewInit {
       datasets: [
         { label: 'Revenue', data: data.map(d => d.revenue), backgroundColor: '#1e3a8a', borderRadius: 4 },
         { label: 'Salaries', data: data.map(d => d.salaries), backgroundColor: '#f59e0b', borderRadius: 4 },
-        { label: 'Net Profit', data: data.map(d => d.profit), backgroundColor: '#10b981', borderRadius: 4 }
+        {
+          label: 'Net Profit',
+          data: data.map(d => d.profit),
+          backgroundColor: data.map(d => d.profit >= 0 ? '#10b981' : '#ef4444'), // ✅ أخضر للموجب، أحمر للسالب
+          borderRadius: 4
+        }
       ]
     };
   }
 
-  private getMainChartData() { return { labels: this.monthNames, datasets: [{ label: 'Revenue', data: this.totals().monthlyRevenue, borderColor: '#2563eb', fill: true, backgroundColor: 'rgba(37, 99, 235, 0.05)', tension: 0.4 }, { label: 'Total Cost', data: this.totals().monthlyCost, borderColor: '#f43f5e', borderDash: [5, 5], tension: 0.4 }] }; }
-  private getDonutData() { const data = this.summaryData().filter(p => p.total > 0).sort((a, b) => b.total - a.total); return { labels: data.map(p => p.name), datasets: [{ data: data.map(p => p.total), backgroundColor: ['#1e3a8a', '#2563eb', '#60a5fa', '#10b981', '#f59e0b', '#f43f5e'] }] }; }
-  private getTargetVsActualData() { const data = this.summaryData().filter(p => p.total > 0 || p.target > 0); return { labels: data.map(p => p.name), datasets: [{ label: 'Target', data: data.map(p => p.target), backgroundColor: 'rgba(245, 158, 11, 0.2)', borderColor: '#f59e0b', borderWidth: 1 }, { label: 'Actual', data: data.map(p => p.total), backgroundColor: '#2563eb' }] }; }
+  private getMainChartData() {
+    return {
+      labels: this.monthNames,
+      datasets: [
+        { label: 'Revenue', data: this.totals().monthlyRevenue, borderColor: '#2563eb', fill: true, backgroundColor: 'rgba(37, 99, 235, 0.05)', tension: 0.4 },
+        { label: 'Total Cost', data: this.totals().monthlyCost, borderColor: '#f43f5e', borderDash: [5, 5], tension: 0.4 }
+      ]
+    };
+  }
+
+  private getDonutData() {
+    const data = this.summaryData().filter(p => p.total > 0).sort((a, b) => b.total - a.total);
+    return {
+      labels: data.map(p => p.name),
+      datasets: [{
+        data: data.map(p => p.total),
+        backgroundColor: ['#1e3a8a', '#2563eb', '#60a5fa', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6', '#06b6d4']
+      }]
+    };
+  }
+
+  private getTargetVsActualData() {
+    const data = this.summaryData().filter(p => p.total > 0 || p.target > 0);
+    return {
+      labels: data.map(p => p.name),
+      datasets: [
+        { label: 'Target', data: data.map(p => p.target), backgroundColor: 'rgba(245, 158, 11, 0.2)', borderColor: '#f59e0b', borderWidth: 1 },
+        { label: 'Actual', data: data.map(p => p.total), backgroundColor: '#2563eb' }
+      ]
+    };
+  }
+
   private getAllYearsMonthlyData() {
     const years = [...this.yearsList()].reverse();
     const colors = ['#1e3a8a', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6'];
@@ -294,7 +464,59 @@ export class DashboardComponent implements AfterViewInit {
       }))
     };
   }
-  private getGeoData() { const revs = this.dataService.revenues().filter(r => new Date(r.date).getFullYear() === this.selectedYear()); return { labels: ['UAE', 'KSA'], datasets: [{ data: [revs.filter(r => r.country === 'UAE').reduce((s, r) => s + Number(r.gross_amount), 0), revs.filter(r => r.country === 'KSA').reduce((s, r) => s + Number(r.gross_amount), 0)], backgroundColor: ['#10b981', '#f59e0b'] }] }; }
-  private getProfitabilityData() { const year = this.selectedYear(); const data = this.dataService.products().map(p => { const rev = this.dataService.revenues().filter(r => r.product_id === p.product_id && new Date(r.date).getFullYear() === year).reduce((s, r) => s + (Number(r.gross_amount) || 0), 0); const cost = this.dataService.costs().filter(c => c.product_id === p.product_id && c.year === year).reduce((s, c) => s + (Number(c.amount) || 0), 0); return { name: p.product_name, margin: rev > 0 ? ((rev - cost) / rev) * 100 : 0 }; }).filter(x => x.margin !== 0).sort((a, b) => b.margin - a.margin); return { labels: data.map(d => d.name), datasets: [{ label: 'Margin %', data: data.map(d => d.margin), backgroundColor: '#10b981' }] }; }
-  private getMultiYearData() { const years = [...this.yearsList()].reverse(); return { labels: years.map(String), datasets: [{ label: 'Annual Revenue', data: years.map(year => this.dataService.revenues().filter(r => new Date(r.date).getFullYear() === year).reduce((sum, r) => sum + (Number(r.gross_amount) || 0), 0)), backgroundColor: '#1e3a8a', borderRadius: 10 }] }; }
+
+  private getGeoData() {
+    const revs = this.dataService.revenues().filter(r => new Date(r.date).getFullYear() === this.selectedYear());
+    const uaeTotal = revs.filter(r => r.country === 'UAE').reduce((s, r) => s + Number(r.gross_amount), 0);
+    const ksaTotal = revs.filter(r => r.country === 'KSA').reduce((s, r) => s + Number(r.gross_amount), 0);
+    const syrTotal = revs.filter(r => r.country === 'SYR').reduce((s, r) => s + Number(r.gross_amount), 0);
+    const jorTotal = revs.filter(r => r.country === 'JOR').reduce((s, r) => s + Number(r.gross_amount), 0);
+    const otherTotal = revs.filter(r => !['UAE', 'KSA', 'SYR', 'JOR'].includes(r.country)).reduce((s, r) => s + Number(r.gross_amount), 0);
+
+    const labels = [];
+    const data = [];
+    const colors = [];
+
+    if (uaeTotal > 0) { labels.push('UAE'); data.push(uaeTotal); colors.push('#10b981'); }
+    if (ksaTotal > 0) { labels.push('KSA'); data.push(ksaTotal); colors.push('#f59e0b'); }
+    if (syrTotal > 0) { labels.push('SYR'); data.push(syrTotal); colors.push('#3b82f6'); }
+    if (jorTotal > 0) { labels.push('JOR'); data.push(jorTotal); colors.push('#8b5cf6'); }
+    if (otherTotal > 0) { labels.push('Other'); data.push(otherTotal); colors.push('#64748b'); }
+
+    return {
+      labels: labels,
+      datasets: [{ data: data, backgroundColor: colors }]
+    };
+  }
+
+  private getProfitabilityData() {
+    const year = this.selectedYear();
+    const data = this.dataService.products().map(p => {
+      const rev = this.dataService.revenues().filter(r => r.product_id === p.product_id && new Date(r.date).getFullYear() === year).reduce((s, r) => s + (Number(r.gross_amount) || 0), 0);
+      const cost = this.dataService.costs().filter(c => c.product_id === p.product_id && c.year === year).reduce((s, c) => s + (Number(c.amount) || 0), 0);
+      return { name: p.product_name, margin: rev > 0 ? ((rev - cost) / rev) * 100 : 0 };
+    }).filter(x => x.margin !== 0).sort((a, b) => b.margin - a.margin);
+
+    return {
+      labels: data.map(d => d.name),
+      datasets: [{
+        label: 'Margin %',
+        data: data.map(d => d.margin),
+        backgroundColor: data.map(d => d.margin >= 0 ? '#10b981' : '#ef4444') // ✅ أحمر للسالب
+      }]
+    };
+  }
+
+  private getMultiYearData() {
+    const years = [...this.yearsList()].reverse();
+    return {
+      labels: years.map(String),
+      datasets: [{
+        label: 'Annual Revenue',
+        data: years.map(year => this.dataService.revenues().filter(r => new Date(r.date).getFullYear() === year).reduce((sum, r) => sum + (Number(r.gross_amount) || 0), 0)),
+        backgroundColor: '#1e3a8a',
+        borderRadius: 10
+      }]
+    };
+  }
 }
