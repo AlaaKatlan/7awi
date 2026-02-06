@@ -86,7 +86,7 @@ import { FactPipeline } from '../../models/data.models';
               <th class="p-5">Client</th>
               <th class="p-5">Product</th>
               <th class="p-5">Lead</th>
-              <th class="p-5">Owner</th>
+              <th class="p-5">Relationship Manager</th>
               <th class="p-5 text-right">Target Amount</th>
               <th class="p-5 text-center">Period</th>
               <th class="p-5 text-center">Status</th>
@@ -199,10 +199,10 @@ import { FactPipeline } from '../../models/data.models';
                 </select>
               </div>
               <div>
-                <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Owner</label>
+                <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Relationship Manager</label>
                 <select [(ngModel)]="currentPipeline.owner_id"
                         class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer">
-                  <option [ngValue]="null">— Select Owner —</option>
+                  <option [ngValue]="null">— Select Relationship Manager —</option>
                   @for (emp of sortedEmployees(); track emp.employee_id) {
                     <option [ngValue]="emp.employee_id">{{ emp.name }}</option>
                   }
@@ -280,7 +280,7 @@ import { FactPipeline } from '../../models/data.models';
           </div>
           <h3 class="font-black text-xl text-slate-800 mb-2">Delete Pipeline?</h3>
           <p class="text-slate-500 mb-6">
-            Are you sure you want to delete this pipeline record for 
+            Are you sure you want to delete this pipeline record for
             <strong>{{ dataService.getClientName(pipelineToDelete?.client_id) }}</strong>?
           </p>
           <div class="flex gap-3">

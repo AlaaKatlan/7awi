@@ -90,12 +90,12 @@
         </div>
 
         <div class="lg:col-span-6 bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
-           <h3 class="font-black text-slate-800 mb-6 italic uppercase text-sm tracking-widest text-center">Product Contribution</h3>
+           <h3 class="font-black text-slate-800 mb-6 italic uppercase text-sm tracking-widest text-center">Department Contribution</h3>
            <div class="h-[300px]"><canvas id="productProfitChart"></canvas></div>
         </div>
 
         <div class="lg:col-span-6 bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
-           <h3 class="font-black text-slate-800 mb-6 italic uppercase text-sm tracking-widest text-center">Product Profitability Index</h3>
+           <h3 class="font-black text-slate-800 mb-6 italic uppercase text-sm tracking-widest text-center">Department Profitability Index</h3>
            <div class="h-[300px]"><canvas id="profitabilityChart"></canvas></div>
         </div>
       </div>
@@ -103,7 +103,7 @@
 <!-- تم تغيير العنوان من Department إلى Product -->
 <div class="lg:col-span-12 bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 mb-8">
    <h3 class="font-black text-slate-800 mb-6 flex items-center gap-2 italic uppercase text-sm tracking-widest">
-     <span class="w-2 h-6 bg-slate-900 rounded-full"></span> Product Financial Performance Analysis
+     <span class="w-2 h-6 bg-slate-900 rounded-full"></span> Department Financial Performance Analysis
    </h3>
    <div class="h-[450px]"><canvas id="productComparisonChart"></canvas></div>
 </div>
@@ -143,7 +143,7 @@
 <div class="lg:col-span-12 bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 mb-8">
    <div class="flex justify-between items-center mb-6">
      <h3 class="font-black text-slate-800 flex items-center gap-2 italic uppercase text-sm tracking-widest">
-       <span class="w-2 h-6 bg-blue-500 rounded-full"></span> Product Productivity & Headcount Matrix
+       <span class="w-2 h-6 bg-blue-500 rounded-full"></span> Department Productivity & Headcount Matrix
      </h3>
      <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Efficiency per Employee</span>
    </div>
@@ -151,7 +151,7 @@
      <canvas id="productProductivityChart"></canvas>
    </div>
    <p class="mt-4 text-[10px] text-slate-400 italic text-center">
-     * Productivity = (Annual Product Revenue - Annual Salaries) / 12 Months / Total Staff in Product
+     * Productivity = (Annual Department Revenue - Annual Salaries) / 12 Months / Total Staff in Department
    </p>
 </div>
 
@@ -168,7 +168,7 @@
           <table class="w-full text-left border-collapse">
             <thead>
               <tr class="bg-slate-50 text-slate-400 uppercase text-[10px] font-black tracking-widest border-b border-slate-100">
-                <th class="p-5 sticky left-0 bg-slate-50 z-10 min-w-[180px]">Category / Product</th>
+                <th class="p-5 sticky left-0 bg-slate-50 z-10 min-w-[180px]">Department</th>
                 @for (m of monthNames; track m) {
                   <th class="p-3 text-center">{{ m }}</th>
                 }

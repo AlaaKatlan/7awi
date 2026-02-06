@@ -55,37 +55,37 @@ export class DataService {
     const { data } = await this.supabase.from('dim_product').select('*');
     if (data) this.products.set(data);
   }
-  
+
   async fetchClients() {
     const { data } = await this.supabase.from('dim_client').select('*');
     if (data) this.clients.set(data);
   }
-  
+
   async fetchEmployees() {
     const { data } = await this.supabase.from('dim_employee').select('*').order('name', { ascending: true });
     if (data) this.employees.set(data);
   }
-  
+
   async fetchRevenues() {
     const { data } = await this.supabase.from('fact_revenue').select('*').order('date', { ascending: false });
     if (data) this.revenues.set(data);
   }
-  
+
   async fetchPipelines() {
     const { data } = await this.supabase.from('fact_pipeline').select('*').order('created_at', { ascending: false });
     if (data) this.pipelines.set(data);
   }
-  
+
   async fetchTargets() {
     const { data } = await this.supabase.from('fact_target_annual').select('*');
     if (data) this.targets.set(data);
   }
-  
+
   async fetchCosts() {
     const { data } = await this.supabase.from('fact_cost').select('*');
     if (data) this.costs.set(data);
   }
-  
+
   async fetchSalaries() {
     const { data } = await this.supabase.from('fact_salary').select('*').order('year', { ascending: false }).order('month', { ascending: false });
     if (data) this.salaries.set(data);
@@ -109,7 +109,7 @@ export class DataService {
 
   // --- Logic Methods ---
   generateBookingRef(country: string, productId: number): string {
-    const countryCode = (country || 'UA').substring(0, 2).toUpperCase();
+    const countryCode = (country || 'UAE').substring(0, 3).toUpperCase();
     const product = this.products().find(p => p.product_id == productId);
     const prodCode = product?.product_code || 'GEN';
     const nextId = this.revenues().length + 1;
@@ -156,17 +156,37 @@ export class DataService {
         return { success: true, generated: 0 };
       }
 
-      const newSalaryRecords = employeesNeedingSalary.map(emp => ({
-        employee_id: emp.employee_id,
-        year: year,
-        month: month,
-        base_salary: Number(emp.salary) || 0,
-        bonus: 0,
-        deductions: 0,
-        net_salary: Number(emp.salary) || 0,
-        status: 'pending' as const
-      }));
+      // const newSalaryRecords = employeesNeedingSalary.map(emp => ({
+      //   employee_id: emp.employee_id,
+      //   year: year,
+      //   month: month,
+      //   base_salary: Number(emp.salary) || 0,
+      //   bonus: 0,
+      //   deductions: 0,
+      //   net_salary: Number(emp.salary) || 0,
+      //   status: 'pending' as const
+      // }));
+      // القيمة التي سيتم الضرب بها (المعامل)
+      const SALARY_MULTIPLIER = 1;
 
+      const newSalaryRecords = employeesNeedingSalary.map(emp => {
+        // حساب الراتب الأساسي بعد الضرب
+        const calculatedBase = (Number(emp.salary) || 0) * SALARY_MULTIPLIER;
+
+        // نقوم بتقريب الناتج لأقرب خانتين عشريتين لضمان دقة البيانات المالية
+        const finalSalary = Math.round(calculatedBase * 100) / 100;
+
+        return {
+          employee_id: emp.employee_id,
+          year: year,
+          month: month,
+          base_salary: finalSalary,
+          bonus: 0,
+          deductions: 0,
+          net_salary: finalSalary, // تأكد أن صافي الراتب يعكس القيمة الجديدة أيضاً
+          status: 'pending' as const
+        };
+      });
       console.log('New salary records to insert:', newSalaryRecords.length);
 
       const BATCH_SIZE = 50;
@@ -175,7 +195,7 @@ export class DataService {
 
       for (let i = 0; i < newSalaryRecords.length; i += BATCH_SIZE) {
         const batch = newSalaryRecords.slice(i, i + BATCH_SIZE);
-        console.log(`Inserting batch ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(newSalaryRecords.length/BATCH_SIZE)} (${batch.length} records)...`);
+        console.log(`Inserting batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(newSalaryRecords.length / BATCH_SIZE)} (${batch.length} records)...`);
 
         const { data: insertedData, error: insertError } = await this.supabase
           .from('fact_salary')
@@ -293,40 +313,40 @@ export class DataService {
   // --- CLIENT (معدّل) ---
   async addClient(item: Partial<DimClient>) {
     console.log('[DataService] addClient called with:', item);
-    
+
     // تنظيف الـ payload - إزالة القيم الفارغة
     const payload: any = {
       client_name: item.client_name,
       country: item.country || 'UAE'
     };
-    
+
     // إضافة الحقول الاختيارية فقط إذا كانت موجودة
     if (item.product_id) payload.product_id = item.product_id;
     if (item.lead_id) payload.lead_id = item.lead_id;
     if (item.relationship_manager_id) payload.relationship_manager_id = item.relationship_manager_id;
-    
+
     console.log('[DataService] Clean payload:', payload);
-    
+
     const { data, error } = await this.supabase.from('dim_client').insert([payload]).select();
-    
+
     console.log('[DataService] addClient result - data:', data, 'error:', error);
-    
+
     if (data && data.length > 0) {
       this.clients.update(v => [data[0], ...v]);
     }
-    
+
     return { success: !error, error: error?.message, data };
   }
 
   async updateClient(item: Partial<DimClient>) {
     console.log('[DataService] updateClient called with:', item);
-    
+
     const { client_id, created_at, ...rest } = item as any;
-    
+
     if (!client_id) {
       return { success: false, error: 'No client_id provided', data: null };
     }
-    
+
     // تنظيف الـ payload
     const payload: any = {};
     if (rest.client_name !== undefined) payload.client_name = rest.client_name;
@@ -334,17 +354,17 @@ export class DataService {
     if (rest.product_id !== undefined) payload.product_id = rest.product_id || null;
     if (rest.lead_id !== undefined) payload.lead_id = rest.lead_id || null;
     if (rest.relationship_manager_id !== undefined) payload.relationship_manager_id = rest.relationship_manager_id || null;
-    
+
     console.log('[DataService] Update payload:', payload);
-    
+
     const { data, error } = await this.supabase.from('dim_client').update(payload).eq('client_id', client_id).select();
-    
+
     console.log('[DataService] updateClient result - data:', data, 'error:', error);
-    
+
     if (data && data.length > 0) {
       this.clients.update(v => v.map(c => c.client_id === client_id ? data[0] : c));
     }
-    
+
     return { success: !error, error: error?.message, data };
   }
 
@@ -364,11 +384,11 @@ export class DataService {
 
   async updatePipeline(item: Partial<FactPipeline>) {
     const { id, created_at, ...payload } = item as any;
-    
+
     if (!id) {
       return { success: false, error: 'No pipeline id provided', data: null };
     }
-    
+
     const { data, error } = await this.supabase.from('fact_pipeline').update(payload).eq('id', id).select();
     if (data) this.pipelines.update(v => v.map(p => p.id === id ? data[0] : p));
     return { success: !error, error: error?.message, data };

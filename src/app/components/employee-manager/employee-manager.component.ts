@@ -24,7 +24,7 @@ import { DimEmployee } from '../../models/data.models';
           <p class="text-3xl font-black text-gray-800 mt-2">{{ fullTimeCount() }}</p>
         </div>
         <div class="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-purple-500">
-          <h3 class="text-gray-400 text-sm font-medium uppercase">Products</h3>
+          <h3 class="text-gray-400 text-sm font-medium uppercase">Departments</h3>
           <p class="text-3xl font-black text-gray-800 mt-2">{{ productsCount() }}</p>
         </div>
       </div>
@@ -38,11 +38,11 @@ import { DimEmployee } from '../../models/data.models';
         </div>
 
         <div class="w-44">
-          <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Product</label>
+          <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Department</label>
           <select [ngModel]="filterProduct()" (ngModelChange)="filterProduct.set($event)"
                   class="w-full bg-slate-50 border-0 rounded-lg px-3 py-2 outline-none cursor-pointer">
-            <option [ngValue]="null">All Products</option>
-            @for (prod of dataService.products(); track prod.product_id) {
+            <option [ngValue]="null">All Departments</option>
+            @for (prod of sortedProducts(); track prod.product_id) {
               <option [ngValue]="prod.product_id">{{ prod.product_name }}</option>
             }
           </select>
@@ -101,22 +101,18 @@ import { DimEmployee } from '../../models/data.models';
                 <span class="text-[10px] text-slate-400 uppercase font-bold">Salary (USD)</span>
                 <span class="font-black text-lg text-[#1e3a8a]">{{ emp.salary | currency:'USD':'symbol':'1.0-0' }}</span>
               </div>
-
               <div class="flex justify-between items-center">
                 <span class="text-[10px] text-slate-400 uppercase font-bold">Contract</span>
                 <span class="px-2 py-1 bg-blue-50 text-blue-700 rounded-lg text-xs font-bold">{{ emp.contract }}</span>
               </div>
-
               <div class="flex justify-between items-center">
                 <span class="text-[10px] text-slate-400 uppercase font-bold">Office</span>
                 <span class="text-sm text-slate-600">{{ emp.office }}</span>
               </div>
-
               <div class="flex justify-between items-center">
                 <span class="text-[10px] text-slate-400 uppercase font-bold">Start Date</span>
                 <span class="text-sm text-slate-600 font-mono">{{ emp.start_date | date:'MMM yyyy' }}</span>
               </div>
-
               @if (emp.email) {
                 <div class="pt-3 border-t border-slate-50">
                   <a [href]="'mailto:' + emp.email" class="text-blue-600 hover:underline text-sm flex items-center gap-1">
@@ -166,10 +162,10 @@ import { DimEmployee } from '../../models/data.models';
                        placeholder="Employee name">
               </div>
               <div>
-                <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Product *</label>
+                <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Department *</label>
                 <select [(ngModel)]="currentEmployee.product_id"
                         class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a] cursor-pointer">
-                  @for (prod of dataService.products(); track prod.product_id) {
+                  @for (prod of sortedProducts(); track prod.product_id) {
                     <option [ngValue]="prod.product_id">{{ prod.product_name }}</option>
                   }
                 </select>
@@ -286,7 +282,7 @@ export class EmployeeManagerComponent {
   dataService = inject(DataService);
 
   searchText = signal('');
-  filterProduct = signal<number | null>(null);  // تم تغييرها من filterDepartment
+  filterProduct = signal<number | null>(null);
   filterContract = signal('ALL');
   filterStatus = signal('active');
   saving = signal(false);
@@ -295,6 +291,12 @@ export class EmployeeManagerComponent {
   showDeleteModal = false;
   isEditMode = false;
   employeeToDelete: DimEmployee | null = null;
+
+  sortedProducts = computed(() => {
+    return this.dataService.products().slice().sort((a, b) =>
+      a.product_name.localeCompare(b.product_name)
+    );
+  });
 
   currentEmployee: DimEmployee = this.getEmptyEmployee();
 
@@ -307,7 +309,6 @@ export class EmployeeManagerComponent {
       data = data.filter(e => !!e.end_date);
     }
 
-    // تم تغييرها من filterDepartment إلى filterProduct
     if (this.filterProduct() !== null) {
       data = data.filter(e => e.product_id === this.filterProduct());
     }
@@ -324,14 +325,22 @@ export class EmployeeManagerComponent {
       );
     }
 
-    return data;
+    return data.sort((a, b) => a.name.localeCompare(b.name));
   });
 
-  activeEmployeesCount = computed(() => this.dataService.employees().filter(e => !e.end_date).length);
-  totalPayroll = computed(() => this.dataService.employees().filter(e => !e.end_date).reduce((sum, e) => sum + Number(e.salary), 0));
-  fullTimeCount = computed(() => this.dataService.employees().filter(e => !e.end_date && (e.contract === 'Full Time Contractor' || e.contract === 'Permanent')).length);
-  // تم تغييرها من departmentsCount إلى productsCount
-  productsCount = computed(() => new Set(this.dataService.employees().map(e => e.product_id)).size);
+  // ✅ التغييرات هنا: الاعتماد على filteredEmployees() بدلاً من dataService.employees()
+
+  // عدد الموظفين النشطين في القائمة المفلترة
+  activeEmployeesCount = computed(() => this.filteredEmployees().filter(e => !e.end_date).length);
+
+  // مجموع رواتب الموظفين النشطين في القائمة المفلترة
+  totalPayroll = computed(() => this.filteredEmployees().filter(e => !e.end_date).reduce((sum, e) => sum + Number(e.salary), 0));
+
+  // عدد موظفي العقود الكاملة/الدائمة في القائمة المفلترة (والنشطين)
+  fullTimeCount = computed(() => this.filteredEmployees().filter(e => !e.end_date && (e.contract === 'Full Time Contractor' || e.contract === 'Permanent')).length);
+
+  // عدد الأقسام المختلفة في القائمة المفلترة
+  productsCount = computed(() => new Set(this.filteredEmployees().map(e => e.product_id)).size);
 
   getEmptyEmployee(): DimEmployee {
     return {
@@ -343,7 +352,7 @@ export class EmployeeManagerComponent {
       office: 'UAE',
       start_date: new Date().toISOString().split('T')[0],
       end_date: null,
-      product_id: this.dataService.products()[0]?.product_id || 1,  // تم تغييرها
+      product_id: 0,
       email: '',
       phone: ''
     };
@@ -352,25 +361,16 @@ export class EmployeeManagerComponent {
   openModal() {
     this.isEditMode = false;
     this.currentEmployee = this.getEmptyEmployee();
+    const products = this.sortedProducts();
+    if (products.length > 0) {
+        this.currentEmployee.product_id = products[0].product_id;
+    }
     this.showModal = true;
   }
 
   editEmployee(emp: DimEmployee) {
-    console.log('Editing employee:', emp);
     this.isEditMode = true;
-    this.currentEmployee = {
-      employee_id: emp.employee_id,
-      name: emp.name,
-      salary: emp.salary,
-      salary_aed: emp.salary_aed || 0,
-      contract: emp.contract,
-      office: emp.office,
-      start_date: emp.start_date,
-      end_date: emp.end_date,
-      product_id: emp.product_id,  // تم تغييرها
-      email: emp.email || '',
-      phone: emp.phone || ''
-    };
+    this.currentEmployee = { ...emp };
     this.showModal = true;
   }
 
@@ -385,10 +385,6 @@ export class EmployeeManagerComponent {
   }
 
   async save() {
-    console.log('=== SAVE CALLED ===');
-    console.log('isEditMode:', this.isEditMode);
-    console.log('currentEmployee:', JSON.stringify(this.currentEmployee, null, 2));
-
     if (!this.currentEmployee.name?.trim()) {
       alert('Employee Name is required');
       return;
@@ -402,53 +398,32 @@ export class EmployeeManagerComponent {
 
     try {
       let result;
+      const payload: Partial<DimEmployee> = {
+          name: this.currentEmployee.name.trim(),
+          salary: Number(this.currentEmployee.salary),
+          salary_aed: Number(this.currentEmployee.salary_aed) || 0,
+          contract: this.currentEmployee.contract,
+          office: this.currentEmployee.office,
+          start_date: this.currentEmployee.start_date,
+          end_date: this.currentEmployee.end_date || null,
+          product_id: Number(this.currentEmployee.product_id),
+          email: this.currentEmployee.email || '',
+          phone: this.currentEmployee.phone || ''
+      };
 
       if (this.isEditMode) {
-        console.log('Calling updateEmployee with ID:', this.currentEmployee.employee_id);
-
-        const updatePayload: Partial<DimEmployee> = {
-          employee_id: this.currentEmployee.employee_id,
-          name: this.currentEmployee.name.trim(),
-          salary: Number(this.currentEmployee.salary),
-          salary_aed: Number(this.currentEmployee.salary_aed) || 0,
-          contract: this.currentEmployee.contract,
-          office: this.currentEmployee.office,
-          start_date: this.currentEmployee.start_date,
-          end_date: this.currentEmployee.end_date || null,
-          product_id: Number(this.currentEmployee.product_id),  // تم تغييرها
-        };
-
-        console.log('Update payload:', JSON.stringify(updatePayload, null, 2));
-        result = await this.dataService.updateEmployee(updatePayload);
-
+        payload.employee_id = this.currentEmployee.employee_id;
+        result = await this.dataService.updateEmployee(payload);
       } else {
-        console.log('Calling addEmployee');
-
-        const addPayload: Partial<DimEmployee> = {
-          name: this.currentEmployee.name.trim(),
-          salary: Number(this.currentEmployee.salary),
-          salary_aed: Number(this.currentEmployee.salary_aed) || 0,
-          contract: this.currentEmployee.contract,
-          office: this.currentEmployee.office,
-          start_date: this.currentEmployee.start_date,
-          end_date: this.currentEmployee.end_date || null,
-          product_id: Number(this.currentEmployee.product_id),  // تم تغييرها
-        };
-
-        result = await this.dataService.addEmployee(addPayload);
+        result = await this.dataService.addEmployee(payload);
       }
 
-      console.log('Save result:', result);
-
       if (result.success) {
-        console.log('Success! Closing modal...');
         this.closeModal();
       } else {
-        console.error('Save failed:', result.error);
         alert('Error saving employee: ' + (result.error || 'Unknown error'));
       }
     } catch (error: any) {
-      console.error('Unexpected error in save:', error);
       alert('An unexpected error occurred: ' + error.message);
     } finally {
       this.saving.set(false);
@@ -464,7 +439,6 @@ export class EmployeeManagerComponent {
         alert('Error deleting employee: ' + result.error);
       }
     } catch (error: any) {
-      console.error('Delete error:', error);
       alert('Error deleting employee: ' + error.message);
     }
 

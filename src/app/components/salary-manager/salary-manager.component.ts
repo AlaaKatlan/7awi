@@ -10,19 +10,25 @@ import { FactSalary } from '../../models/data.models';
   imports: [CommonModule, FormsModule],
   template: `
     <div class="p-6 bg-[#f8fafc] min-h-screen">
-      <!-- Header with Generate Action -->
       <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
           <h1 class="text-2xl font-black text-slate-800 uppercase tracking-tight">Monthly Payroll Management</h1>
           <p class="text-slate-500 text-sm">Manage and track employee salaries month by month</p>
         </div>
-        <button (click)="openGenerateModal()"
-                class="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-emerald-700 transition flex items-center gap-2">
-          <span class="material-icons">auto_fix_high</span> Generate Monthly Salaries
-        </button>
+
+        <div class="flex gap-2">
+          <button (click)="exportToCSV()"
+                  class="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition flex items-center gap-2">
+            <span class="material-icons">download</span> Export Report
+          </button>
+
+          <button (click)="openGenerateModal()"
+                  class="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-emerald-700 transition flex items-center gap-2">
+            <span class="material-icons">auto_fix_high</span> Generate Monthly Salaries
+          </button>
+        </div>
       </div>
 
-      <!-- Stats Cards -->
       <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <div class="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-[#1e3a8a]">
           <h3 class="text-gray-400 text-sm font-medium uppercase">Records This Month</h3>
@@ -42,11 +48,11 @@ import { FactSalary } from '../../models/data.models';
         </div>
       </div>
 
-      <!-- Filters -->
       <div class="bg-white p-4 rounded-xl shadow-sm mb-6 border border-gray-100 flex flex-wrap gap-4 items-end">
+
         <div class="flex-1 min-w-[200px]">
           <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Search Employee</label>
-          <input type="text" [ngModel]="searchText()" (ngModelChange)="searchText.set($event)" 
+          <input type="text" [ngModel]="searchText()" (ngModelChange)="searchText.set($event)"
                  placeholder="Search by name..."
                  class="w-full bg-slate-50 border-0 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#1e3a8a] outline-none">
         </div>
@@ -72,6 +78,17 @@ import { FactSalary } from '../../models/data.models';
           </select>
         </div>
 
+        <div class="w-44">
+          <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Department</label>
+          <select [ngModel]="filterProduct()" (ngModelChange)="filterProduct.set($event)"
+                  class="w-full bg-slate-50 border-0 rounded-lg px-3 py-2 outline-none cursor-pointer">
+            <option [ngValue]="null">All Departments</option>
+            @for (prod of sortedProducts(); track prod.product_id) {
+              <option [ngValue]="prod.product_id">{{ prod.product_name }}</option>
+            }
+          </select>
+        </div>
+
         <div class="w-32">
           <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Status</label>
           <select [ngModel]="filterStatus()" (ngModelChange)="filterStatus.set($event)"
@@ -89,7 +106,6 @@ import { FactSalary } from '../../models/data.models';
         </button>
       </div>
 
-      <!-- Salary Table -->
       <div class="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100">
         <table class="w-full text-left border-collapse">
           <thead class="bg-slate-50 text-[10px] text-gray-400 font-black uppercase tracking-widest border-b border-slate-100">
@@ -112,7 +128,12 @@ import { FactSalary } from '../../models/data.models';
                     <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm">
                       {{ getEmployeeInitial(salary.employee_id) }}
                     </div>
-                    <span class="font-bold text-slate-700">{{ dataService.getEmployeeName(salary.employee_id) }}</span>
+                    <div>
+                      <span class="font-bold text-slate-700 block">{{ dataService.getEmployeeName(salary.employee_id) }}</span>
+                      <span class="text-[10px] text-slate-400 font-medium">
+                        {{ getEmployeeDepartment(salary.employee_id) }}
+                      </span>
+                    </div>
                   </div>
                 </td>
                 <td class="p-5 text-center">
@@ -136,13 +157,11 @@ import { FactSalary } from '../../models/data.models';
                 </td>
                 <td class="p-5 text-center">
                   <div class="flex items-center justify-center gap-1">
-                    <button (click)="editSalary(salary)" class="text-slate-400 hover:text-[#1e3a8a] transition p-2"
-                            title="Edit">
+                    <button (click)="editSalary(salary)" class="text-slate-400 hover:text-[#1e3a8a] transition p-2" title="Edit">
                       <span class="material-icons text-base">edit</span>
                     </button>
                     @if (salary.status === 'pending') {
-                      <button (click)="markAsPaid(salary)" class="text-slate-400 hover:text-emerald-500 transition p-2"
-                              title="Mark as Paid">
+                      <button (click)="markAsPaid(salary)" class="text-slate-400 hover:text-emerald-500 transition p-2" title="Mark as Paid">
                         <span class="material-icons text-base">check_circle</span>
                       </button>
                     }
@@ -165,7 +184,6 @@ import { FactSalary } from '../../models/data.models';
       </div>
     </div>
 
-    <!-- Generate Salaries Modal -->
     @if (showGenerateModal) {
       <div class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
         <div class="bg-white p-8 rounded-[2rem] w-full max-w-md shadow-2xl">
@@ -175,40 +193,27 @@ import { FactSalary } from '../../models/data.models';
               <span class="material-icons">close</span>
             </button>
           </div>
-
           <p class="text-slate-500 text-sm mb-6">
-            This will create salary records for all active employees for the selected month. 
+            This will create salary records for all active employees for the selected month.
             Existing records will not be overwritten.
           </p>
-
           <div class="grid grid-cols-2 gap-4 mb-6">
             <div>
               <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Year</label>
-              <select [(ngModel)]="generateYear"
-                      class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a] cursor-pointer">
-                @for (year of yearsList(); track year) {
-                  <option [ngValue]="year">{{ year }}</option>
-                }
+              <select [(ngModel)]="generateYear" class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a] cursor-pointer">
+                @for (year of yearsList(); track year) { <option [ngValue]="year">{{ year }}</option> }
               </select>
             </div>
             <div>
               <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Month</label>
-              <select [(ngModel)]="generateMonth"
-                      class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a] cursor-pointer">
-                @for (m of months; track m.value) {
-                  <option [ngValue]="m.value">{{ m.name }}</option>
-                }
+              <select [(ngModel)]="generateMonth" class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a] cursor-pointer">
+                @for (m of months; track m.value) { <option [ngValue]="m.value">{{ m.name }}</option> }
               </select>
             </div>
           </div>
-
           <div class="flex gap-3">
-            <button (click)="showGenerateModal = false"
-                    class="flex-1 py-3 text-slate-400 font-bold uppercase text-[10px] tracking-widest hover:bg-slate-50 rounded-xl transition">
-              Cancel
-            </button>
-            <button (click)="generateSalaries()" [disabled]="generating()"
-                    class="flex-[2] py-3 bg-emerald-600 text-white rounded-xl font-black shadow-lg uppercase text-[10px] tracking-widest hover:bg-emerald-700 transition disabled:opacity-50">
+            <button (click)="showGenerateModal = false" class="flex-1 py-3 text-slate-400 font-bold uppercase text-[10px] tracking-widest hover:bg-slate-50 rounded-xl transition">Cancel</button>
+            <button (click)="generateSalaries()" [disabled]="generating()" class="flex-[2] py-3 bg-emerald-600 text-white rounded-xl font-black shadow-lg uppercase text-[10px] tracking-widest hover:bg-emerald-700 transition disabled:opacity-50">
               {{ generating() ? 'Generating...' : 'Generate Salaries' }}
             </button>
           </div>
@@ -216,7 +221,6 @@ import { FactSalary } from '../../models/data.models';
       </div>
     }
 
-    <!-- Edit Salary Modal -->
     @if (showEditModal) {
       <div class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
         <div class="bg-white p-8 rounded-[2rem] w-full max-w-lg shadow-2xl">
@@ -224,74 +228,28 @@ import { FactSalary } from '../../models/data.models';
             <h3 class="font-black text-xl text-slate-800 uppercase tracking-tight">
               Edit Salary - {{ dataService.getEmployeeName(currentSalary.employee_id) }}
             </h3>
-            <button (click)="showEditModal = false" class="text-slate-400 hover:text-rose-500 transition">
-              <span class="material-icons">close</span>
-            </button>
+            <button (click)="showEditModal = false" class="text-slate-400 hover:text-rose-500 transition"><span class="material-icons">close</span></button>
           </div>
-
           <div class="bg-slate-50 p-4 rounded-xl mb-6">
             <span class="text-[10px] font-black text-slate-400 uppercase">Period</span>
             <p class="text-lg font-bold text-slate-700">{{ getMonthName(currentSalary.month) }} {{ currentSalary.year }}</p>
           </div>
-
           <div class="space-y-4">
             <div class="grid grid-cols-3 gap-4">
-              <div>
-                <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Base Salary</label>
-                <input type="number" [(ngModel)]="currentSalary.base_salary" (ngModelChange)="calculateNet()"
-                       class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a] font-bold">
-              </div>
-              <div>
-                <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Bonus (+)</label>
-                <input type="number" [(ngModel)]="currentSalary.bonus" (ngModelChange)="calculateNet()"
-                       class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-emerald-500 text-emerald-600">
-              </div>
-              <div>
-                <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Deductions (-)</label>
-                <input type="number" [(ngModel)]="currentSalary.deductions" (ngModelChange)="calculateNet()"
-                       class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-rose-500 text-rose-500">
-              </div>
+              <div><label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Base Salary</label><input type="number" [(ngModel)]="currentSalary.base_salary" (ngModelChange)="calculateNet()" class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a] font-bold"></div>
+              <div><label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Bonus (+)</label><input type="number" [(ngModel)]="currentSalary.bonus" (ngModelChange)="calculateNet()" class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-emerald-500 text-emerald-600"></div>
+              <div><label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Deductions (-)</label><input type="number" [(ngModel)]="currentSalary.deductions" (ngModelChange)="calculateNet()" class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-rose-500 text-rose-500"></div>
             </div>
-
-            <div class="bg-blue-50 p-4 rounded-xl">
-              <span class="text-[10px] font-black text-blue-400 uppercase">Net Salary</span>
-              <p class="text-2xl font-black text-[#1e3a8a]">{{ currentSalary.net_salary | currency:'USD':'symbol':'1.0-0' }}</p>
-            </div>
-
+            <div class="bg-blue-50 p-4 rounded-xl"><span class="text-[10px] font-black text-blue-400 uppercase">Net Salary</span><p class="text-2xl font-black text-[#1e3a8a]">{{ currentSalary.net_salary | currency:'USD':'symbol':'1.0-0' }}</p></div>
             <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Status</label>
-                <select [(ngModel)]="currentSalary.status"
-                        class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a] cursor-pointer">
-                  <option value="pending">Pending</option>
-                  <option value="paid">Paid</option>
-                  <option value="cancelled">Cancelled</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Payment Date</label>
-                <input type="date" [(ngModel)]="currentSalary.payment_date"
-                       class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a]">
-              </div>
+              <div><label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Status</label><select [(ngModel)]="currentSalary.status" class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a] cursor-pointer"><option value="pending">Pending</option><option value="paid">Paid</option><option value="cancelled">Cancelled</option></select></div>
+              <div><label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Payment Date</label><input type="date" [(ngModel)]="currentSalary.payment_date" class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a]"></div>
             </div>
-
-            <div>
-              <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Notes</label>
-              <textarea [(ngModel)]="currentSalary.notes" rows="2"
-                        class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a]"
-                        placeholder="Optional notes..."></textarea>
-            </div>
+            <div><label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Notes</label><textarea [(ngModel)]="currentSalary.notes" rows="2" class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a]" placeholder="Optional notes..."></textarea></div>
           </div>
-
           <div class="mt-8 flex gap-3">
-            <button (click)="showEditModal = false"
-                    class="flex-1 py-3 text-slate-400 font-bold uppercase text-[10px] tracking-widest hover:bg-slate-50 rounded-xl transition">
-              Cancel
-            </button>
-            <button (click)="saveSalary()"
-                    class="flex-[2] py-3 bg-[#1e3a8a] text-white rounded-xl font-black shadow-lg shadow-blue-200 uppercase text-[10px] tracking-widest hover:bg-blue-900 transition">
-              Save Changes
-            </button>
+            <button (click)="showEditModal = false" class="flex-1 py-3 text-slate-400 font-bold uppercase text-[10px] tracking-widest hover:bg-slate-50 rounded-xl transition">Cancel</button>
+            <button (click)="saveSalary()" class="flex-[2] py-3 bg-[#1e3a8a] text-white rounded-xl font-black shadow-lg shadow-blue-200 uppercase text-[10px] tracking-widest hover:bg-blue-900 transition">Save Changes</button>
           </div>
         </div>
       </div>
@@ -305,6 +263,7 @@ export class SalaryManagerComponent {
   selectedYear = signal(new Date().getFullYear());
   selectedMonth = signal<number | null>(new Date().getMonth() + 1);
   filterStatus = signal('all');
+  filterProduct = signal<number | null>(null);
 
   showGenerateModal = false;
   showEditModal = false;
@@ -323,27 +282,37 @@ export class SalaryManagerComponent {
   ];
 
   yearsList = computed(() => {
-    const currentYear = new Date().getFullYear();
-    return [currentYear + 1, currentYear, currentYear - 1, currentYear - 2];
+    const years = this.dataService.salaries().map(s => s.year);
+    const allYears = [...years, new Date().getFullYear()];
+    return Array.from(new Set(allYears)).sort((a, b) => b - a);
+  });
+
+  sortedProducts = computed(() => {
+    return this.dataService.products().slice().sort((a, b) =>
+      a.product_name.localeCompare(b.product_name)
+    );
   });
 
   filteredSalaries = computed(() => {
     let data = this.dataService.salaries();
 
-    // Filter by year
     data = data.filter(s => s.year === this.selectedYear());
 
-    // Filter by month
     if (this.selectedMonth() !== null) {
       data = data.filter(s => s.month === this.selectedMonth());
     }
 
-    // Filter by status
     if (this.filterStatus() !== 'all') {
       data = data.filter(s => s.status === this.filterStatus());
     }
 
-    // Search filter
+    if (this.filterProduct() !== null) {
+      data = data.filter(s => {
+        const emp = this.dataService.employees().find(e => e.employee_id === s.employee_id);
+        return emp?.product_id === this.filterProduct();
+      });
+    }
+
     const text = this.searchText().toLowerCase();
     if (text) {
       data = data.filter(s =>
@@ -382,6 +351,11 @@ export class SalaryManagerComponent {
     return name.charAt(0).toUpperCase();
   }
 
+  getEmployeeDepartment(empId: number): string {
+    const emp = this.dataService.employees().find(e => e.employee_id === empId);
+    return this.dataService.getProductName(emp?.product_id);
+  }
+
   getStatusClass(status: string): string {
     switch (status) {
       case 'paid': return 'bg-emerald-50 text-emerald-700';
@@ -390,6 +364,60 @@ export class SalaryManagerComponent {
       default: return 'bg-slate-100 text-slate-500';
     }
   }
+
+  // === دالة التصدير إلى Excel/CSV (الجديدة) ===
+  exportToCSV() {
+    const data = this.filteredSalaries().map(s => ({
+      'Employee': this.dataService.getEmployeeName(s.employee_id),
+      'Department': this.getEmployeeDepartment(s.employee_id), // إضافة القسم
+      'Year': s.year,
+      'Month': this.getMonthName(s.month),
+      'Base Salary': s.base_salary,
+      'Bonus': s.bonus || 0,
+      'Deductions': s.deductions || 0,
+      'Net Salary': s.net_salary,
+      'Status': s.status,
+      'Payment Date': s.payment_date || ''
+    }));
+
+    const csvContent = this.convertToCSV(data);
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+
+    link.setAttribute('href', url);
+    link.setAttribute('download', `payroll_export_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  private convertToCSV(objArray: any[]): string {
+    const array = typeof objArray !== 'object' ? JSON.parse(objArray) : objArray;
+    let str = '';
+
+    // Header
+    let row = '';
+    for (let index in objArray[0]) {
+        row += index + ',';
+    }
+    row = row.slice(0, -1);
+    str += row + '\r\n';
+
+    // Body
+    for (let i = 0; i < array.length; i++) {
+        let line = '';
+        for (let index in array[i]) {
+            if (line !== '') line += ',';
+            line += array[i][index];
+        }
+        str += line + '\r\n';
+    }
+    return str;
+  }
+
+  // ... (باقي الدوال كما هي)
 
   openGenerateModal() {
     this.generateYear = this.selectedYear();
@@ -422,9 +450,9 @@ export class SalaryManagerComponent {
   }
 
   calculateNet() {
-    this.currentSalary.net_salary = 
-      Number(this.currentSalary.base_salary || 0) + 
-      Number(this.currentSalary.bonus || 0) - 
+    this.currentSalary.net_salary =
+      Number(this.currentSalary.base_salary || 0) +
+      Number(this.currentSalary.bonus || 0) -
       Number(this.currentSalary.deductions || 0);
   }
 

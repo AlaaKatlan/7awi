@@ -78,12 +78,12 @@ export class DashboardComponent implements AfterViewInit {
     return products.map(prod => {
       // عدد الموظفين في هذا المنتج
       const empCount = employees.filter(e => e.product_id === prod.product_id && !e.end_date).length;
-      
+
       // إيرادات هذا المنتج
       const totalRev = revenues
         .filter(r => r.product_id === prod.product_id && new Date(r.date).getFullYear() === year)
         .reduce((sum, r) => sum + (Number(r.gross_amount) || 0), 0);
-      
+
       const monthsToCount = year < currentYear ? 12 : (year === currentYear ? currentMonth + 1 : 0);
 
       // رواتب الموظفين في هذا المنتج
@@ -98,13 +98,13 @@ export class DashboardComponent implements AfterViewInit {
       const profit = totalRev - totalSalaries;
       const productivity = (empCount > 0 && monthsToCount > 0) ? (profit / monthsToCount / empCount) : 0;
 
-      return { 
-        name: prod.product_name, 
-        empCount, 
-        revenue: totalRev, 
-        salaries: totalSalaries, 
-        profit, 
-        productivity 
+      return {
+        name: prod.product_name,
+        empCount,
+        revenue: totalRev,
+        salaries: totalSalaries,
+        profit,
+        productivity
       };
     });
   });

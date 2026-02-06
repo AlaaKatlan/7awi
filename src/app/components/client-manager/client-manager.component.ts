@@ -42,13 +42,15 @@ import { DimClient } from '../../models/data.models';
             <option value="ALL">All Countries</option>
             <option value="UAE">UAE</option>
             <option value="KSA">KSA</option>
+            <option value="SYR">SYR</option>
+            <option value="JOR">JOR</option>
           </select>
         </div>
 <div class="w-48">
-          <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Product</label>
+          <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Department</label>
           <select [ngModel]="filterProduct()" (ngModelChange)="filterProduct.set($event)"
                   class="w-full bg-slate-50 border-0 rounded-lg px-3 py-2 outline-none cursor-pointer">
-            <option [ngValue]="null">All Products</option>
+            <option [ngValue]="null">All Departments</option>
             @for (prod of dataService.products(); track prod.product_id) {
               <option [ngValue]="prod.product_id">{{ prod.product_name }}</option>
             }
@@ -67,7 +69,7 @@ import { DimClient } from '../../models/data.models';
             <tr>
               <th class="p-5">Client Name</th>
               <th class="p-5 text-center">Country</th>
-              <th class="p-5">Product</th>
+              <th class="p-5">Department</th>
               <th class="p-5">Lead</th>
               <th class="p-5">Relationship Manager</th>
               <th class="p-5 text-center">Actions</th>
@@ -155,15 +157,17 @@ import { DimClient } from '../../models/data.models';
                       class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a] cursor-pointer">
                 <option value="UAE">UAE</option>
                 <option value="KSA">KSA</option>
+                <option value="SYR">SYR</option>
+                <option value="JOR">JOR</option>
               </select>
             </div>
 
             <!-- Product -->
             <div>
-              <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Product</label>
+              <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Department</label>
               <select [(ngModel)]="currentClient.product_id"
                       class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a] cursor-pointer">
-                <option [ngValue]="null">— Select Product —</option>
+                <option [ngValue]="null">— Select Department —</option>
                 @for (prod of dataService.products(); track prod.product_id) {
                   <option [ngValue]="prod.product_id">{{ prod.product_name }}</option>
                 }

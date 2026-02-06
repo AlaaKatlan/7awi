@@ -19,9 +19,9 @@
           </div>
 
           <div>
-              <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Product</label>
+              <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Department</label>
               <select [ngModel]="filterProduct()" (ngModelChange)="filterProduct.set($event)" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 outline-none text-sm focus:ring-2 focus:ring-[#1e3a8a] cursor-pointer">
-                  <option [ngValue]="null">All Products</option>
+                  <option [ngValue]="null">All Departments</option>
                   @for (p of dataService.products(); track p.product_id) {
                       <option [ngValue]="p.product_id">{{ p.product_name }}</option>
                   }
@@ -74,7 +74,7 @@
                   <tr>
                       <th class="p-5">Order #</th>
                       <th class="p-5">Date</th>
-                      <th class="p-5">Product</th> <th class="p-5">Country</th>
+                      <th class="p-5">Department</th> <th class="p-5">Country</th>
                       <th class="p-5 text-right">Total Value</th> <th class="p-5 text-right">Gross Amount</th>
                       <th class="p-5 text-center">Action</th>
                   </tr>
@@ -152,7 +152,7 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block text-[10px] font-black text-gray-400 uppercase mb-2">Owner</label>
+                        <label class="block text-[10px] font-black text-gray-400 uppercase mb-2">Relationship Manager</label>
                         <select [(ngModel)]="currentItem.owner_id" class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none font-bold focus:ring-2 focus:ring-[#1e3a8a]">
                             <option *ngFor="let emp of employees()" [value]="emp.employee_id">{{ emp.name }}</option>
                         </select>
@@ -177,7 +177,7 @@
 
                 <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-[10px] font-black text-gray-400 uppercase mb-2">Product Category</label>
+                        <label class="block text-[10px] font-black text-gray-400 uppercase mb-2">Department Category</label>
                         <select [(ngModel)]="currentItem.product_id" (change)="updateBookingOrder()" class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none font-bold focus:ring-2 focus:ring-[#1e3a8a]">
                             @for (prod of products(); track prod.product_id) {
                                 <option [value]="prod.product_id">{{ prod.product_name }}</option>

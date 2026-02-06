@@ -22,7 +22,7 @@ import { DataService } from '../../services/data.service';
                 <tr>
                     <th class="p-4">Date</th>
                     <th class="p-4">Client</th>
-                    <th class="p-4">Product</th>
+                    <th class="p-4">Department</th>
                     <th class="p-4 text-right">Cost</th>
                     <th class="p-4 text-center">Action</th>
                 </tr>
@@ -79,7 +79,7 @@ import { DataService } from '../../services/data.service';
                     </div>
 
                     <div>
-                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Product</label>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Department</label>
                         <select [(ngModel)]="newItem.product_id" class="w-full p-3 bg-gray-50 rounded-lg border focus:ring-2 focus:ring-red-500 outline-none">
                             @for (prod of dataService.products(); track prod.product_id) {
                                 <option [value]="prod.product_id">{{ prod.product_name }}</option>
