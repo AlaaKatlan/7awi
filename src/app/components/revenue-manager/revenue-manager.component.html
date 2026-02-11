@@ -22,7 +22,7 @@
               <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Department</label>
               <select [ngModel]="filterProduct()" (ngModelChange)="filterProduct.set($event)" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 outline-none text-sm focus:ring-2 focus:ring-[#1e3a8a] cursor-pointer">
                   <option [ngValue]="null">All Departments</option>
-                  @for (p of dataService.products(); track p.product_id) {
+                  @for (p of products(); track p.product_id) {
                       <option [ngValue]="p.product_id">{{ p.product_name }}</option>
                   }
               </select>
@@ -52,10 +52,9 @@
               <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Country</label>
               <select [ngModel]="filterCountry()" (ngModelChange)="filterCountry.set($event)" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 outline-none text-sm focus:ring-2 focus:ring-[#1e3a8a] cursor-pointer">
                   <option value="ALL">All Countries</option>
-                  <option value="UAE">UAE</option>
-                  <option value="KSA">KSA</option>
-                  <option value="SYR">SYR</option>
-                  <option value="JOR">JOR</option>
+                  @for (country of sortedCountries(); track country) {
+                      <option [value]="country">{{ country }}</option>
+                  }
               </select>
           </div>
       </div>
@@ -148,13 +147,17 @@
                     <div>
                         <label class="block text-[10px] font-black text-gray-400 uppercase mb-2">Lead</label>
                         <select [(ngModel)]="currentItem.lead_id" class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none font-bold focus:ring-2 focus:ring-[#1e3a8a]">
-                            <option *ngFor="let emp of employees()" [value]="emp.employee_id">{{ emp.name }}</option>
+                            @for (emp of employees(); track emp.employee_id) {
+                                <option [value]="emp.employee_id">{{ emp.name }}</option>
+                            }
                         </select>
                     </div>
                     <div>
                         <label class="block text-[10px] font-black text-gray-400 uppercase mb-2">Relationship Manager</label>
                         <select [(ngModel)]="currentItem.owner_id" class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none font-bold focus:ring-2 focus:ring-[#1e3a8a]">
-                            <option *ngFor="let emp of employees()" [value]="emp.employee_id">{{ emp.name }}</option>
+                            @for (emp of employees(); track emp.employee_id) {
+                                <option [value]="emp.employee_id">{{ emp.name }}</option>
+                            }
                         </select>
                     </div>
                 </div>
@@ -187,10 +190,9 @@
                     <div>
                         <label class="block text-[10px] font-black text-gray-400 uppercase mb-2">Region/Country</label>
                         <select [(ngModel)]="currentItem.country" (change)="updateBookingOrder()" class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none font-bold focus:ring-2 focus:ring-[#1e3a8a]">
-                            <option value="UAE">UAE</option>
-                            <option value="KSA">KSA</option>
-                            <option value="SYR">SYR</option>
-                            <option value="JOR">JOR</option>
+                            @for (country of sortedCountries(); track country) {
+                                <option [value]="country">{{ country }}</option>
+                            }
                         </select>
                     </div>
                 </div>

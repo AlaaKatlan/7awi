@@ -40,18 +40,17 @@ import { DimClient } from '../../models/data.models';
           <select [ngModel]="filterCountry()" (ngModelChange)="filterCountry.set($event)"
                   class="w-full bg-slate-50 border-0 rounded-lg px-3 py-2 outline-none cursor-pointer">
             <option value="ALL">All Countries</option>
-            <option value="UAE">UAE</option>
-            <option value="KSA">KSA</option>
-            <option value="SYR">SYR</option>
-            <option value="JOR">JOR</option>
+            @for (country of sortedCountries(); track country) {
+              <option [value]="country">{{ country }}</option>
+            }
           </select>
         </div>
-<div class="w-48">
+        <div class="w-48">
           <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Department</label>
           <select [ngModel]="filterProduct()" (ngModelChange)="filterProduct.set($event)"
                   class="w-full bg-slate-50 border-0 rounded-lg px-3 py-2 outline-none cursor-pointer">
             <option [ngValue]="null">All Departments</option>
-            @for (prod of dataService.products(); track prod.product_id) {
+            @for (prod of sortedProducts(); track prod.product_id) {
               <option [ngValue]="prod.product_id">{{ prod.product_name }}</option>
             }
           </select>
@@ -155,10 +154,9 @@ import { DimClient } from '../../models/data.models';
               <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Country *</label>
               <select [(ngModel)]="currentClient.country"
                       class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a] cursor-pointer">
-                <option value="UAE">UAE</option>
-                <option value="KSA">KSA</option>
-                <option value="SYR">SYR</option>
-                <option value="JOR">JOR</option>
+                @for (country of sortedCountries(); track country) {
+                  <option [value]="country">{{ country }}</option>
+                }
               </select>
             </div>
 
@@ -168,7 +166,7 @@ import { DimClient } from '../../models/data.models';
               <select [(ngModel)]="currentClient.product_id"
                       class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a] cursor-pointer">
                 <option [ngValue]="null">— Select Department —</option>
-                @for (prod of dataService.products(); track prod.product_id) {
+                @for (prod of sortedProducts(); track prod.product_id) {
                   <option [ngValue]="prod.product_id">{{ prod.product_name }}</option>
                 }
               </select>
@@ -263,7 +261,7 @@ export class ClientManagerComponent {
   showDeleteModal = false;
   isEditMode = false;
   clientToDelete: DimClient | null = null;
-  filterProduct = signal<number | null>(null); // Signal الجديد
+  filterProduct = signal<number | null>(null);
 
   currentClient: DimClient = this.getEmptyClient();
 
@@ -274,6 +272,25 @@ export class ClientManagerComponent {
     );
   });
 
+  // Computed: المنتجات/الأقسام مرتبة أبجدياً مع Other في النهاية
+  sortedProducts = computed(() => {
+    return this.dataService.products().slice().sort((a, b) => {
+      if (a.product_name.toLowerCase() === 'others') return 1;
+      if (b.product_name.toLowerCase() === 'others') return -1;
+      return a.product_name.localeCompare(b.product_name);
+    });
+  });
+
+  // Computed: الدول مرتبة أبجدياً مع Other في النهاية
+  sortedCountries = computed(() => {
+    const countries = ['JOR', 'KSA', 'SYR', 'UAE'];
+    return countries.sort((a, b) => {
+      if (a.toLowerCase() === 'other') return 1;
+      if (b.toLowerCase() === 'other') return -1;
+      return a.localeCompare(b);
+    });
+  });
+
   filteredClients = computed(() => {
     let data = this.dataService.clients();
 
@@ -281,7 +298,7 @@ export class ClientManagerComponent {
     if (this.filterCountry() !== 'ALL') {
       data = data.filter(c => c.country === this.filterCountry());
     }
-// 2. فلتر المنتج
+    // فلتر المنتج
     if (this.filterProduct() !== null) {
       data = data.filter(c => c.product_id === this.filterProduct());
     }
@@ -349,13 +366,12 @@ export class ClientManagerComponent {
     this.saving.set(true);
 
     try {
-      // تجهيز البيانات: نرسل null إذا كانت القيمة غير موجودة ليقبلها Supabase كقيمة فارغة
       const payload: any = {
         client_name: this.currentClient.client_name.trim(),
         country: this.currentClient.country,
-        contact_person: '', // تأكدنا من إضافتها
-        contact_email: '',   // تأكدنا من إضافتها
-        contact_phone: '',   // تأكدنا من إضافتها
+        contact_person: '',
+        contact_email: '',
+        contact_phone: '',
         product_id: this.currentClient.product_id ? Number(this.currentClient.product_id) : null,
         lead_id: this.currentClient.lead_id ? Number(this.currentClient.lead_id) : null,
         relationship_manager_id: this.currentClient.relationship_manager_id ? Number(this.currentClient.relationship_manager_id) : null
@@ -364,11 +380,8 @@ export class ClientManagerComponent {
       let result;
 
       if (this.isEditMode) {
-        // في التحديث نحتاج الـ ID
-        // نستخدم spread operator لدمج الـ payload مع الـ ID
         result = await this.dataService.updateClient({ client_id: this.currentClient.client_id, ...payload });
       } else {
-        // في الإضافة لا نحتاج ID (يتم توليده تلقائياً)
         result = await this.dataService.addClient(payload);
       }
 
@@ -382,7 +395,6 @@ export class ClientManagerComponent {
       console.error('Unexpected error:', error);
       alert('An unexpected error occurred: ' + error.message);
     } finally {
-      // ضمان إيقاف التحميل في كل الحالات
       this.saving.set(false);
     }
   }

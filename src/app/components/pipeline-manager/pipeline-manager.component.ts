@@ -8,295 +8,7 @@ import { FactPipeline } from '../../models/data.models';
   selector: 'app-pipeline-manager',
   standalone: true,
   imports: [CommonModule, FormsModule],
-  template: `
-    <div class="p-6 bg-[#f8fafc] min-h-screen">
-      <!-- Stats Cards -->
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div class="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-purple-600">
-          <h3 class="text-gray-400 text-sm font-medium uppercase">Total Pipeline</h3>
-          <p class="text-3xl font-black text-gray-800 mt-2">{{ totalPipelineCount() }}</p>
-        </div>
-        <div class="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-amber-500">
-          <h3 class="text-gray-400 text-sm font-medium uppercase">Pending Value</h3>
-          <p class="text-3xl font-black text-amber-600 mt-2">{{ pendingValue() | currency:'USD':'symbol':'1.0-0' }}</p>
-        </div>
-        <div class="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-emerald-500">
-          <h3 class="text-gray-400 text-sm font-medium uppercase">Done Value</h3>
-          <p class="text-3xl font-black text-emerald-600 mt-2">{{ doneValue() | currency:'USD':'symbol':'1.0-0' }}</p>
-        </div>
-        <div class="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-blue-600">
-          <h3 class="text-gray-400 text-sm font-medium uppercase">Total Value</h3>
-          <p class="text-3xl font-black text-gray-800 mt-2">{{ totalValue() | currency:'USD':'symbol':'1.0-0' }}</p>
-        </div>
-      </div>
-
-      <!-- Filters & Actions -->
-      <div class="bg-white p-4 rounded-xl shadow-sm mb-6 border border-gray-100 flex flex-wrap gap-4 items-end">
-        <div class="flex-1 min-w-[200px]">
-          <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Search</label>
-          <input type="text" [ngModel]="searchText()" (ngModelChange)="searchText.set($event)"
-                 placeholder="Search by client..."
-                 class="w-full bg-slate-50 border-0 rounded-lg px-4 py-2 focus:ring-2 focus:ring-purple-500 outline-none">
-        </div>
-
-        <div class="w-32">
-          <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Year</label>
-          <select [ngModel]="filterYear()" (ngModelChange)="filterYear.set($event)"
-                  class="w-full bg-slate-50 border-0 rounded-lg px-3 py-2 outline-none cursor-pointer">
-            @for (year of yearsList(); track year) {
-              <option [ngValue]="year">{{ year }}</option>
-            }
-          </select>
-        </div>
-
-        <div class="w-32">
-          <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Quarter</label>
-          <select [ngModel]="filterQuarter()" (ngModelChange)="filterQuarter.set($event)"
-                  class="w-full bg-slate-50 border-0 rounded-lg px-3 py-2 outline-none cursor-pointer">
-            <option [ngValue]="null">All</option>
-            <option [ngValue]="1">Q1</option>
-            <option [ngValue]="2">Q2</option>
-            <option [ngValue]="3">Q3</option>
-            <option [ngValue]="4">Q4</option>
-          </select>
-        </div>
-
-        <div class="w-32">
-          <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Status</label>
-          <select [ngModel]="filterStatus()" (ngModelChange)="filterStatus.set($event)"
-                  class="w-full bg-slate-50 border-0 rounded-lg px-3 py-2 outline-none cursor-pointer">
-            <option value="all">All Status</option>
-            <option value="Pending">Pending</option>
-            <option value="Done">Done</option>
-            <option value="Completed">Completed</option>
-          </select>
-        </div>
-
-        <button (click)="openModal()"
-                class="bg-purple-600 text-white px-6 py-2 rounded-lg font-bold shadow-md hover:bg-purple-700 transition flex items-center gap-2">
-          <span class="material-icons text-sm">add</span> New Pipeline
-        </button>
-      </div>
-
-      <!-- Pipeline Table -->
-      <div class="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100">
-        <table class="w-full text-left border-collapse">
-          <thead class="bg-slate-50 text-[10px] text-gray-400 font-black uppercase tracking-widest border-b border-slate-100">
-            <tr>
-              <th class="p-5">Client</th>
-              <th class="p-5">Product</th>
-              <th class="p-5">Lead</th>
-              <th class="p-5">Relationship Manager</th>
-              <th class="p-5 text-right">Target Amount</th>
-              <th class="p-5 text-center">Period</th>
-              <th class="p-5 text-center">Status</th>
-              <th class="p-5 text-center">Actions</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-50 text-sm">
-            @for (pipe of filteredPipelines(); track pipe.id) {
-              <tr class="hover:bg-purple-50/50 transition duration-150">
-                <td class="p-5">
-                  <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm">
-                      {{ getClientInitial(pipe.client_id) }}
-                    </div>
-                    <span class="font-bold text-slate-700">{{ dataService.getClientName(pipe.client_id) }}</span>
-                  </div>
-                </td>
-                <td class="p-5">
-                  <span class="bg-purple-50 text-purple-700 px-3 py-1 rounded-full text-[10px] font-black uppercase">
-                    {{ dataService.getProductName(pipe.product_id) }}
-                  </span>
-                </td>
-                <td class="p-5 text-slate-600">{{ dataService.getEmployeeName(pipe.lead_id) }}</td>
-                <td class="p-5 text-slate-600">{{ dataService.getEmployeeName(pipe.owner_id) }}</td>
-                <td class="p-5 text-right font-black text-purple-700">{{ pipe.target_amount | currency:'USD':'symbol':'1.0-0' }}</td>
-                <td class="p-5 text-center">
-                  <span class="bg-indigo-50 text-indigo-700 px-2 py-1 rounded text-xs font-bold mr-1">Q{{ pipe.quarter }}</span>
-                  <span class="text-gray-400 text-xs">{{ pipe.year }}</span>
-                </td>
-                <td class="p-5 text-center">
-                  <span [class]="getStatusClass(pipe.status)"
-                        class="px-3 py-1 rounded-full text-[10px] font-black uppercase">
-                    {{ pipe.status }}
-                  </span>
-                </td>
-                <td class="p-5 text-center">
-                  <div class="flex items-center justify-center gap-1">
-                    <button (click)="editPipeline(pipe)" class="text-slate-400 hover:text-purple-600 transition p-2"
-                            title="Edit">
-                      <span class="material-icons text-base">edit</span>
-                    </button>
-                    <button (click)="confirmDelete(pipe)" class="text-slate-400 hover:text-red-500 transition p-2"
-                            title="Delete">
-                      <span class="material-icons text-base">delete</span>
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            } @empty {
-              <tr>
-                <td colspan="8" class="p-10 text-center text-slate-400">
-                  <span class="material-icons text-5xl text-slate-200 block mb-3">insights</span>
-                  <p class="italic">No pipeline records found.</p>
-                </td>
-              </tr>
-            }
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Add/Edit Modal -->
-    @if (showModal) {
-      <div class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div class="bg-white p-8 rounded-[2rem] w-full max-w-lg shadow-2xl">
-          <div class="flex justify-between items-center mb-6">
-            <h3 class="font-black text-xl text-slate-800 uppercase tracking-tight">
-              {{ isEditMode ? 'Update Pipeline' : 'New Pipeline' }}
-            </h3>
-            <button (click)="closeModal()" class="text-slate-400 hover:text-rose-500 transition">
-              <span class="material-icons">close</span>
-            </button>
-          </div>
-
-          <div class="space-y-4">
-            <!-- Client -->
-            <div>
-              <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Client *</label>
-              <select [(ngModel)]="currentPipeline.client_id"
-                      class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer">
-                <option [ngValue]="null" disabled>Select Client</option>
-                @for (c of sortedClients(); track c.client_id) {
-                  <option [ngValue]="c.client_id">{{ c.client_name }}</option>
-                }
-              </select>
-            </div>
-
-            <!-- Product -->
-            <div>
-              <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Product *</label>
-              <select [(ngModel)]="currentPipeline.product_id"
-                      class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer">
-                <option [ngValue]="null" disabled>Select Product</option>
-                @for (p of dataService.products(); track p.product_id) {
-                  <option [ngValue]="p.product_id">{{ p.product_name }}</option>
-                }
-              </select>
-            </div>
-
-            <!-- Lead & Owner -->
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Lead</label>
-                <select [(ngModel)]="currentPipeline.lead_id"
-                        class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer">
-                  <option [ngValue]="null">— Select Lead —</option>
-                  @for (emp of sortedEmployees(); track emp.employee_id) {
-                    <option [ngValue]="emp.employee_id">{{ emp.name }}</option>
-                  }
-                </select>
-              </div>
-              <div>
-                <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Relationship Manager</label>
-                <select [(ngModel)]="currentPipeline.owner_id"
-                        class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer">
-                  <option [ngValue]="null">— Select Relationship Manager —</option>
-                  @for (emp of sortedEmployees(); track emp.employee_id) {
-                    <option [ngValue]="emp.employee_id">{{ emp.name }}</option>
-                  }
-                </select>
-              </div>
-            </div>
-
-            <!-- Target Amount -->
-            <div>
-              <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Target Amount ($) *</label>
-              <input type="number" [(ngModel)]="currentPipeline.target_amount"
-                     class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-purple-500 font-bold">
-            </div>
-
-            <!-- Quarter & Year -->
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Quarter *</label>
-                <select [(ngModel)]="currentPipeline.quarter"
-                        class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer">
-                  <option [ngValue]="1">Q1 (Jan-Mar)</option>
-                  <option [ngValue]="2">Q2 (Apr-Jun)</option>
-                  <option [ngValue]="3">Q3 (Jul-Sep)</option>
-                  <option [ngValue]="4">Q4 (Oct-Dec)</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Year *</label>
-                <select [(ngModel)]="currentPipeline.year"
-                        class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer">
-                  @for (year of yearsList(); track year) {
-                    <option [ngValue]="year">{{ year }}</option>
-                  }
-                </select>
-              </div>
-            </div>
-
-            <!-- Status -->
-            <div>
-              <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Status</label>
-              <select [(ngModel)]="currentPipeline.status"
-                      class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer">
-                <option value="Pending">Pending</option>
-                <option value="Done">Done</option>
-                <option value="Completed">Completed</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="mt-8 flex gap-3">
-            <button (click)="closeModal()"
-                    class="flex-1 py-3 text-slate-400 font-bold uppercase text-[10px] tracking-widest hover:bg-slate-50 rounded-xl transition">
-              Cancel
-            </button>
-            <button (click)="save()" [disabled]="!canSave() || saving()"
-                    class="flex-[2] py-3 bg-purple-600 text-white rounded-xl font-black shadow-lg shadow-purple-200 uppercase text-[10px] tracking-widest hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-              @if (saving()) {
-                <span class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
-                <span>Saving...</span>
-              } @else {
-                <span>{{ isEditMode ? 'Update Pipeline' : 'Save Pipeline' }}</span>
-              }
-            </button>
-          </div>
-        </div>
-      </div>
-    }
-
-    <!-- Delete Confirmation Modal -->
-    @if (showDeleteModal) {
-      <div class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div class="bg-white p-8 rounded-[2rem] w-full max-w-md shadow-2xl text-center">
-          <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <span class="material-icons text-red-500 text-3xl">warning</span>
-          </div>
-          <h3 class="font-black text-xl text-slate-800 mb-2">Delete Pipeline?</h3>
-          <p class="text-slate-500 mb-6">
-            Are you sure you want to delete this pipeline record for
-            <strong>{{ dataService.getClientName(pipelineToDelete?.client_id) }}</strong>?
-          </p>
-          <div class="flex gap-3">
-            <button (click)="showDeleteModal = false"
-                    class="flex-1 py-3 text-slate-400 font-bold uppercase text-[10px] tracking-widest hover:bg-slate-50 rounded-xl transition">
-              Cancel
-            </button>
-            <button (click)="deletePipeline()"
-                    class="flex-1 py-3 bg-red-500 text-white rounded-xl font-black shadow-lg uppercase text-[10px] tracking-widest hover:bg-red-600 transition">
-              Delete
-            </button>
-          </div>
-        </div>
-      </div>
-    }
-  `
+  templateUrl: './pipeline-manager.component.html'
 })
 export class PipelineManagerComponent {
   dataService = inject(DataService);
@@ -320,11 +32,22 @@ export class PipelineManagerComponent {
     return [currentYear + 1, currentYear, currentYear - 1, currentYear - 2];
   });
 
-  // Computed: العملاء مرتبين أبجدياً
+  // Computed: العملاء مرتبين أبجدياً مع Other في النهاية
   sortedClients = computed(() => {
-    return this.dataService.clients().slice().sort((a, b) =>
-      a.client_name.localeCompare(b.client_name)
-    );
+    return this.dataService.clients().slice().sort((a, b) => {
+      if (a.client_name.toLowerCase() === 'others') return 1;
+      if (b.client_name.toLowerCase() === 'others') return -1;
+      return a.client_name.localeCompare(b.client_name);
+    });
+  });
+
+  // Computed: المنتجات مرتبة أبجدياً مع Other في النهاية
+  sortedProducts = computed(() => {
+    return this.dataService.products().slice().sort((a, b) => {
+      if (a.product_name.toLowerCase() === 'others') return 1;
+      if (b.product_name.toLowerCase() === 'others') return -1;
+      return a.product_name.localeCompare(b.product_name);
+    });
   });
 
   // Computed: الموظفين مرتبين أبجدياً
@@ -338,20 +61,16 @@ export class PipelineManagerComponent {
   filteredPipelines = computed(() => {
     let data = this.dataService.pipelines();
 
-    // فلتر السنة
     data = data.filter(p => p.year === this.filterYear());
 
-    // فلتر الربع
     if (this.filterQuarter() !== null) {
       data = data.filter(p => p.quarter === this.filterQuarter());
     }
 
-    // فلتر الحالة
     if (this.filterStatus() !== 'all') {
       data = data.filter(p => p.status === this.filterStatus());
     }
 
-    // البحث
     const text = this.searchText().toLowerCase();
     if (text) {
       data = data.filter(p =>

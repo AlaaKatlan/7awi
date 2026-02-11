@@ -27,8 +27,40 @@ export class RevenueManagerComponent {
   loading = signal(false);
 
   // Lists
-  employees = this.dataService.employees;
-  products = this.dataService.products;
+// Lists
+  employees = computed(() => {
+    return this.dataService.employees().slice().sort((a, b) => a.name.localeCompare(b.name));
+  });
+
+  products = computed(() => {
+    return this.dataService.products().slice().sort((a, b) => {
+      // تنظيف الأسماء من المسافات وتحويلها لأحرف صغيرة
+      const nameA = a.product_name.toLowerCase().trim();
+      const nameB = b.product_name.toLowerCase().trim();
+
+      // التحقق من وجود كلمة Other أو Others
+      const isAOthers = nameA === 'others' || nameA === 'other';
+      const isBOthers = nameB === 'others' || nameB === 'other';
+
+      // المنطق: إذا كان A هو Others، اجعله في النهاية (1)
+      if (isAOthers && !isBOthers) return 1;
+      // إذا كان B هو Others، اجعله في النهاية (بالتالي A يسبقه -1)
+      if (!isAOthers && isBOthers) return -1;
+
+      // الترتيب الأبجدي العادي لباقي العناصر
+      return nameA.localeCompare(nameB);
+    });
+  });
+
+  // Sorted countries
+  sortedCountries = computed(() => {
+    const countries = ['JOR', 'KSA', 'SYR', 'UAE'];
+    return countries.sort((a, b) => {
+      if (a.toLowerCase() === 'others') return 1;
+      if (b.toLowerCase() === 'others') return -1;
+      return a.localeCompare(b);
+    });
+  });
 
   months = [
     { name: 'January', value: 1 }, { name: 'February', value: 2 }, { name: 'March', value: 3 },
@@ -61,9 +93,8 @@ export class RevenueManagerComponent {
     if (this.filterMonth()) {
       data = data.filter(r => new Date(r.date).getMonth() + 1 === this.filterMonth());
     }
-    // فلتر المنتج (تم إصلاحه)
+    // فلتر المنتج
     if (this.filterProduct()) {
-      // استخدام == للمقارنة المرنة بين النص والرقم
       data = data.filter(r => r.product_id == this.filterProduct());
     }
     // فلتر الدولة

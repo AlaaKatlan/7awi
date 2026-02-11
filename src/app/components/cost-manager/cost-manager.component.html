@@ -1,0 +1,92 @@
+<!-- <div class="bg-white rounded-2xl shadow-sm p-6">
+    <div class="flex justify-between items-center mb-6">
+        <h2 class="text-xl font-bold text-gray-800">Monthly Costs Tracking</h2>
+        <button (click)="openModal()" class="bg-red-500 hover:bg-red-600 text-white px-5 py-2 rounded-lg transition shadow-md flex items-center">
+            <span class="material-icons mr-2 text-sm">add</span> Add Cost
+        </button>
+    </div>
+
+    <table class="w-full text-left">
+        <thead class="bg-gray-50 text-xs text-gray-500 uppercase">
+            <tr>
+                <th class="p-4">Date</th>
+                <th class="p-4">Client</th>
+                <th class="p-4">Department</th>
+                <th class="p-4 text-right">Cost</th>
+                <th class="p-4 text-center">Action</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100 text-sm">
+            @for (item of dataService.costs(); track item.id) {
+                <tr class="hover:bg-red-50 transition">
+                    <td class="p-4 font-mono text-gray-600">
+                      {{ item.date | date: 'MMM-yyyy' }}
+                    </td>
+                    <td class="p-4 font-bold">{{ dataService.getClientName(item.client_id!) }}</td>
+                    <td class="p-4">
+                      <span class="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-xs font-semibold">
+                        {{ dataService.getProductName(item.product_id!) }}
+                      </span>
+                    </td>
+                    <td class="p-4 text-right font-bold text-red-600">{{ item.amount | currency:'$ ':'symbol':'1.0-0' }}</td>
+                    <td class="p-4 text-center">
+                        <button (click)="editItem(item)" class="text-blue-600 hover:text-blue-800 font-medium text-xs uppercase cursor-pointer">
+                            Edit
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@if (showModal) {
+    <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
+        <div class="bg-white p-8 rounded-2xl w-full max-w-md shadow-2xl animate-fade-in">
+            <h3 class="font-bold text-xl mb-4 text-gray-800">{{ isEditMode ? 'Edit Cost' : 'Add New Cost' }}</h3>
+
+            <div class="space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                      <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Date</label>
+                      <input type="date" [(ngModel)]="inputDate" (change)="onDateChange()" class="w-full p-3 bg-gray-50 rounded-lg border focus:ring-2 focus:ring-red-500 outline-none">
+                  </div>
+                  <div>
+                      <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Cost Amount</label>
+                      <input type="number" [(ngModel)]="newItem.amount" class="w-full p-3 bg-gray-50 rounded-lg border focus:ring-2 focus:ring-red-500 outline-none">
+                  </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Client</label>
+                    <select [(ngModel)]="newItem.client_id" class="w-full p-3 bg-gray-50 rounded-lg border focus:ring-2 focus:ring-red-500 outline-none">
+                        @for (client of sortedClients(); track client.client_id) {
+                            <option [value]="client.client_id">{{ client.client_name }}</option>
+                        }
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Department</label>
+                    <select [(ngModel)]="newItem.product_id" class="w-full p-3 bg-gray-50 rounded-lg border focus:ring-2 focus:ring-red-500 outline-none">
+                        @for (prod of sortedProducts(); track prod.product_id) {
+                            <option [value]="prod.product_id">{{ prod.product_name }}</option>
+                        }
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Description</label>
+                    <textarea [(ngModel)]="newItem.description" class="w-full p-3 bg-gray-50 rounded-lg border focus:ring-2 focus:ring-red-500 outline-none" rows="2"></textarea>
+                </div>
+            </div>
+
+            <div class="mt-6 flex justify-end gap-3">
+                <button (click)="showModal=false" class="px-4 py-2 text-gray-500 hover:bg-gray-100 rounded-lg font-medium transition">Cancel</button>
+                <button (click)="save()" class="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-bold shadow-lg transition">
+                    {{ isEditMode ? 'Update' : 'Save' }}
+                </button>
+            </div>
+        </div>
+    </div>
+} -->

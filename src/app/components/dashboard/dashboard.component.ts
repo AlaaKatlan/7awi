@@ -22,61 +22,61 @@ export class DashboardComponent implements AfterViewInit {
     return Array.from(new Set([...dbYears, new Date().getFullYear()])).sort((a, b) => b - a);
   });
 
-  // 1. حساب الرواتب الشهرية الإجمالية
+  // 1. حساب الرواتب الشهرية الإجمالية من fact_salary
   monthlySalaries = computed(() => {
     const year = this.selectedYear();
-    const employees = this.dataService.employees();
+    const salaries = this.dataService.salaries();
 
     return Array.from({ length: 12 }, (_, monthIndex) => {
-      const firstDayOfMonth = new Date(year, monthIndex, 1);
-      const lastDayOfMonth = new Date(year, monthIndex + 1, 0);
-
-      return employees.filter(emp => {
-        const start = new Date(emp.start_date);
-        const end = emp.end_date ? new Date(emp.end_date) : null;
-        return start <= lastDayOfMonth && (!end || end >= firstDayOfMonth);
-      }).reduce((sum, emp) => sum + Number(emp.salary), 0);
+      const month = monthIndex + 1;
+      return salaries
+        .filter(s => s.year === year && s.month === month)
+        .reduce((sum, s) => sum + Number(s.net_salary || 0), 0);
     });
   });
 
-  // 2. حساب الرواتب مع تنظيف البيانات لمنع التكرار
+  // 2. حساب الرواتب حسب نوع العقد من fact_salary
   salaryBreakdown = computed(() => {
     const year = this.selectedYear();
+    const salaries = this.dataService.salaries();
     const employees = this.dataService.employees();
     const breakdown: { [key: string]: number } = {};
 
-    employees.forEach(emp => {
+    // جلب سجلات الرواتب للسنة المحددة
+    const yearSalaries = salaries.filter(s => s.year === year);
+
+    yearSalaries.forEach(salary => {
+      const emp = employees.find(e => e.employee_id === salary.employee_id);
+      if (!emp) return;
+
       let type = (emp.contract || 'Not Specified').trim();
       type = type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
 
-      const totalEmpSalaryForYear = Array.from({ length: 12 }, (_, m) => {
-        const d1 = new Date(year, m, 1);
-        const d2 = new Date(year, m + 1, 0);
-        const start = new Date(emp.start_date);
-        const end = emp.end_date ? new Date(emp.end_date) : null;
-        return (start <= d2 && (!end || end >= d1)) ? (Number(emp.salary) || 0) : 0;
-      }).reduce((a, b) => a + b, 0);
-
-      if (totalEmpSalaryForYear > 0) {
-        breakdown[type] = (breakdown[type] || 0) + totalEmpSalaryForYear;
-      }
+      breakdown[type] = (breakdown[type] || 0) + Number(salary.net_salary || 0);
     });
 
     return breakdown;
   });
 
-  // 3. إحصائيات المنتجات مع الإنتاجية
+  // 3. إحصائيات المنتجات مع الإنتاجية - الاعتماد على fact_salary
   productStats = computed(() => {
     const year = this.selectedYear();
     const currentYear = new Date().getFullYear();
     const currentMonth = new Date().getMonth();
 
     const products = this.dataService.products();
-    const employees = this.dataService.employees();
+    const salaries = this.dataService.salaries();
     const revenues = this.dataService.revenues();
 
     return products.map(prod => {
-      const empCount = employees.filter(e => e.product_id === prod.product_id && !e.end_date).length;
+      // عدد الموظفين الفريدين من fact_salary لهذا القسم في السنة المحددة
+      const productSalaries = salaries.filter(s => {
+        const emp = this.dataService.employees().find(e => e.employee_id === s.employee_id);
+        return emp?.product_id === prod.product_id && s.year === year;
+      });
+
+      const uniqueEmployeeIds = new Set(productSalaries.map(s => s.employee_id));
+      const empCount = uniqueEmployeeIds.size;
 
       const totalRev = revenues
         .filter(r => r.product_id === prod.product_id && new Date(r.date).getFullYear() === year)
@@ -84,13 +84,8 @@ export class DashboardComponent implements AfterViewInit {
 
       const monthsToCount = year < currentYear ? 12 : (year === currentYear ? currentMonth + 1 : 0);
 
-      const totalSalaries = Array.from({ length: monthsToCount }, (_, m) => {
-        const d1 = new Date(year, m, 1);
-        const d2 = new Date(year, m + 1, 0);
-        return employees
-          .filter(e => e.product_id === prod.product_id && new Date(e.start_date) <= d2 && (!e.end_date || new Date(e.end_date) >= d1))
-          .reduce((sum, e) => sum + (Number(e.salary) || 0), 0);
-      }).reduce((a, b) => a + b, 0);
+      // حساب الرواتب من fact_salary
+      const totalSalaries = productSalaries.reduce((sum, s) => sum + Number(s.net_salary || 0), 0);
 
       const profit = totalRev - totalSalaries;
       const productivity = (empCount > 0 && monthsToCount > 0) ? (profit / monthsToCount / empCount) : 0;
@@ -106,15 +101,30 @@ export class DashboardComponent implements AfterViewInit {
     });
   });
 
-  // 4. الإحصائيات العامة
+  // 4. الإحصائيات العامة - Cost = Salaries + Operational Cost
   stats = computed(() => {
     const year = this.selectedYear();
     const revs = this.dataService.revenues().filter(r => new Date(r.date).getFullYear() === year);
     const revenue = revs.reduce((sum, r) => sum + (Number(r.gross_amount) || 0), 0);
-    const totalCost = this.dataService.costs().filter(c => c.year === year).reduce((sum, c) => sum + Number(c.amount), 0);
+
+    // الرواتب من fact_salary
     const salaries = this.monthlySalaries().reduce((a, b) => a + b, 0);
+
+    // التكاليف التشغيلية من fact_cost
+    const opCost = this.dataService.costs().filter(c => c.year === year).reduce((sum, c) => sum + Number(c.amount), 0);
+
+    // إجمالي التكلفة = الرواتب + التكاليف التشغيلية
+    const totalCost = salaries + opCost;
+
     const profit = revenue - totalCost;
-    return { revenue, cost: totalCost, profit, margin: revenue > 0 ? Math.round((profit / revenue) * 100) : 0, salaries, opCost: totalCost - salaries };
+    return {
+      revenue,
+      cost: totalCost,
+      profit,
+      margin: revenue > 0 ? Math.round((profit / revenue) * 100) : 0,
+      salaries,
+      opCost
+    };
   });
 
   // 5. بيانات الجدول السنوي
@@ -135,9 +145,21 @@ export class DashboardComponent implements AfterViewInit {
 
   totals = computed(() => {
     const data = this.summaryData();
+    const year = this.selectedYear();
     const monthlyRevenue = Array.from({ length: 12 }, (_, m) => data.reduce((s, p) => s + p.monthlyValues[m], 0));
-    const monthlyOpCost = Array.from({ length: 12 }, (_, m) => this.dataService.costs().filter(c => c.year === this.selectedYear() && c.month === (m + 1)).reduce((s, c) => s + Number(c.amount), 0));
-    return { monthlyRevenue, monthlyCost: monthlyOpCost, monthlyNet: monthlyRevenue.map((rev, i) => rev - monthlyOpCost[i]) };
+
+    // التكاليف الشهرية = الرواتب من fact_salary + التكاليف التشغيلية من fact_cost
+    const monthlySalariesData = this.monthlySalaries();
+    const monthlyOpCost = Array.from({ length: 12 }, (_, m) =>
+      this.dataService.costs().filter(c => c.year === year && c.month === (m + 1)).reduce((s, c) => s + Number(c.amount), 0)
+    );
+    const monthlyCost = Array.from({ length: 12 }, (_, m) => monthlySalariesData[m] + monthlyOpCost[m]);
+
+    return {
+      monthlyRevenue,
+      monthlyCost,
+      monthlyNet: monthlyRevenue.map((rev, i) => rev - monthlyCost[i])
+    };
   });
 
   ngAfterViewInit() { this.initCharts(); }
@@ -382,8 +404,13 @@ export class DashboardComponent implements AfterViewInit {
 
   private getSalaryTypeData() {
     const data = this.salaryBreakdown();
-    const labels = Object.keys(data);
-    const values = Object.values(data);
+    // ترتيب أبجدي مع وضع Other في النهاية
+    const labels = Object.keys(data).sort((a, b) => {
+      if (a.toLowerCase() === 'other') return 1;
+      if (b.toLowerCase() === 'other') return -1;
+      return a.localeCompare(b);
+    });
+    const values = labels.map(l => data[l]);
     const colors = ['#1e3a8a', '#2563eb', '#60a5fa', '#93c5fd', '#bae6fd', '#0ea5e9'];
 
     return {
@@ -393,7 +420,7 @@ export class DashboardComponent implements AfterViewInit {
   }
 
   private getProductProductivityData() {
-    const data = this.productStats().filter(d => d.empCount > 0);
+    const data = this.productStats().filter(d => d.empCount > 0).sort((a, b) => a.name.localeCompare(b.name));
     return {
       labels: data.map(d => d.name),
       datasets: [
@@ -404,7 +431,7 @@ export class DashboardComponent implements AfterViewInit {
   }
 
   private getProductComparisonData() {
-    const data = this.productStats().filter(d => d.revenue > 0 || d.salaries > 0);
+    const data = this.productStats().filter(d => d.revenue > 0 || d.salaries > 0).sort((a, b) => a.name.localeCompare(b.name));
     return {
       labels: data.map(d => d.name),
       datasets: [
@@ -413,7 +440,7 @@ export class DashboardComponent implements AfterViewInit {
         {
           label: 'Net Profit',
           data: data.map(d => d.profit),
-          backgroundColor: data.map(d => d.profit >= 0 ? '#10b981' : '#ef4444'), // ✅ أخضر للموجب، أحمر للسالب
+          backgroundColor: data.map(d => d.profit >= 0 ? '#10b981' : '#ef4444'),
           borderRadius: 4
         }
       ]
@@ -442,7 +469,7 @@ export class DashboardComponent implements AfterViewInit {
   }
 
   private getTargetVsActualData() {
-    const data = this.summaryData().filter(p => p.total > 0 || p.target > 0);
+    const data = this.summaryData().filter(p => p.total > 0 || p.target > 0).sort((a, b) => a.name.localeCompare(b.name));
     return {
       labels: data.map(p => p.name),
       datasets: [
@@ -467,21 +494,31 @@ export class DashboardComponent implements AfterViewInit {
 
   private getGeoData() {
     const revs = this.dataService.revenues().filter(r => new Date(r.date).getFullYear() === this.selectedYear());
-    const uaeTotal = revs.filter(r => r.country === 'UAE').reduce((s, r) => s + Number(r.gross_amount), 0);
-    const ksaTotal = revs.filter(r => r.country === 'KSA').reduce((s, r) => s + Number(r.gross_amount), 0);
-    const syrTotal = revs.filter(r => r.country === 'SYR').reduce((s, r) => s + Number(r.gross_amount), 0);
-    const jorTotal = revs.filter(r => r.country === 'JOR').reduce((s, r) => s + Number(r.gross_amount), 0);
-    const otherTotal = revs.filter(r => !['UAE', 'KSA', 'SYR', 'JOR'].includes(r.country)).reduce((s, r) => s + Number(r.gross_amount), 0);
+    const geoTotals: { [key: string]: number } = {};
 
-    const labels = [];
-    const data = [];
-    const colors = [];
+    revs.forEach(r => {
+      const country = r.country || 'Other';
+      geoTotals[country] = (geoTotals[country] || 0) + Number(r.gross_amount || 0);
+    });
 
-    if (uaeTotal > 0) { labels.push('UAE'); data.push(uaeTotal); colors.push('#10b981'); }
-    if (ksaTotal > 0) { labels.push('KSA'); data.push(ksaTotal); colors.push('#f59e0b'); }
-    if (syrTotal > 0) { labels.push('SYR'); data.push(syrTotal); colors.push('#3b82f6'); }
-    if (jorTotal > 0) { labels.push('JOR'); data.push(jorTotal); colors.push('#8b5cf6'); }
-    if (otherTotal > 0) { labels.push('Other'); data.push(otherTotal); colors.push('#64748b'); }
+    // ترتيب أبجدي مع وضع Other في النهاية
+    const sortedKeys = Object.keys(geoTotals).filter(k => geoTotals[k] > 0).sort((a, b) => {
+      if (a.toLowerCase() === 'other') return 1;
+      if (b.toLowerCase() === 'other') return -1;
+      return a.localeCompare(b);
+    });
+
+    const colorMap: { [key: string]: string } = {
+      'UAE': '#10b981',
+      'KSA': '#f59e0b',
+      'SYR': '#3b82f6',
+      'JOR': '#8b5cf6',
+      'Other': '#64748b'
+    };
+
+    const labels = sortedKeys;
+    const data = sortedKeys.map(k => geoTotals[k]);
+    const colors = sortedKeys.map(k => colorMap[k] || '#64748b');
 
     return {
       labels: labels,
@@ -489,20 +526,42 @@ export class DashboardComponent implements AfterViewInit {
     };
   }
 
+  // Department Profitability Index - حساب الكوست من fact_salary
   private getProfitabilityData() {
     const year = this.selectedYear();
-    const data = this.dataService.products().map(p => {
-      const rev = this.dataService.revenues().filter(r => r.product_id === p.product_id && new Date(r.date).getFullYear() === year).reduce((s, r) => s + (Number(r.gross_amount) || 0), 0);
-      const cost = this.dataService.costs().filter(c => c.product_id === p.product_id && c.year === year).reduce((s, c) => s + (Number(c.amount) || 0), 0);
-      return { name: p.product_name, margin: rev > 0 ? ((rev - cost) / rev) * 100 : 0 };
-    }).filter(x => x.margin !== 0).sort((a, b) => b.margin - a.margin);
+    const products = this.dataService.products();
+    const salaries = this.dataService.salaries();
+    const revenues = this.dataService.revenues();
+
+    const data = products.map(p => {
+      const rev = revenues
+        .filter(r => r.product_id === p.product_id && new Date(r.date).getFullYear() === year)
+        .reduce((s, r) => s + (Number(r.gross_amount) || 0), 0);
+
+      // حساب الرواتب من fact_salary للقسم
+      const productSalaries = salaries.filter(s => {
+        const emp = this.dataService.employees().find(e => e.employee_id === s.employee_id);
+        return emp?.product_id === p.product_id && s.year === year;
+      });
+      const cost = productSalaries.reduce((s, sal) => s + (Number(sal.net_salary) || 0), 0);
+
+      return {
+        name: p.product_name,
+        margin: rev > 0 ? ((rev - cost) / rev) * 100 : 0
+      };
+    }).filter(x => x.margin !== 0).sort((a, b) => {
+      // ترتيب أبجدي مع وضع Other في النهاية
+      if (a.name.toLowerCase() === 'other') return 1;
+      if (b.name.toLowerCase() === 'other') return -1;
+      return a.name.localeCompare(b.name);
+    });
 
     return {
       labels: data.map(d => d.name),
       datasets: [{
         label: 'Margin %',
         data: data.map(d => d.margin),
-        backgroundColor: data.map(d => d.margin >= 0 ? '#10b981' : '#ef4444') // ✅ أحمر للسالب
+        backgroundColor: data.map(d => d.margin >= 0 ? '#10b981' : '#ef4444')
       }]
     };
   }
