@@ -27,39 +27,25 @@ export class RevenueManagerComponent {
   loading = signal(false);
 
   // Lists
-// Lists
   employees = computed(() => {
     return this.dataService.employees().slice().sort((a, b) => a.name.localeCompare(b.name));
   });
 
   products = computed(() => {
     return this.dataService.products().slice().sort((a, b) => {
-      // تنظيف الأسماء من المسافات وتحويلها لأحرف صغيرة
       const nameA = a.product_name.toLowerCase().trim();
       const nameB = b.product_name.toLowerCase().trim();
-
-      // التحقق من وجود كلمة Other أو Others
       const isAOthers = nameA === 'others' || nameA === 'other';
       const isBOthers = nameB === 'others' || nameB === 'other';
-
-      // المنطق: إذا كان A هو Others، اجعله في النهاية (1)
       if (isAOthers && !isBOthers) return 1;
-      // إذا كان B هو Others، اجعله في النهاية (بالتالي A يسبقه -1)
       if (!isAOthers && isBOthers) return -1;
-
-      // الترتيب الأبجدي العادي لباقي العناصر
       return nameA.localeCompare(nameB);
     });
   });
 
-  // Sorted countries
   sortedCountries = computed(() => {
     const countries = ['JOR', 'KSA', 'SYR', 'UAE'];
-    return countries.sort((a, b) => {
-      if (a.toLowerCase() === 'others') return 1;
-      if (b.toLowerCase() === 'others') return -1;
-      return a.localeCompare(b);
-    });
+    return countries.sort((a, b) => a.localeCompare(b));
   });
 
   months = [
@@ -75,33 +61,16 @@ export class RevenueManagerComponent {
     return Array.from(years).sort((a, b) => b - a);
   });
 
-  // Modal Fields
   modalMonth = new Date().getMonth() + 1;
   modalYear = new Date().getFullYear();
-
   currentItem: Partial<FactRevenue> = this.getEmptyRevenue();
 
-  // Filter Logic
   filteredRevenues = computed(() => {
     let data = this.dataService.revenues();
-
-    // فلتر السنة
-    if (this.filterYear()) {
-      data = data.filter(r => new Date(r.date).getFullYear() === this.filterYear());
-    }
-    // فلتر الشهر
-    if (this.filterMonth()) {
-      data = data.filter(r => new Date(r.date).getMonth() + 1 === this.filterMonth());
-    }
-    // فلتر المنتج
-    if (this.filterProduct()) {
-      data = data.filter(r => r.product_id == this.filterProduct());
-    }
-    // فلتر الدولة
-    if (this.filterCountry() !== 'ALL') {
-      data = data.filter(r => r.country === this.filterCountry());
-    }
-
+    if (this.filterYear()) data = data.filter(r => new Date(r.date).getFullYear() === this.filterYear());
+    if (this.filterMonth()) data = data.filter(r => new Date(r.date).getMonth() + 1 === this.filterMonth());
+    if (this.filterProduct()) data = data.filter(r => r.product_id == this.filterProduct());
+    if (this.filterCountry() !== 'ALL') data = data.filter(r => r.country === this.filterCountry());
     const text = this.searchText().toLowerCase();
     if (text) {
       data = data.filter(r =>
@@ -109,7 +78,6 @@ export class RevenueManagerComponent {
         (r.country.toLowerCase().includes(text))
       );
     }
-
     return data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   });
 
@@ -127,7 +95,9 @@ export class RevenueManagerComponent {
       total_value: 0,
       order_number: 'Generating...',
       lead_id: this.employees()[0]?.employee_id,
-      owner_id: this.employees()[0]?.employee_id
+      owner_id: this.employees()[0]?.employee_id,
+      start_date: null,
+      end_date: null
     };
   }
 
@@ -140,22 +110,27 @@ export class RevenueManagerComponent {
 
   editItem(item: FactRevenue) {
     this.isEditMode = true;
-    this.currentItem = { ...item };
+    this.currentItem = { ...item, start_date: item.start_date || null, end_date: item.end_date || null };
     const d = new Date(item.date);
     this.modalMonth = d.getMonth() + 1;
     this.modalYear = d.getFullYear();
     this.showModal = true;
   }
 
-  closeModal() {
-    this.showModal = false;
-  }
+  closeModal() { this.showModal = false; }
 
   updateBookingOrder() {
-    if (!this.isEditMode && this.currentItem.country && this.currentItem.product_id) {
+    if (!this.currentItem.country || !this.currentItem.product_id) return;
+    if (!this.isEditMode) {
       this.currentItem.order_number = this.dataService.generateBookingRef(
         this.currentItem.country,
         Number(this.currentItem.product_id)
+      );
+    } else {
+      this.currentItem.order_number = this.dataService.regenerateBookingRefForEdit(
+        this.currentItem.country,
+        Number(this.currentItem.product_id),
+        this.currentItem.order_number || ''
       );
     }
   }
@@ -164,7 +139,6 @@ export class RevenueManagerComponent {
     this.loading.set(true);
     const monthStr = this.modalMonth.toString().padStart(2, '0');
     this.currentItem.date = `${this.modalYear}-${monthStr}-01`;
-
     try {
       let result;
       if (this.isEditMode) {
@@ -172,7 +146,6 @@ export class RevenueManagerComponent {
       } else {
         result = await this.dataService.addRevenue(this.currentItem);
       }
-
       if (result.success) {
         this.closeModal();
       } else {

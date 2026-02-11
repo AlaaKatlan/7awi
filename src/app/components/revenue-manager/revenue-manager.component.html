@@ -73,8 +73,11 @@
                   <tr>
                       <th class="p-5">Order #</th>
                       <th class="p-5">Date</th>
-                      <th class="p-5">Department</th> <th class="p-5">Country</th>
-                      <th class="p-5 text-right">Total Value</th> <th class="p-5 text-right">Gross Amount</th>
+                      <th class="p-5">Department</th>
+                      <th class="p-5">Country</th>
+                      <th class="p-5 text-center">Project Period</th>
+                      <th class="p-5 text-right">Total Value</th>
+                      <th class="p-5 text-right">Gross Amount</th>
                       <th class="p-5 text-center">Action</th>
                   </tr>
               </thead>
@@ -104,6 +107,22 @@
                                   {{ item.country }}
                               </span>
                           </td>
+                          <!-- ✅ عمود جديد: Project Period -->
+                          <td class="p-5 text-center">
+                              @if (item.start_date || item.end_date) {
+                                  <div class="flex flex-col items-center gap-1">
+                                      <span class="text-[10px] text-slate-500">
+                                          {{ item.start_date ? (item.start_date | date:'dd MMM yy') : '—' }}
+                                      </span>
+                                      <span class="material-icons text-slate-300 text-xs">arrow_downward</span>
+                                      <span class="text-[10px] text-slate-500">
+                                          {{ item.end_date ? (item.end_date | date:'dd MMM yy') : '—' }}
+                                      </span>
+                                  </div>
+                              } @else {
+                                  <span class="text-slate-300 text-xs">—</span>
+                              }
+                          </td>
                           <td class="p-5 text-right font-bold text-slate-500">
                               {{ (item.total_value || 0) | currency:'USD ':'symbol':'1.0-0' }}
                           </td>
@@ -125,13 +144,14 @@
 
 @if (showModal) {
     <div class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-        <div class="bg-white w-full max-w-lg rounded-[2rem] shadow-2xl p-8 animate-fade-in">
+        <div class="bg-white w-full max-w-xl rounded-[2rem] shadow-2xl p-8 animate-fade-in max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-xl font-black text-slate-800 uppercase tracking-tight">{{ isEditMode ? 'Update Entry' : 'New Booking Order' }}</h2>
                 <button (click)="closeModal()" class="text-gray-400 hover:text-rose-500 transition"><span class="material-icons">close</span></button>
             </div>
 
             <div class="space-y-5">
+                <!-- Order Number (Auto-generated) -->
                 <div>
                     <label class="block text-[10px] font-black text-gray-400 uppercase mb-2">Order Number</label>
                     <div class="flex items-center gap-2">
@@ -139,10 +159,14 @@
                                class="flex-1 p-3 bg-slate-100 rounded-xl border-0 outline-none font-mono text-slate-600 font-bold"
                                [readonly]="true"
                                placeholder="Auto-generated">
-                        <span class="text-[10px] text-slate-400 italic">Auto-generated</span>
+                        <span class="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-1 rounded">
+                            <!-- <span class="material-icons text-xs align-middle">auto_awesome</span> Sequential -->
+                        </span>
                     </div>
+                    <p class="text-[10px] text-slate-400 mt-1 italic">Format: COUNTRY-PRODUCT-0001 (auto-incremented)</p>
                 </div>
 
+                <!-- Lead & Owner -->
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-[10px] font-black text-gray-400 uppercase mb-2">Lead</label>
@@ -162,6 +186,7 @@
                     </div>
                 </div>
 
+                <!-- Booking Period -->
                 <div>
                     <label class="block text-[10px] font-black text-gray-400 uppercase mb-2">Booking Period</label>
                     <div class="grid grid-cols-2 gap-4">
@@ -178,10 +203,11 @@
                     </div>
                 </div>
 
+                <!-- Department & Country -->
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-[10px] font-black text-gray-400 uppercase mb-2">Department Category</label>
-                        <select [(ngModel)]="currentItem.product_id" (change)="updateBookingOrder()" class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none font-bold focus:ring-2 focus:ring-[#1e3a8a]">
+                        <select [(ngModel)]="currentItem.product_id" (ngModelChange)="updateBookingOrder()" class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none font-bold focus:ring-2 focus:ring-[#1e3a8a]">
                             @for (prod of products(); track prod.product_id) {
                                 <option [value]="prod.product_id">{{ prod.product_name }}</option>
                             }
@@ -189,7 +215,7 @@
                     </div>
                     <div>
                         <label class="block text-[10px] font-black text-gray-400 uppercase mb-2">Region/Country</label>
-                        <select [(ngModel)]="currentItem.country" (change)="updateBookingOrder()" class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none font-bold focus:ring-2 focus:ring-[#1e3a8a]">
+                        <select [(ngModel)]="currentItem.country" (ngModelChange)="updateBookingOrder()" class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none font-bold focus:ring-2 focus:ring-[#1e3a8a]">
                             @for (country of sortedCountries(); track country) {
                                 <option [value]="country">{{ country }}</option>
                             }
@@ -197,6 +223,27 @@
                     </div>
                 </div>
 
+                <!-- ✅ Project Dates Section (NEW) -->
+                <div class="border-t border-slate-100 pt-4 mt-4">
+                    <h4 class="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-2">
+                        <span class="material-icons text-sm">date_range</span> Project Timeline
+                    </h4>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-[10px] font-black text-gray-400 uppercase mb-2">Start Date</label>
+                            <input [(ngModel)]="currentItem.start_date" type="date"
+                                   class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a]">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-black text-gray-400 uppercase mb-2">End Date</label>
+                            <input [(ngModel)]="currentItem.end_date" type="date"
+                                   class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a]">
+                        </div>
+                    </div>
+                    <p class="text-[10px] text-slate-400 mt-2 italic">Optional: Define the project duration</p>
+                </div>
+
+                <!-- Values -->
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-[10px] font-black text-gray-400 uppercase mb-2">Total Value ($)</label>

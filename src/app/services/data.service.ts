@@ -107,14 +107,86 @@ export class DataService {
     return this.products().find(p => p.product_id == id)?.product_name || `Product ${id}`;
   }
 
-  // --- Logic Methods ---
+  // =============================================
+  // ✅ نظام ترقيم الطلبات التسلسلي الجديد
+  // Format: [COUNTRY]-[PRODUCT_CODE]-[SEQUENTIAL_NUMBER]
+  // Example: UAE-DOPX-0001, KSA-SCAM-0002
+  // الرقم التسلسلي يبدأ من 1 ويزيد تلقائياً
+  // =============================================
+
+  /**
+   * توليد رقم الطلب التسلسلي
+   * يعتمد على أعلى رقم موجود في قاعدة البيانات + 1
+   */
   generateBookingRef(country: string, productId: number): string {
+    // A. Country Code (3 chars uppercase)
+    const countryCode = (country || 'UAE').substring(0, 3).toUpperCase();
+
+    // B. Product Code
+    const product = this.products().find(p => p.product_id == productId);
+    const prodCode = product?.product_code || 'GEN';
+
+    // C. الحصول على أعلى رقم تسلسلي من جميع الطلبات
+    const nextSeq = this.getNextSequentialNumber();
+    const increment = nextSeq.toString().padStart(4, '0');
+
+    return `${countryCode}-${prodCode}-${increment}`;
+  }
+
+  /**
+   * الحصول على الرقم التسلسلي التالي
+   * يستخرج أعلى رقم من order_number الحالية ويضيف 1
+   */
+  private getNextSequentialNumber(): number {
+    const allRevenues = this.revenues();
+    
+    if (allRevenues.length === 0) {
+      return 1; // أول طلب
+    }
+
+    // استخراج الأرقام التسلسلية من جميع order_numbers
+    const sequenceNumbers = allRevenues
+      .map(r => {
+        if (!r.order_number) return 0;
+        // استخراج الجزء الأخير (الرقم) من order_number
+        // Format: UAE-DOPX-0001
+        const parts = r.order_number.split('-');
+        if (parts.length >= 3) {
+          const numPart = parts[parts.length - 1]; // آخر جزء
+          const num = parseInt(numPart, 10);
+          return isNaN(num) ? 0 : num;
+        }
+        return 0;
+      })
+      .filter(n => n > 0);
+
+    if (sequenceNumbers.length === 0) {
+      return 1;
+    }
+
+    // إرجاع أعلى رقم + 1
+    return Math.max(...sequenceNumbers) + 1;
+  }
+
+  /**
+   * إعادة توليد رقم الطلب عند تغيير الدولة أو المنتج (للتعديل)
+   * الرقم التسلسلي يبقى كما هو، فقط البادئة تتغير
+   */
+  regenerateBookingRefForEdit(country: string, productId: number, currentOrderNumber: string): string {
     const countryCode = (country || 'UAE').substring(0, 3).toUpperCase();
     const product = this.products().find(p => p.product_id == productId);
     const prodCode = product?.product_code || 'GEN';
-    const nextId = this.revenues().length + 1;
-    const increment = nextId.toString().padStart(4, '0');
-    return `${countryCode}-${prodCode}-${increment}`;
+
+    // استخراج الرقم التسلسلي الحالي
+    let seqNum = '0001';
+    if (currentOrderNumber) {
+      const parts = currentOrderNumber.split('-');
+      if (parts.length >= 3) {
+        seqNum = parts[parts.length - 1];
+      }
+    }
+
+    return `${countryCode}-${prodCode}-${seqNum}`;
   }
 
   // =============================================
@@ -156,24 +228,10 @@ export class DataService {
         return { success: true, generated: 0 };
       }
 
-      // const newSalaryRecords = employeesNeedingSalary.map(emp => ({
-      //   employee_id: emp.employee_id,
-      //   year: year,
-      //   month: month,
-      //   base_salary: Number(emp.salary) || 0,
-      //   bonus: 0,
-      //   deductions: 0,
-      //   net_salary: Number(emp.salary) || 0,
-      //   status: 'pending' as const
-      // }));
-      // القيمة التي سيتم الضرب بها (المعامل)
       const SALARY_MULTIPLIER = 1;
 
       const newSalaryRecords = employeesNeedingSalary.map(emp => {
-        // حساب الراتب الأساسي بعد الضرب
         const calculatedBase = (Number(emp.salary) || 0) * SALARY_MULTIPLIER;
-
-        // نقوم بتقريب الناتج لأقرب خانتين عشريتين لضمان دقة البيانات المالية
         const finalSalary = Math.round(calculatedBase * 100) / 100;
 
         return {
@@ -183,10 +241,11 @@ export class DataService {
           base_salary: finalSalary,
           bonus: 0,
           deductions: 0,
-          net_salary: finalSalary, // تأكد أن صافي الراتب يعكس القيمة الجديدة أيضاً
+          net_salary: finalSalary,
           status: 'pending' as const
         };
       });
+
       console.log('New salary records to insert:', newSalaryRecords.length);
 
       const BATCH_SIZE = 50;
@@ -234,27 +293,51 @@ export class DataService {
   // CRUD Operations
   // =============================================
 
-  // --- REVENUE ---
+  // --- REVENUE (معدّل مع حقول start_date و end_date) ---
   async addRevenue(item: Partial<FactRevenue>) {
     const payload = {
       date: item.date,
       gross_amount: item.gross_amount,
-      total_value: item.total_value,
+      total_value: item.total_value || 0,
       order_number: item.order_number,
       product_id: item.product_id,
       country: item.country,
       lead_id: item.lead_id,
-      owner_id: item.owner_id
+      owner_id: item.owner_id,
+      start_date: item.start_date || null,  // ✅ حقل جديد
+      end_date: item.end_date || null       // ✅ حقل جديد
     };
+
     const { data, error } = await this.supabase.from('fact_revenue').insert([payload]).select();
-    if (data) this.revenues.update(v => [data[0], ...v]);
+
+    if (data) {
+      this.revenues.update(v => [data[0], ...v]);
+    }
+
     return { success: !error, error: error?.message, data };
   }
 
   async updateRevenue(item: Partial<FactRevenue>) {
-    const { id, ...payload } = item;
+    const { id, ...rest } = item;
+
+    const payload: any = {};
+    if (rest.date !== undefined) payload.date = rest.date;
+    if (rest.gross_amount !== undefined) payload.gross_amount = rest.gross_amount;
+    if (rest.total_value !== undefined) payload.total_value = rest.total_value;
+    if (rest.order_number !== undefined) payload.order_number = rest.order_number;
+    if (rest.product_id !== undefined) payload.product_id = rest.product_id;
+    if (rest.country !== undefined) payload.country = rest.country;
+    if (rest.lead_id !== undefined) payload.lead_id = rest.lead_id;
+    if (rest.owner_id !== undefined) payload.owner_id = rest.owner_id;
+    if (rest.start_date !== undefined) payload.start_date = rest.start_date || null;  // ✅
+    if (rest.end_date !== undefined) payload.end_date = rest.end_date || null;        // ✅
+
     const { data, error } = await this.supabase.from('fact_revenue').update(payload).eq('id', id).select();
-    if (data) this.revenues.update(v => v.map(r => r.id === id ? data[0] : r));
+
+    if (data) {
+      this.revenues.update(v => v.map(r => r.id === id ? data[0] : r));
+    }
+
     return { success: !error, error: error?.message, data };
   }
 
@@ -310,17 +393,15 @@ export class DataService {
     return { success: !error, error: error?.message };
   }
 
-  // --- CLIENT (معدّل) ---
+  // --- CLIENT ---
   async addClient(item: Partial<DimClient>) {
     console.log('[DataService] addClient called with:', item);
 
-    // تنظيف الـ payload - إزالة القيم الفارغة
     const payload: any = {
       client_name: item.client_name,
       country: item.country || 'UAE'
     };
 
-    // إضافة الحقول الاختيارية فقط إذا كانت موجودة
     if (item.product_id) payload.product_id = item.product_id;
     if (item.lead_id) payload.lead_id = item.lead_id;
     if (item.relationship_manager_id) payload.relationship_manager_id = item.relationship_manager_id;
@@ -347,7 +428,6 @@ export class DataService {
       return { success: false, error: 'No client_id provided', data: null };
     }
 
-    // تنظيف الـ payload
     const payload: any = {};
     if (rest.client_name !== undefined) payload.client_name = rest.client_name;
     if (rest.country !== undefined) payload.country = rest.country;
@@ -374,7 +454,7 @@ export class DataService {
     return { success: !error, error: error?.message };
   }
 
-  // --- PIPELINE (معدّل - إضافة lead_id و owner_id) ---
+  // --- PIPELINE ---
   async addPipeline(item: Partial<FactPipeline>) {
     const { id, created_at, ...payload } = item as any;
     const { data, error } = await this.supabase.from('fact_pipeline').insert([payload]).select();
@@ -414,6 +494,7 @@ export class DataService {
     if (data) this.costs.update(v => v.map(c => c.id === id ? data[0] : c));
     return { success: !error, error: error?.message, data };
   }
+
   async deleteCost(id: number) {
     const { error } = await this.supabase.from('fact_cost').delete().eq('id', id);
     if (!error) this.costs.update(v => v.filter(c => c.id !== id));
@@ -421,39 +502,34 @@ export class DataService {
   }
 
   // =============================================
-  // GENERATE ZERO COSTS (New Logic)
+  // GENERATE ZERO COSTS
   // =============================================
   async generateZeroCostsForMonth(year: number, month: number): Promise<{ success: boolean; generated: number; error?: string }> {
     try {
-      // 1. جلب كل الأقسام
       const allProducts = this.products();
       if (allProducts.length === 0) return { success: false, generated: 0, error: 'No departments found' };
 
-      // 2. معرفة ما تم إدخاله مسبقاً لهذا الشهر لتجنب التكرار
       const currentCosts = this.costs().filter(c => c.year === year && c.month === month);
       const existingProductIds = new Set(currentCosts.map(c => c.product_id));
 
-      // 3. تحديد الأقسام التي ليس لها سجل في هذا الشهر
       const missingProducts = allProducts.filter(p => !existingProductIds.has(p.product_id));
 
       if (missingProducts.length === 0) {
-        return { success: true, generated: 0 }; // الكل موجود
+        return { success: true, generated: 0 };
       }
 
-      // 4. تجهيز البيانات (القيمة 0)
-      const dateStr = `${year}-${month.toString().padStart(2, '0')}-01`; // أول يوم في الشهر
+      const dateStr = `${year}-${month.toString().padStart(2, '0')}-01`;
 
       const newCosts = missingProducts.map(prod => ({
         year: year,
         month: month,
         date: dateStr,
-        amount: 0, // القيمة صفر
+        amount: 0,
         product_id: prod.product_id,
-        description: `Monthly Cost - ${prod.product_name}`, // وصف افتراضي
-        client_id: null // بدون عميل افتراضياً
+        description: `Monthly Cost - ${prod.product_name}`,
+        client_id: null
       }));
 
-      // 5. الإضافة لقاعدة البيانات
       const { data, error } = await this.supabase
         .from('fact_cost')
         .insert(newCosts)
@@ -461,7 +537,6 @@ export class DataService {
 
       if (error) throw error;
 
-      // 6. تحديث الواجهة
       if (data) {
         this.costs.update(current => [...data, ...current]);
       }
@@ -473,6 +548,7 @@ export class DataService {
       return { success: false, generated: 0, error: error.message };
     }
   }
+
   // --- SALARY ---
   async updateSalary(item: Partial<FactSalary>) {
     const { id, created_at, ...payload } = item as any;

@@ -10,9 +10,9 @@ export interface DimClient {
   client_id: number;
   client_name: string;
   country: string;
-  product_id?: number;           // Product - تم إضافته
-  lead_id?: number;              // Lead - تم إضافته
-  relationship_manager_id?: number;  // Relationship Manager - تم إضافته
+  product_id?: number;
+  lead_id?: number;
+  relationship_manager_id?: number;
   created_at?: string;
 }
 
@@ -46,6 +46,8 @@ export interface FactRevenue {
   owner_id?: number;
   booking_order?: string;
   notes?: string;
+  start_date?: string | null;  // ✅ تاريخ بداية المشروع
+  end_date?: string | null;    // ✅ تاريخ نهاية المشروع
 }
 
 export interface FactPipeline {
@@ -56,8 +58,8 @@ export interface FactPipeline {
   quarter: number;
   year: number;
   status: string;
-  lead_id?: number;      // Lead - تم إضافته
-  owner_id?: number;     // Owner - تم إضافته
+  lead_id?: number;
+  owner_id?: number;
   created_at?: string;
 }
 
