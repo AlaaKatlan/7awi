@@ -35,7 +35,7 @@ export class EmployeeManagerComponent {
 
   // Computed: أنواع العقود مرتبة أبجدياً
   sortedContracts = computed(() => {
-    return ['Full Time Contractor', 'Part Time Contractor', 'Permanent'].sort((a, b) => a.localeCompare(b));
+    return ['Full Time Contractor', 'Part Time Contractor', 'Permanent','Internship'].sort((a, b) => a.localeCompare(b));
   });
 
   currentEmployee: DimEmployee = this.getEmptyEmployee();

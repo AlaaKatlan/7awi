@@ -60,7 +60,7 @@ export class AuthService {
           this.session.set(session);
           this.currentUser.set(session.user);
           if (!this.userProfile()) {
-             await this.loadUserProfile(session.user.id);
+            await this.loadUserProfile(session.user.id);
           }
         } else {
           this.session.set(null);
@@ -96,18 +96,18 @@ export class AuthService {
         // Fallback: إنشاء بروفايل محلي مؤقت
         const user = this.currentUser();
         if (user) {
-            this.userProfile.set({
-                id: user.id,
-                email: user.email!,
-                full_name: user.user_metadata?.['full_name'] || user.email?.split('@')[0],
-                role: 'viewer'
-            });
+          this.userProfile.set({
+            id: user.id,
+            email: user.email!,
+            full_name: user.user_metadata?.['full_name'] || user.email?.split('@')[0],
+            role: 'viewer'
+          });
         }
       }
     } catch (err: any) {
-       if (err.name !== 'AbortError') {
-         console.warn('Profile load error:', err);
-       }
+      if (err.name !== 'AbortError') {
+        console.warn('Profile load error:', err);
+      }
     }
   }
 
@@ -136,9 +136,9 @@ export class AuthService {
 
   async signUp(email: string, password: string, fullName: string): Promise<{ success: boolean; error?: string }> {
     const { error } = await this.supabase.auth.signUp({
-        email,
-        password,
-        options: { data: { full_name: fullName } }
+      email,
+      password,
+      options: { data: { full_name: fullName } }
     });
     if (error) return { success: false, error: error.message };
     return { success: true };
@@ -149,8 +149,17 @@ export class AuthService {
     return { success: !error, error: error?.message };
   }
 
-  async updatePassword(newPassword: string) {
-    const { error } = await this.supabase.auth.updateUser({ password: newPassword });
-    return { success: !error, error: error?.message };
+
+  async updatePassword(newPassword: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { error } = await this.supabase.auth.updateUser({
+        password: newPassword
+      });
+      if (error) return { success: false, error: error.message };
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
   }
+
 }

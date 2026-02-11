@@ -1,5 +1,6 @@
-import { Component, inject, computed, effect } from '@angular/core';
+import { Component, inject, computed, effect, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { DataService } from '../../services/data.service';
 import { AuthService } from '../../services/auth.service';
 import { DashboardComponent } from '../dashboard/dashboard.component';
@@ -16,6 +17,7 @@ import { SalaryManagerComponent } from '../salary-manager/salary-manager.compone
   standalone: true,
   imports: [
     CommonModule,
+    FormsModule,
     DashboardComponent,
     RevenueManagerComponent,
     PipelineManagerComponent,
@@ -90,7 +92,6 @@ import { SalaryManagerComponent } from '../salary-manager/salary-manager.compone
               <span *ngIf="sidebarOpen">Costs</span>
           </button>
 
-          <!-- ✅ قسم People - يظهر فقط للـ Admin -->
           <ng-container *ngIf="authService.isAdmin()">
             <div *ngIf="sidebarOpen" class="pt-4 pb-2">
               <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">People</span>
@@ -160,6 +161,12 @@ import { SalaryManagerComponent } from '../salary-manager/salary-manager.compone
                 <h1 class="text-3xl font-black text-gray-800 capitalize tracking-tight">{{ getPageTitle() }}</h1>
                 <p class="text-gray-500 font-medium text-sm mt-1">7awi Financial System</p>
              </div>
+
+             <button (click)="showProfileModal.set(true)"
+                     class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition text-slate-600 font-bold text-xs uppercase tracking-wider">
+               <span class="material-icons text-hawy-blue">manage_accounts</span>
+               Settings
+             </button>
         </header>
 
         @switch (activeTab) {
@@ -203,6 +210,46 @@ import { SalaryManagerComponent } from '../salary-manager/salary-manager.compone
             }
         }
       </main>
+
+      <div *ngIf="showProfileModal()" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-md rounded-2.5xl p-8 shadow-2xl animate-fade-in">
+          <div class="flex justify-between items-center mb-8">
+            <h2 class="text-xl font-black text-slate-800 uppercase tracking-tight">User Profile</h2>
+            <button (click)="closeProfileModal()" class="text-slate-300 hover:text-rose-500 transition-colors">
+              <span class="material-icons">close</span>
+            </button>
+          </div>
+
+          <div class="space-y-6">
+            <div class="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+              <div class="mb-4">
+                <label class="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Full Name</label>
+                <div class="font-black text-slate-700">{{ userProfile()?.full_name || 'N/A' }}</div>
+              </div>
+              <div>
+                <label class="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Email Address</label>
+                <div class="font-black text-slate-700">{{ currentUser()?.email }}</div>
+              </div>
+            </div>
+
+            <div class="space-y-4">
+              <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Change Password</label>
+              <input [(ngModel)]="newPassValue" type="password" placeholder="New Password"
+                     class="w-full p-4 bg-slate-50 rounded-2xl border-0 outline-none font-bold focus:ring-2 focus:ring-hawy-blue">
+              <input [(ngModel)]="confirmPassValue" type="password" placeholder="Confirm Password"
+                     class="w-full p-4 bg-slate-50 rounded-2xl border-0 outline-none font-bold focus:ring-2 focus:ring-hawy-blue">
+
+              <button (click)="handleUpdatePassword()"
+                      [disabled]="!newPassValue || isUpdatingPassword()"
+                      class="w-full py-4 bg-hawy-blue text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg hover:bg-hawy-dark transition-all flex justify-center items-center gap-2">
+                <span *ngIf="isUpdatingPassword()" class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
+                Update Password
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
   `,
   styles: [`
@@ -230,12 +277,18 @@ export class MainLayoutComponent {
   dataService = inject(DataService);
   authService = inject(AuthService);
 
-  // استخدام computed لضمان التحديث التلقائي عند تغير البيانات
+  // Signals for Modal State
+  showProfileModal = signal(false);
+  isUpdatingPassword = signal(false);
+
+  // Properties for ngModel
+  newPassValue = '';
+  confirmPassValue = '';
+
   userProfile = this.authService.userProfile;
   currentUser = this.authService.currentUser;
 
   constructor() {
-    // مراقبة التغيرات (للتأكد فقط، ليس ضرورياً مع computed)
     effect(() => {
       console.log('Layout Profile Updated:', this.userProfile());
     });
@@ -259,7 +312,6 @@ export class MainLayoutComponent {
     return titles[this.activeTab] || 'Management';
   }
 
-  // دالة مساعدة للحصول على الاسم
   getUserDisplayName(): string {
     return this.userProfile()?.full_name || this.currentUser()?.email || 'Loading...';
   }
@@ -271,5 +323,29 @@ export class MainLayoutComponent {
 
   async logout() {
     await this.authService.signOut();
+  }
+
+  async handleUpdatePassword() {
+    if (this.newPassValue !== this.confirmPassValue) {
+      alert('Passwords do not match!');
+      return;
+    }
+
+    this.isUpdatingPassword.set(true);
+    const result = await this.authService.updatePassword(this.newPassValue);
+    this.isUpdatingPassword.set(false);
+
+    if (result.success) {
+      alert('Password updated successfully!');
+      this.closeProfileModal();
+    } else {
+      alert('Error: ' + result.error);
+    }
+  }
+
+  closeProfileModal() {
+    this.showProfileModal.set(false);
+    this.newPassValue = '';
+    this.confirmPassValue = '';
   }
 }
