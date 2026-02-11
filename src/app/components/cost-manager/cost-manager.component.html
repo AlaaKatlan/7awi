@@ -1,92 +1,287 @@
-<!-- <div class="bg-white rounded-2xl shadow-sm p-6">
-    <div class="flex justify-between items-center mb-6">
-        <h2 class="text-xl font-bold text-gray-800">Monthly Costs Tracking</h2>
-        <button (click)="openModal()" class="bg-red-500 hover:bg-red-600 text-white px-5 py-2 rounded-lg transition shadow-md flex items-center">
-            <span class="material-icons mr-2 text-sm">add</span> Add Cost
-        </button>
+<div class="p-6 bg-[#f8fafc] min-h-screen">
+
+  <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+    <div>
+      <h1 class="text-2xl font-black text-slate-800 uppercase tracking-tight">Cost Management</h1>
+      <p class="text-slate-500 text-sm">Track and manage operational expenses</p>
     </div>
 
-    <table class="w-full text-left">
-        <thead class="bg-gray-50 text-xs text-gray-500 uppercase">
-            <tr>
-                <th class="p-4">Date</th>
-                <th class="p-4">Client</th>
-                <th class="p-4">Department</th>
-                <th class="p-4 text-right">Cost</th>
-                <th class="p-4 text-center">Action</th>
-            </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-100 text-sm">
-            @for (item of dataService.costs(); track item.id) {
-                <tr class="hover:bg-red-50 transition">
-                    <td class="p-4 font-mono text-gray-600">
-                      {{ item.date | date: 'MMM-yyyy' }}
-                    </td>
-                    <td class="p-4 font-bold">{{ dataService.getClientName(item.client_id!) }}</td>
-                    <td class="p-4">
-                      <span class="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-xs font-semibold">
-                        {{ dataService.getProductName(item.product_id!) }}
-                      </span>
-                    </td>
-                    <td class="p-4 text-right font-bold text-red-600">{{ item.amount | currency:'$ ':'symbol':'1.0-0' }}</td>
-                    <td class="p-4 text-center">
-                        <button (click)="editItem(item)" class="text-blue-600 hover:text-blue-800 font-medium text-xs uppercase cursor-pointer">
-                            Edit
-                        </button>
-                    </td>
-                </tr>
-            }
-        </tbody>
+    <div class="flex gap-2">
+      <button (click)="exportToExcel()"
+              class="bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition flex items-center gap-2 text-sm">
+        <span class="material-icons text-base">file_download</span> Export
+      </button>
+
+      <button (click)="openGenerateModal()"
+              class="bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg hover:bg-emerald-700 transition flex items-center gap-2 text-sm">
+        <span class="material-icons text-base">auto_fix_high</span> Generate Monthly Costs
+      </button>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+    <div class="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-[#1e3a8a]">
+      <h3 class="text-gray-400 text-sm font-medium uppercase">Total Transactions</h3>
+      <p class="text-3xl font-black text-gray-800 mt-2">{{ filteredCosts().length }}</p>
+    </div>
+    <div class="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-rose-500">
+      <h3 class="text-gray-400 text-sm font-medium uppercase">Total Costs (Filtered)</h3>
+      <p class="text-3xl font-black text-gray-800 mt-2">{{ totalCost() | currency:'USD ':'symbol':'1.0-0' }}</p>
+    </div>
+  </div>
+
+  <div class="bg-white p-4 rounded-xl shadow-sm mb-6 border border-gray-100 flex flex-wrap gap-4 items-end">
+    <div class="flex-1 min-w-[200px]">
+      <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Search</label>
+      <input type="text" [ngModel]="searchText()" (ngModelChange)="searchText.set($event)"
+             placeholder="Search description..."
+             class="w-full bg-slate-50 border-0 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#1e3a8a] outline-none">
+    </div>
+
+    <div class="w-32">
+      <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Year</label>
+      <select [ngModel]="filterYear()" (ngModelChange)="filterYear.set($event)"
+              class="w-full bg-slate-50 border-0 rounded-lg px-3 py-2 outline-none cursor-pointer">
+        <option [ngValue]="null">All Years</option>
+        @for (year of yearsList(); track year) {
+          <option [ngValue]="year">{{ year }}</option>
+        }
+      </select>
+    </div>
+
+    <div class="w-36">
+      <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Month</label>
+      <select [ngModel]="filterMonth()" (ngModelChange)="filterMonth.set($event)"
+              class="w-full bg-slate-50 border-0 rounded-lg px-3 py-2 outline-none cursor-pointer">
+        <option [ngValue]="null">All Months</option>
+        @for (m of months; track m.value) {
+          <option [ngValue]="m.value">{{ m.name }}</option>
+        }
+      </select>
+    </div>
+
+    <div class="w-44">
+      <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Department</label>
+      <select [ngModel]="filterProduct()" (ngModelChange)="filterProduct.set($event)"
+              class="w-full bg-slate-50 border-0 rounded-lg px-3 py-2 outline-none cursor-pointer">
+        <option [ngValue]="null">All Departments</option>
+        @for (prod of sortedProducts(); track prod.product_id) {
+          <option [ngValue]="prod.product_id">{{ prod.product_name }}</option>
+        }
+      </select>
+    </div>
+
+    <div class="w-44">
+      <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Client</label>
+      <select [ngModel]="filterClient()" (ngModelChange)="filterClient.set($event)"
+              class="w-full bg-slate-50 border-0 rounded-lg px-3 py-2 outline-none cursor-pointer">
+        <option [ngValue]="null">All Clients</option>
+        @for (client of sortedClients(); track client.client_id) {
+          <option [ngValue]="client.client_id">{{ client.client_name }}</option>
+        }
+      </select>
+    </div>
+
+    <button (click)="openModal()"
+            class="bg-[#1e3a8a] text-white px-6 py-2 rounded-lg font-bold shadow-md hover:bg-blue-900 transition flex items-center gap-2">
+      <span class="material-icons text-sm">add</span> Add Cost
+    </button>
+  </div>
+
+  <div class="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100">
+    <table class="w-full text-left border-collapse">
+      <thead class="bg-slate-50 text-[10px] text-gray-400 font-black uppercase tracking-widest border-b border-slate-100">
+        <tr>
+          <th class="p-5">Date</th>
+          <th class="p-5">Description</th>
+          <th class="p-5">Department</th>
+          <th class="p-5">Client</th>
+          <th class="p-5 text-right">Amount</th>
+          <th class="p-5 text-center">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-50 text-sm">
+        @for (cost of filteredCosts(); track cost.id) {
+          <tr class="hover:bg-blue-50/50 transition duration-150">
+            <td class="p-5">
+              <div class="font-bold text-slate-700">{{ cost.date | date:'MMM dd, yyyy' }}</div>
+            </td>
+            <td class="p-5 text-slate-600">
+              {{ cost.description || '-' }}
+            </td>
+            <td class="p-5">
+              <span class="bg-blue-50 text-[#1e3a8a] px-3 py-1 rounded-full text-[11px] font-black uppercase">
+                {{ dataService.getProductName(cost.product_id) }}
+              </span>
+            </td>
+            <td class="p-5 text-slate-600">
+              {{ dataService.getClientName(cost.client_id) }}
+            </td>
+            <td class="p-5 text-right font-black" [class.text-gray-400]="cost.amount === 0" [class.text-rose-600]="cost.amount > 0">
+              {{ cost.amount | currency:'USD':'symbol':'1.0-0' }}
+            </td>
+            <td class="p-5 text-center">
+              <div class="flex items-center justify-center gap-2">
+                <button (click)="editCost(cost)" class="text-slate-400 hover:text-[#1e3a8a] transition p-2">
+                  <span class="material-icons text-base">edit</span>
+                </button>
+                <button (click)="confirmDelete(cost)" class="text-slate-400 hover:text-red-500 transition p-2">
+                  <span class="material-icons text-base">delete</span>
+                </button>
+              </div>
+            </td>
+          </tr>
+        } @empty {
+          <tr>
+            <td colspan="6" class="p-10 text-center text-slate-400 italic">
+              No cost records found matching your criteria.
+            </td>
+          </tr>
+        }
+      </tbody>
     </table>
+  </div>
 </div>
 
 @if (showModal) {
-    <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
-        <div class="bg-white p-8 rounded-2xl w-full max-w-md shadow-2xl animate-fade-in">
-            <h3 class="font-bold text-xl mb-4 text-gray-800">{{ isEditMode ? 'Edit Cost' : 'Add New Cost' }}</h3>
+  <div class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div class="bg-white p-8 rounded-[2rem] w-full max-w-lg shadow-2xl">
+      <div class="flex justify-between items-center mb-6">
+        <h3 class="font-black text-xl text-slate-800 uppercase tracking-tight">
+          {{ isEditMode ? 'Update Cost' : 'New Cost' }}
+        </h3>
+        <button (click)="closeModal()" class="text-slate-400 hover:text-rose-500 transition">
+          <span class="material-icons">close</span>
+        </button>
+      </div>
 
-            <div class="space-y-4">
-                <div class="grid grid-cols-2 gap-4">
-                  <div>
-                      <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Date</label>
-                      <input type="date" [(ngModel)]="inputDate" (change)="onDateChange()" class="w-full p-3 bg-gray-50 rounded-lg border focus:ring-2 focus:ring-red-500 outline-none">
-                  </div>
-                  <div>
-                      <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Cost Amount</label>
-                      <input type="number" [(ngModel)]="newItem.amount" class="w-full p-3 bg-gray-50 rounded-lg border focus:ring-2 focus:ring-red-500 outline-none">
-                  </div>
-                </div>
-
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Client</label>
-                    <select [(ngModel)]="newItem.client_id" class="w-full p-3 bg-gray-50 rounded-lg border focus:ring-2 focus:ring-red-500 outline-none">
-                        @for (client of sortedClients(); track client.client_id) {
-                            <option [value]="client.client_id">{{ client.client_name }}</option>
-                        }
-                    </select>
-                </div>
-
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Department</label>
-                    <select [(ngModel)]="newItem.product_id" class="w-full p-3 bg-gray-50 rounded-lg border focus:ring-2 focus:ring-red-500 outline-none">
-                        @for (prod of sortedProducts(); track prod.product_id) {
-                            <option [value]="prod.product_id">{{ prod.product_name }}</option>
-                        }
-                    </select>
-                </div>
-
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Description</label>
-                    <textarea [(ngModel)]="newItem.description" class="w-full p-3 bg-gray-50 rounded-lg border focus:ring-2 focus:ring-red-500 outline-none" rows="2"></textarea>
-                </div>
-            </div>
-
-            <div class="mt-6 flex justify-end gap-3">
-                <button (click)="showModal=false" class="px-4 py-2 text-gray-500 hover:bg-gray-100 rounded-lg font-medium transition">Cancel</button>
-                <button (click)="save()" class="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-bold shadow-lg transition">
-                    {{ isEditMode ? 'Update' : 'Save' }}
-                </button>
-            </div>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Amount (USD) *</label>
+          <input type="number" [(ngModel)]="currentCost.amount"
+                 class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a] font-bold text-lg">
         </div>
+        <div>
+          <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Date *</label>
+          <input type="date" [(ngModel)]="currentCost.date"
+                 class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a]">
+        </div>
+        <div>
+          <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Department</label>
+          <select [(ngModel)]="currentCost.product_id"
+                  class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a] cursor-pointer">
+            <option [ngValue]="undefined">-- Select Department --</option>
+            @for (prod of sortedProducts(); track prod.product_id) {
+              <option [ngValue]="prod.product_id">{{ prod.product_name }}</option>
+            }
+          </select>
+        </div>
+        <div>
+          <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Client (Optional)</label>
+          <select [(ngModel)]="currentCost.client_id"
+                  class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a] cursor-pointer">
+            <option [ngValue]="undefined">-- Select Client --</option>
+            @for (client of sortedClients(); track client.client_id) {
+              <option [ngValue]="client.client_id">{{ client.client_name }}</option>
+            }
+          </select>
+        </div>
+        <div>
+          <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Description</label>
+          <textarea [(ngModel)]="currentCost.description" rows="3"
+                    class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a]"
+                    placeholder="Enter cost details..."></textarea>
+        </div>
+      </div>
+
+      <div class="mt-8 flex gap-3">
+        <button (click)="closeModal()"
+                class="flex-1 py-3 text-slate-400 font-bold uppercase text-[10px] tracking-widest hover:bg-slate-50 rounded-xl transition">
+          Cancel
+        </button>
+        <button (click)="save()" [disabled]="loading()"
+                class="flex-[2] py-3 bg-[#1e3a8a] text-white rounded-xl font-black shadow-lg shadow-blue-200 uppercase text-[10px] tracking-widest hover:bg-blue-900 transition disabled:opacity-50 flex justify-center items-center gap-2">
+          @if (loading()) {
+            <span class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
+          }
+          <span>{{ isEditMode ? 'Update Cost' : 'Save Cost' }}</span>
+        </button>
+      </div>
     </div>
-} -->
+  </div>
+}
+
+@if (showGenerateModal) {
+  <div class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div class="bg-white p-8 rounded-[2rem] w-full max-w-md shadow-2xl">
+      <div class="flex justify-between items-center mb-6">
+        <h3 class="font-black text-xl text-slate-800 uppercase tracking-tight">Generate Monthly Costs</h3>
+        <button (click)="showGenerateModal = false" class="text-slate-400 hover:text-rose-500 transition">
+          <span class="material-icons">close</span>
+        </button>
+      </div>
+
+      <p class="text-slate-500 text-sm mb-6 bg-blue-50 p-3 rounded-lg border border-blue-100">
+        <span class="material-icons text-blue-500 text-sm align-middle mr-1">info</span>
+        This will create a cost record for <strong>every department</strong> for the selected month with amount <strong>$0</strong>.
+        You can then edit them to enter the actual costs.
+      </p>
+
+      <div class="space-y-4">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[10px] font-black text-slate-400 uppercase mb-2">Year</label>
+            <select [(ngModel)]="generateTargetYear" class="w-full p-2 bg-white rounded-lg border border-slate-200 text-sm font-bold">
+              @for (year of yearsList(); track year) { <option [ngValue]="year">{{ year }}</option> }
+            </select>
+          </div>
+          <div>
+            <label class="block text-[10px] font-black text-slate-400 uppercase mb-2">Month</label>
+            <select [(ngModel)]="generateTargetMonth" class="w-full p-2 bg-white rounded-lg border border-slate-200 text-sm font-bold">
+              @for (m of months; track m.value) { <option [ngValue]="m.value">{{ m.name }}</option> }
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-8 flex gap-3">
+        <button (click)="showGenerateModal = false"
+                class="flex-1 py-3 text-slate-400 font-bold uppercase text-[10px] tracking-widest hover:bg-slate-50 rounded-xl transition">
+          Cancel
+        </button>
+        <button (click)="generateCosts()" [disabled]="generating()"
+                class="flex-[2] py-3 bg-emerald-600 text-white rounded-xl font-black shadow-lg uppercase text-[10px] tracking-widest hover:bg-emerald-700 transition disabled:opacity-50 flex justify-center items-center gap-2">
+          @if (generating()) {
+            <span class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
+          }
+          <span>Generate Records</span>
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showDeleteModal) {
+  <div class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div class="bg-white p-8 rounded-[2rem] w-full max-w-md shadow-2xl text-center">
+      <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+        <span class="material-icons text-red-500 text-3xl">warning</span>
+      </div>
+      <h3 class="font-black text-xl text-slate-800 mb-2">Delete Record?</h3>
+      <p class="text-slate-500 mb-6">
+        Are you sure you want to delete this cost record?
+        This action cannot be undone.
+      </p>
+      <div class="flex gap-3">
+        <button (click)="showDeleteModal = false"
+                class="flex-1 py-3 text-slate-400 font-bold uppercase text-[10px] tracking-widest hover:bg-slate-50 rounded-xl transition">
+          Cancel
+        </button>
+        <button (click)="deleteCost()"
+                class="flex-1 py-3 bg-red-500 text-white rounded-xl font-black shadow-lg uppercase text-[10px] tracking-widest hover:bg-red-600 transition">
+          Delete
+        </button>
+      </div>
+    </div>
+  </div>
+}

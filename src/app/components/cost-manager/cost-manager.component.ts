@@ -1,154 +1,248 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, computed, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { FactCost } from '../../models/data.models';
 import { DataService } from '../../services/data.service';
+import { FactCost } from '../../models/data.models';
+import * as XLSX from 'xlsx';
 
 @Component({
   selector: 'app-cost-manager',
   standalone: true,
   imports: [CommonModule, FormsModule],
-  template: `
-    <div class="bg-white rounded-2xl shadow-sm p-6">
-        <div class="flex justify-between items-center mb-6">
-            <h2 class="text-xl font-bold text-gray-800">Monthly Costs Tracking</h2>
-            <button (click)="openModal()" class="bg-red-500 hover:bg-red-600 text-white px-5 py-2 rounded-lg transition shadow-md flex items-center">
-                <span class="material-icons mr-2 text-sm">add</span> Add Cost
-            </button>
-        </div>
-
-        <table class="w-full text-left">
-            <thead class="bg-gray-50 text-xs text-gray-500 uppercase">
-                <tr>
-                    <th class="p-4">Date</th>
-                    <th class="p-4">Client</th>
-                    <th class="p-4">Department</th>
-                    <th class="p-4 text-right">Cost</th>
-                    <th class="p-4 text-center">Action</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100 text-sm">
-                @for (item of dataService.costs(); track item.id) {
-                    <tr class="hover:bg-red-50 transition">
-                        <td class="p-4 font-mono text-gray-600">
-                          {{ item.date | date: 'MMM-yyyy' }}
-                          <!-- <div class="text-[10px] text-gray-400">{{ item.year }} - M{{ item.month }}</div> -->
-                        </td>
-                        <td class="p-4 font-bold">{{ dataService.getClientName(item.client_id!) }}</td>
-                        <td class="p-4">
-                          <span class="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-xs font-semibold">
-                            {{ dataService.getProductName(item.product_id!) }}
-                          </span>
-                        </td>
-                        <td class="p-4 text-right font-bold text-red-600">{{ item.amount | currency:'$ ':'symbol':'1.0-0' }}</td>
-                        <td class="p-4 text-center">
-                            <button (click)="editItem(item)" class="text-blue-600 hover:text-blue-800 font-medium text-xs uppercase cursor-pointer">
-                                Edit
-                            </button>
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </div>
-
-    @if (showModal) {
-        <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
-            <div class="bg-white p-8 rounded-2xl w-full max-w-md shadow-2xl animate-fade-in">
-                <h3 class="font-bold text-xl mb-4 text-gray-800">{{ isEditMode ? 'Edit Cost' : 'Add New Cost' }}</h3>
-
-                <div class="space-y-4">
-                    <div class="grid grid-cols-2 gap-4">
-                      <div>
-                          <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Date</label>
-                          <input type="date" [(ngModel)]="inputDate" (change)="onDateChange()" class="w-full p-3 bg-gray-50 rounded-lg border focus:ring-2 focus:ring-red-500 outline-none">
-                      </div>
-                      <div>
-                          <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Cost Amount</label>
-                          <input type="number" [(ngModel)]="newItem.amount" class="w-full p-3 bg-gray-50 rounded-lg border focus:ring-2 focus:ring-red-500 outline-none">
-                      </div>
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Client</label>
-                        <select [(ngModel)]="newItem.client_id" class="w-full p-3 bg-gray-50 rounded-lg border focus:ring-2 focus:ring-red-500 outline-none">
-                            @for (client of dataService.clients(); track client.client_id) {
-                                <option [value]="client.client_id">{{ client.client_name }}</option>
-                            }
-                        </select>
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Department</label>
-                        <select [(ngModel)]="newItem.product_id" class="w-full p-3 bg-gray-50 rounded-lg border focus:ring-2 focus:ring-red-500 outline-none">
-                            @for (prod of dataService.products(); track prod.product_id) {
-                                <option [value]="prod.product_id">{{ prod.product_name }}</option>
-                            }
-                        </select>
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Description</label>
-                        <textarea [(ngModel)]="newItem.description" class="w-full p-3 bg-gray-50 rounded-lg border focus:ring-2 focus:ring-red-500 outline-none" rows="2"></textarea>
-                    </div>
-                </div>
-
-                <div class="mt-6 flex justify-end gap-3">
-                    <button (click)="showModal=false" class="px-4 py-2 text-gray-500 hover:bg-gray-100 rounded-lg font-medium transition">Cancel</button>
-                    <button (click)="save()" class="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-bold shadow-lg transition">
-                        {{ isEditMode ? 'Update' : 'Save' }}
-                    </button>
-                </div>
-            </div>
-        </div>
-    }
-  `
+  templateUrl: './cost-manager.component.html'
 })
 export class CostManagerComponent {
-  public dataService = inject(DataService);
+  dataService = inject(DataService);
+
+  // --- Filters ---
+  searchText = signal('');
+  filterYear = signal<number | null>(new Date().getFullYear());
+  filterMonth = signal<number | null>(new Date().getMonth() + 1);
+  filterProduct = signal<number | null>(null);
+  filterClient = signal<number | null>(null);
+
+  // --- UI State ---
   showModal = false;
+  showDeleteModal = false;
+  showGenerateModal = false;
   isEditMode = false;
+  loading = signal(false);
+  generating = signal(false);
 
-  inputDate: string = '';
-  newItem: FactCost = {
-    date: '',
-    year: 2026,
-    month: 1,
-    amount: 0,
-    client_id: 0,
-    product_id: 0,
-    description: ''
-  };
+  costToDelete: FactCost | null = null;
+  currentCost: FactCost = this.getEmptyCost();
 
+  // --- Generate Options ---
+  generateTargetYear = new Date().getFullYear();
+  generateTargetMonth = new Date().getMonth() + 1;
+
+  // --- Constants ---
+  months = [
+    { name: 'January', value: 1 }, { name: 'February', value: 2 }, { name: 'March', value: 3 },
+    { name: 'April', value: 4 }, { name: 'May', value: 5 }, { name: 'June', value: 6 },
+    { name: 'July', value: 7 }, { name: 'August', value: 8 }, { name: 'September', value: 9 },
+    { name: 'October', value: 10 }, { name: 'November', value: 11 }, { name: 'December', value: 12 }
+  ];
+
+  // --- Computed Lists ---
+  yearsList = computed(() => {
+    const years = this.dataService.costs().map(c => c.year);
+    const allYears = [...years, new Date().getFullYear(), new Date().getFullYear() + 1];
+    return Array.from(new Set(allYears)).sort((a, b) => b - a);
+  });
+
+  sortedProducts = computed(() => {
+    return this.dataService.products().slice().sort((a, b) =>
+      a.product_name.localeCompare(b.product_name)
+    );
+  });
+
+  sortedClients = computed(() => {
+    return this.dataService.clients().slice().sort((a, b) =>
+      a.client_name.localeCompare(b.client_name)
+    );
+  });
+
+  // --- Filter Logic ---
+  filteredCosts = computed(() => {
+    let data = this.dataService.costs();
+
+    if (this.filterYear() !== null) {
+      data = data.filter(c => c.year === this.filterYear());
+    }
+    if (this.filterMonth() !== null) {
+      data = data.filter(c => c.month === this.filterMonth());
+    }
+    if (this.filterProduct() !== null) {
+      data = data.filter(c => c.product_id === this.filterProduct());
+    }
+    if (this.filterClient() !== null) {
+      data = data.filter(c => c.client_id === this.filterClient());
+    }
+
+    const text = this.searchText().toLowerCase();
+    if (text) {
+      data = data.filter(c =>
+        (c.description?.toLowerCase().includes(text)) ||
+        (this.dataService.getProductName(c.product_id).toLowerCase().includes(text)) ||
+        (this.dataService.getClientName(c.client_id).toLowerCase().includes(text))
+      );
+    }
+
+    return data.sort((a, b) => {
+        // ترتيب حسب التاريخ ثم حسب القسم لسهولة الإدخال
+        const dateDiff = new Date(b.date).getTime() - new Date(a.date).getTime();
+        if (dateDiff !== 0) return dateDiff;
+        return (a.product_id || 0) - (b.product_id || 0); // لمقارنة تقريبية
+    });
+  });
+
+  totalCost = computed(() => {
+    return this.filteredCosts().reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+  });
+
+  // --- Helpers ---
+  getEmptyCost(): FactCost {
+    const today = new Date();
+    return {
+      date: today.toISOString().split('T')[0],
+      year: today.getFullYear(),
+      month: today.getMonth() + 1,
+      amount: 0,
+      description: '',
+      product_id: undefined,
+      client_id: undefined
+    };
+  }
+
+  getMonthName(m: number) {
+    return this.months.find(x => x.value === m)?.name || m;
+  }
+
+  // --- Actions ---
   openModal() {
     this.isEditMode = false;
-    this.inputDate = new Date().toISOString().split('T')[0];
-    this.onDateChange();
+    this.currentCost = this.getEmptyCost();
+    const products = this.sortedProducts();
+    if (products.length > 0) this.currentCost.product_id = products[0].product_id;
     this.showModal = true;
   }
 
-  editItem(item: FactCost) {
+  editCost(cost: FactCost) {
     this.isEditMode = true;
-    this.newItem = { ...item };
-    this.inputDate = item.date;
+    this.currentCost = { ...cost };
     this.showModal = true;
   }
 
-  onDateChange() {
-    if (this.inputDate) {
-        const d = new Date(this.inputDate);
-        this.newItem.year = d.getFullYear();
-        this.newItem.month = d.getMonth() + 1;
-        this.newItem.date = this.inputDate;
+  closeModal() {
+    this.showModal = false;
+  }
+
+  confirmDelete(cost: FactCost) {
+    this.costToDelete = cost;
+    this.showDeleteModal = true;
+  }
+
+  // --- Generate Zero Costs Logic ---
+  openGenerateModal() {
+    // تعيين الشهر الحالي كافتراضي
+    const today = new Date();
+    this.generateTargetYear = today.getFullYear();
+    this.generateTargetMonth = today.getMonth() + 1;
+    this.showGenerateModal = true;
+  }
+
+  async generateCosts() {
+    this.generating.set(true);
+
+    const result = await this.dataService.generateZeroCostsForMonth(
+      this.generateTargetYear,
+      this.generateTargetMonth
+    );
+
+    this.generating.set(false);
+    this.showGenerateModal = false;
+
+    if (result.success) {
+        if(result.generated > 0) {
+            alert(`Success! Generated ${result.generated} records with 0 amount for ${this.getMonthName(this.generateTargetMonth)}.`);
+            // الانتقال للفلتر المختار لرؤية النتائج فوراً
+            this.filterYear.set(this.generateTargetYear);
+            this.filterMonth.set(this.generateTargetMonth);
+        } else {
+            alert('All departments already have cost records for this month.');
+        }
+    } else {
+        alert('Error: ' + result.error);
     }
   }
 
+  // --- Excel Export ---
+  exportToExcel() {
+    const data = this.filteredCosts().map(c => ({
+      'Date': c.date,
+      'Description': c.description,
+      'Department': this.dataService.getProductName(c.product_id),
+      'Client': this.dataService.getClientName(c.client_id),
+      'Amount': c.amount,
+      'Year': c.year,
+      'Month': this.getMonthName(c.month)
+    }));
+
+    const ws: XLSX.WorkSheet = XLSX.utils.json_to_sheet(data);
+    const wb: XLSX.WorkBook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Costs');
+    XLSX.writeFile(wb, `Costs_Export_${new Date().toISOString().slice(0,10)}.xlsx`);
+  }
+
+  // --- Save & Delete ---
   async save() {
-    if (this.isEditMode) {
-        await this.dataService.updateCost({ ...this.newItem });
-    } else {
-        await this.dataService.addCost({ ...this.newItem });
+    // السماح بالقيمة 0 الآن لأننا قد نعدل السجلات المولدة
+    if (this.currentCost.amount === undefined || this.currentCost.amount === null) {
+      alert('Valid amount is required');
+      return;
     }
-    this.showModal = false;
+
+    this.loading.set(true);
+    const d = new Date(this.currentCost.date);
+    this.currentCost.year = d.getFullYear();
+    this.currentCost.month = d.getMonth() + 1;
+
+    try {
+      let result;
+      if (this.isEditMode) {
+        result = await this.dataService.updateCost(this.currentCost);
+      } else {
+        result = await this.dataService.addCost(this.currentCost);
+      }
+      if (result.success) {
+        this.closeModal();
+      } else {
+        alert('Error: ' + result.error);
+      }
+    } catch (e: any) {
+      alert('Unexpected error: ' + e.message);
+    } finally {
+      this.loading.set(false);
+    }
+  }
+
+  async deleteCost() {
+    if (!this.costToDelete?.id) return;
+    // نتأكد من وجود دالة الحذف في السيرفس أو نستدعيها مباشرة
+    // هنا سأفترض أنك أضفتها كما اتفقنا، أو سأستخدم الحذف المباشر هنا للأمان
+    try {
+        const { error } = await this.dataService['supabase'].from('fact_cost').delete().eq('id', this.costToDelete.id);
+        if (!error) {
+            this.dataService.costs.update(v => v.filter(c => c.id !== this.costToDelete?.id));
+        } else {
+            alert('Error deleting: ' + error.message);
+        }
+    } catch(e: any) {
+        alert('Error: ' + e.message);
+    }
+
+    this.showDeleteModal = false;
+    this.costToDelete = null;
   }
 }

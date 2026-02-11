@@ -414,7 +414,65 @@ export class DataService {
     if (data) this.costs.update(v => v.map(c => c.id === id ? data[0] : c));
     return { success: !error, error: error?.message, data };
   }
+  async deleteCost(id: number) {
+    const { error } = await this.supabase.from('fact_cost').delete().eq('id', id);
+    if (!error) this.costs.update(v => v.filter(c => c.id !== id));
+    return { success: !error, error: error?.message };
+  }
 
+  // =============================================
+  // GENERATE ZERO COSTS (New Logic)
+  // =============================================
+  async generateZeroCostsForMonth(year: number, month: number): Promise<{ success: boolean; generated: number; error?: string }> {
+    try {
+      // 1. جلب كل الأقسام
+      const allProducts = this.products();
+      if (allProducts.length === 0) return { success: false, generated: 0, error: 'No departments found' };
+
+      // 2. معرفة ما تم إدخاله مسبقاً لهذا الشهر لتجنب التكرار
+      const currentCosts = this.costs().filter(c => c.year === year && c.month === month);
+      const existingProductIds = new Set(currentCosts.map(c => c.product_id));
+
+      // 3. تحديد الأقسام التي ليس لها سجل في هذا الشهر
+      const missingProducts = allProducts.filter(p => !existingProductIds.has(p.product_id));
+
+      if (missingProducts.length === 0) {
+        return { success: true, generated: 0 }; // الكل موجود
+      }
+
+      // 4. تجهيز البيانات (القيمة 0)
+      const dateStr = `${year}-${month.toString().padStart(2, '0')}-01`; // أول يوم في الشهر
+
+      const newCosts = missingProducts.map(prod => ({
+        year: year,
+        month: month,
+        date: dateStr,
+        amount: 0, // القيمة صفر
+        product_id: prod.product_id,
+        description: `Monthly Cost - ${prod.product_name}`, // وصف افتراضي
+        client_id: null // بدون عميل افتراضياً
+      }));
+
+      // 5. الإضافة لقاعدة البيانات
+      const { data, error } = await this.supabase
+        .from('fact_cost')
+        .insert(newCosts)
+        .select();
+
+      if (error) throw error;
+
+      // 6. تحديث الواجهة
+      if (data) {
+        this.costs.update(current => [...data, ...current]);
+      }
+
+      return { success: true, generated: data?.length || 0 };
+
+    } catch (error: any) {
+      console.error('Generate zero costs error:', error);
+      return { success: false, generated: 0, error: error.message };
+    }
+  }
   // --- SALARY ---
   async updateSalary(item: Partial<FactSalary>) {
     const { id, created_at, ...payload } = item as any;
