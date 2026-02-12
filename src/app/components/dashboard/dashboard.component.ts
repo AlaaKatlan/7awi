@@ -17,20 +17,21 @@ export class DashboardComponent implements AfterViewInit {
   charts: any = {};
   monthNames = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 
-  // ✅ فلتر لنوع الأقسام في شارت الإنتاجية
+  // ✅ فلتر لنوع الأقسام - مشترك بين الشارتات الثلاثة
   showRevenueDepartments = signal(true);
   showCostDepartments = signal(false);
+
+  // ✅ للتحقق إذا كانت السنة 2025
+  isYear2025 = computed(() => this.selectedYear() === 2025);
 
   yearsList = computed(() => {
     const dbYears = this.dataService.revenues().map(r => new Date(r.date).getFullYear());
     return Array.from(new Set([...dbYears, new Date().getFullYear()])).sort((a, b) => b - a);
   });
 
-  // 1. حساب الرواتب الشهرية الإجمالية من fact_salary
   monthlySalaries = computed(() => {
     const year = this.selectedYear();
     const salaries = this.dataService.salaries();
-
     return Array.from({ length: 12 }, (_, monthIndex) => {
       const month = monthIndex + 1;
       return salaries
@@ -39,78 +40,55 @@ export class DashboardComponent implements AfterViewInit {
     });
   });
 
-  // 2. حساب الرواتب حسب نوع العقد من fact_salary
   salaryBreakdown = computed(() => {
     const year = this.selectedYear();
     const salaries = this.dataService.salaries();
     const employees = this.dataService.employees();
     const breakdown: { [key: string]: number } = {};
-
     const yearSalaries = salaries.filter(s => s.year === year);
-
     yearSalaries.forEach(salary => {
       const emp = employees.find(e => e.employee_id === salary.employee_id);
       if (!emp) return;
-
       let type = (emp.contract || 'Not Specified').trim();
       type = type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
-
       breakdown[type] = (breakdown[type] || 0) + Number(salary.net_salary || 0);
     });
-
     return breakdown;
   });
 
-  // 3. إحصائيات المنتجات مع الإنتاجية والتكاليف التشغيلية
   productStats = computed(() => {
     const year = this.selectedYear();
     const currentYear = new Date().getFullYear();
     const currentMonth = new Date().getMonth();
-
     const products = this.dataService.products();
     const salaries = this.dataService.salaries();
     const revenues = this.dataService.revenues();
     const costs = this.dataService.costs();
 
     return products.map(prod => {
-      // عدد الموظفين الفريدين من fact_salary لهذا القسم في السنة المحددة
       const productSalaries = salaries.filter(s => {
         const emp = this.dataService.employees().find(e => e.employee_id === s.employee_id);
         return emp?.product_id === prod.product_id && s.year === year;
       });
-
       const uniqueEmployeeIds = new Set(productSalaries.map(s => s.employee_id));
       const empCount = uniqueEmployeeIds.size;
-
       const totalRev = revenues
         .filter(r => r.product_id === prod.product_id && new Date(r.date).getFullYear() === year)
         .reduce((sum, r) => sum + (Number(r.gross_amount) || 0), 0);
-
       const monthsToCount = year < currentYear ? 12 : (year === currentYear ? currentMonth + 1 : 0);
-
-      // حساب الرواتب من fact_salary
       const totalSalaries = productSalaries.reduce((sum, s) => sum + Number(s.net_salary || 0), 0);
-
-      // ✅ حساب التكاليف التشغيلية من fact_cost للقسم
       const totalOpCost = costs
         .filter(c => c.product_id === prod.product_id && c.year === year)
         .reduce((sum, c) => sum + Number(c.amount || 0), 0);
-
-      // ✅ إجمالي التكلفة = الرواتب + التكاليف التشغيلية
       const totalCost = totalSalaries + totalOpCost;
-
       const profit = totalRev - totalCost;
-      
-      // ✅ الإنتاجية للفرد = (الإيراد - التكلفة) / عدد الأشهر / عدد الموظفين
       const productivityPerPerson = (empCount > 0 && monthsToCount > 0) ? (profit / monthsToCount / empCount) : 0;
-      
-      // ✅ الإنتاجية السنوية للقسم = الإيراد - التكلفة (صافي الربح)
       const annualDeptProductivity = profit;
 
       return {
         name: prod.product_name,
         product_id: prod.product_id,
-        department_type: prod.department_type || 'Revenue', // ✅ نوع القسم
+        department_type: prod.department_type || 'Revenue',
         empCount,
         revenue: Math.round(totalRev),
         salaries: Math.round(totalSalaries),
@@ -123,21 +101,13 @@ export class DashboardComponent implements AfterViewInit {
     });
   });
 
-  // 4. الإحصائيات العامة - Cost = Salaries + Operational Cost
   stats = computed(() => {
     const year = this.selectedYear();
     const revs = this.dataService.revenues().filter(r => new Date(r.date).getFullYear() === year);
     const revenue = revs.reduce((sum, r) => sum + (Number(r.gross_amount) || 0), 0);
-
-    // الرواتب من fact_salary
     const salaries = this.monthlySalaries().reduce((a, b) => a + b, 0);
-
-    // التكاليف التشغيلية من fact_cost
     const opCost = this.dataService.costs().filter(c => c.year === year).reduce((sum, c) => sum + Number(c.amount), 0);
-
-    // إجمالي التكلفة = الرواتب + التكاليف التشغيلية
     const totalCost = salaries + opCost;
-
     const profit = revenue - totalCost;
     return {
       revenue: Math.round(revenue),
@@ -149,13 +119,11 @@ export class DashboardComponent implements AfterViewInit {
     };
   });
 
-  // 5. بيانات الجدول السنوي
   summaryData = computed(() => {
     const year = this.selectedYear();
     const products = this.dataService.products();
     const revenues = this.dataService.revenues();
     const targets = this.dataService.targets();
-
     return products.map(p => {
       const monthlyValues = Array.from({ length: 12 }, (_, m) => {
         const val = revenues
@@ -181,14 +149,11 @@ export class DashboardComponent implements AfterViewInit {
     const data = this.summaryData();
     const year = this.selectedYear();
     const monthlyRevenue = Array.from({ length: 12 }, (_, m) => data.reduce((s, p) => s + p.monthlyValues[m], 0));
-
-    // التكاليف الشهرية = الرواتب من fact_salary + التكاليف التشغيلية من fact_cost
     const monthlySalariesData = this.monthlySalaries();
     const monthlyOpCost = Array.from({ length: 12 }, (_, m) =>
       this.dataService.costs().filter(c => c.year === year && c.month === (m + 1)).reduce((s, c) => s + Number(c.amount), 0)
     );
     const monthlyCost = Array.from({ length: 12 }, (_, m) => Math.round(monthlySalariesData[m] + monthlyOpCost[m]));
-
     return {
       monthlyRevenue,
       monthlyCost,
@@ -203,45 +168,36 @@ export class DashboardComponent implements AfterViewInit {
     this.updateCharts();
   }
 
-  // ✅ دالة لتحديث شارت الإنتاجية عند تغيير الفلتر
   onDeptFilterChange() {
     this.updateProductivityChart();
+    this.updateProductComparisonChart();
+    this.updateHeadcountChart();
   }
 
-  // ✅ Plugin لإظهار النسب المئوية داخل الـ Pie/Doughnut Charts
   private percentagePlugin = {
     id: 'percentagePlugin',
     afterDatasetsDraw: (chart: any) => {
       const ctx = chart.ctx;
       const datasets = chart.data.datasets;
-
       if (chart.config.type !== 'pie' && chart.config.type !== 'doughnut') return;
-
       datasets.forEach((dataset: any, datasetIndex: number) => {
         const meta = chart.getDatasetMeta(datasetIndex);
         const total = dataset.data.reduce((a: number, b: number) => a + b, 0);
-
         if (total === 0) return;
-
         meta.data.forEach((element: any, index: number) => {
           const value = dataset.data[index];
           const percentage = ((value / total) * 100).toFixed(1);
-
           if (parseFloat(percentage) < 3) return;
-
           const { x, y } = element.tooltipPosition();
-
           ctx.save();
           ctx.fillStyle = '#ffffff';
           ctx.font = 'bold 11px Inter, sans-serif';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-
           ctx.shadowColor = 'rgba(0,0,0,0.5)';
           ctx.shadowBlur = 3;
           ctx.shadowOffsetX = 1;
           ctx.shadowOffsetY = 1;
-
           ctx.fillText(`${percentage}%`, x, y);
           ctx.restore();
         });
@@ -249,68 +205,54 @@ export class DashboardComponent implements AfterViewInit {
     }
   };
 
-  // ✅ دالة تنسيق الأرقام الكبيرة
   private formatNumber(value: number): string {
-    if (Math.abs(value) >= 1000000) {
-      return (value / 1000000).toFixed(1) + 'M';
-    } else if (Math.abs(value) >= 1000) {
-      return (value / 1000).toFixed(0) + 'K';
-    }
+    if (Math.abs(value) >= 1000000) return (value / 1000000).toFixed(1) + 'M';
+    else if (Math.abs(value) >= 1000) return (value / 1000).toFixed(0) + 'K';
     return Math.round(value).toString();
   }
 
-  // ✅ دالة تنسيق الأرقام للـ Tooltip - Integer فقط
   private formatTooltipValue(value: number): string {
     return '$' + Math.round(value).toLocaleString();
   }
 
+  private filterDataByDeptType(data: any[]): any[] {
+    if (this.showRevenueDepartments() && !this.showCostDepartments()) {
+      return data.filter(d => d.department_type === 'Revenue');
+    } else if (!this.showRevenueDepartments() && this.showCostDepartments()) {
+      return data.filter(d => d.department_type === 'Cost');
+    } else if (this.showRevenueDepartments() && this.showCostDepartments()) {
+      return data;
+    } else {
+      return data.filter(d => d.department_type === 'Revenue');
+    }
+  }
+
   private initCharts() {
-    // تسجيل الـ Plugin
     Chart.register(this.percentagePlugin);
 
     this.charts.main = new Chart('mainChart', {
       type: 'line',
       data: this.getMainChartData(),
       options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          y: {
-            ticks: {
-              callback: (value: any) => '$' + this.formatNumber(value)
-            }
-          }
-        },
-        plugins: {
-          tooltip: {
-            callbacks: {
-              label: (context: any) => `${context.dataset.label}: ${this.formatTooltipValue(context.raw)}`
-            }
-          }
-        }
+        responsive: true, maintainAspectRatio: false,
+        scales: { y: { ticks: { callback: (value: any) => '$' + this.formatNumber(value) } } },
+        plugins: { tooltip: { callbacks: { label: (context: any) => `${context.dataset.label}: ${this.formatTooltipValue(context.raw)}` } } }
       }
     });
 
-    // ✅ Doughnut مع نسب مئوية
     this.charts.donut = new Chart('productProfitChart', {
       type: 'doughnut',
       data: this.getDonutData(),
       options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        cutout: '60%',
+        responsive: true, maintainAspectRatio: false, cutout: '60%',
         plugins: {
           legend: { position: 'bottom' },
-          tooltip: {
-            callbacks: {
-              label: (context: any) => {
-                const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0);
-                const value = context.raw;
-                const percentage = ((value / total) * 100).toFixed(1);
-                return `${context.label}: ${this.formatTooltipValue(value)} (${percentage}%)`;
-              }
-            }
-          }
+          tooltip: { callbacks: { label: (context: any) => {
+            const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0);
+            const value = context.raw;
+            const percentage = ((value / total) * 100).toFixed(1);
+            return `${context.label}: ${this.formatTooltipValue(value)} (${percentage}%)`;
+          } } }
         }
       }
     });
@@ -319,23 +261,9 @@ export class DashboardComponent implements AfterViewInit {
       type: 'bar',
       data: this.getTargetVsActualData(),
       options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { position: 'bottom' },
-          tooltip: {
-            callbacks: {
-              label: (context: any) => `${context.dataset.label}: ${this.formatTooltipValue(context.raw)}`
-            }
-          }
-        },
-        scales: {
-          y: {
-            ticks: {
-              callback: (value: any) => '$' + this.formatNumber(value)
-            }
-          }
-        }
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: (context: any) => `${context.dataset.label}: ${this.formatTooltipValue(context.raw)}` } } },
+        scales: { y: { ticks: { callback: (value: any) => '$' + this.formatNumber(value) } } }
       }
     });
 
@@ -343,44 +271,25 @@ export class DashboardComponent implements AfterViewInit {
       type: 'bar',
       data: this.getMultiYearData(),
       options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          tooltip: {
-            callbacks: {
-              label: (context: any) => `${context.dataset.label}: ${this.formatTooltipValue(context.raw)}`
-            }
-          }
-        },
-        scales: {
-          y: {
-            ticks: {
-              callback: (value: any) => '$' + this.formatNumber(value)
-            }
-          }
-        }
+        responsive: true, maintainAspectRatio: false,
+        plugins: { tooltip: { callbacks: { label: (context: any) => `${context.dataset.label}: ${this.formatTooltipValue(context.raw)}` } } },
+        scales: { y: { ticks: { callback: (value: any) => '$' + this.formatNumber(value) } } }
       }
     });
 
-    // ✅ Pie Chart مع نسب مئوية - Geographical
     this.charts.geo = new Chart('geoChart', {
       type: 'pie',
       data: this.getGeoData(),
       options: {
-        responsive: true,
-        maintainAspectRatio: false,
+        responsive: true, maintainAspectRatio: false,
         plugins: {
           legend: { position: 'bottom' },
-          tooltip: {
-            callbacks: {
-              label: (context: any) => {
-                const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0);
-                const value = context.raw;
-                const percentage = ((value / total) * 100).toFixed(1);
-                return `${context.label}: ${this.formatTooltipValue(value)} (${percentage}%)`;
-              }
-            }
-          }
+          tooltip: { callbacks: { label: (context: any) => {
+            const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0);
+            const value = context.raw;
+            const percentage = ((value / total) * 100).toFixed(1);
+            return `${context.label}: ${this.formatTooltipValue(value)} (${percentage}%)`;
+          } } }
         }
       }
     });
@@ -389,16 +298,8 @@ export class DashboardComponent implements AfterViewInit {
       type: 'bar',
       data: this.getProfitabilityData(),
       options: {
-        indexAxis: 'y',
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          tooltip: {
-            callbacks: {
-              label: (context: any) => `Margin: ${Math.round(context.raw)}%`
-            }
-          }
-        }
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { tooltip: { callbacks: { label: (context: any) => `Margin: ${Math.round(context.raw)}%` } } }
       }
     });
 
@@ -406,241 +307,144 @@ export class DashboardComponent implements AfterViewInit {
       type: 'line',
       data: this.getAllYearsMonthlyData(),
       options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          tooltip: {
-            callbacks: {
-              label: (context: any) => `${context.dataset.label}: ${this.formatTooltipValue(context.raw)}`
-            }
-          }
-        },
-        scales: {
-          y: {
-            ticks: {
-              callback: (value: any) => '$' + this.formatNumber(value)
-            }
-          }
-        }
+        responsive: true, maintainAspectRatio: false,
+        plugins: { tooltip: { callbacks: { label: (context: any) => `${context.dataset.label}: ${this.formatTooltipValue(context.raw)}` } } },
+        scales: { y: { ticks: { callback: (value: any) => '$' + this.formatNumber(value) } } }
       }
     });
 
-    // ✅ Department Financial Performance Analysis - Revenue, Salaries, Costs, Net Profit
     this.charts.productComparison = new Chart('productComparisonChart', {
       type: 'bar',
       data: this.getProductComparisonData(),
       options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { position: 'bottom' },
-          tooltip: {
-            callbacks: {
-              label: (context: any) => `${context.dataset.label}: ${this.formatTooltipValue(context.raw)}`
-            }
-          }
-        },
-        scales: {
-          y: {
-            ticks: {
-              callback: (value: any) => '$' + this.formatNumber(value)
-            }
-          }
-        }
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: (context: any) => `${context.dataset.label}: ${this.formatTooltipValue(context.raw)}` } } },
+        scales: { y: { ticks: { callback: (value: any) => '$' + this.formatNumber(value) } } }
       }
     });
 
-    // ✅ Doughnut مع نسب مئوية - Salary
     this.charts.salaryType = new Chart('salaryTypeChart', {
       type: 'doughnut',
       data: this.getSalaryTypeData(),
       options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        cutout: '60%',
+        responsive: true, maintainAspectRatio: false, cutout: '60%',
         plugins: {
           legend: { position: 'bottom' },
-          tooltip: {
-            callbacks: {
-              label: (context: any) => {
-                const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0);
-                const value = context.raw;
-                const percentage = ((value / total) * 100).toFixed(1);
-                return `${context.label}: ${this.formatTooltipValue(value)} (${percentage}%)`;
-              }
-            }
-          }
+          tooltip: { callbacks: { label: (context: any) => {
+            const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0);
+            const value = context.raw;
+            const percentage = ((value / total) * 100).toFixed(1);
+            return `${context.label}: ${this.formatTooltipValue(value)} (${percentage}%)`;
+          } } }
         }
       }
     });
 
-    // ✅ شارت الإنتاجية للفرد (الأصلي)
-    this.charts.productivity = new Chart('productProductivityChart', {
-      type: 'bar',
-      data: this.getProductProductivityData(),
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { position: 'bottom' },
-          tooltip: {
-            callbacks: {
-              label: (context: any) => {
-                if (context.dataset.label === 'Staff Count') {
-                  return `${context.dataset.label}: ${Math.round(context.raw)}`;
-                }
-                return `${context.dataset.label}: ${this.formatTooltipValue(context.raw)}`;
-              }
-            }
-          }
-        },
-        scales: {
-          y: { type: 'linear', position: 'left', title: { display: true, text: 'Staff Count' } },
-          y1: {
-            type: 'linear',
-            position: 'right',
-            grid: { drawOnChartArea: false },
-            title: { display: true, text: 'Productivity ($)' },
-            ticks: {
-              callback: (value: any) => '$' + this.formatNumber(value)
-            }
-          }
-        }
-      }
-    });
+    // ✅ شارت الإنتاجية للفرد - لا يظهر إذا كانت السنة 2025
+    if (!this.isYear2025()) {
+      this.initHeadcountChart();
+    }
 
-    // ✅ شارت جديد: الإنتاجية السنوية للقسم
     this.charts.deptAnnualProductivity = new Chart('deptAnnualProductivityChart', {
       type: 'bar',
       data: this.getDeptAnnualProductivityData(),
       options: {
-        responsive: true,
-        maintainAspectRatio: false,
+        responsive: true, maintainAspectRatio: false,
         plugins: {
           legend: { position: 'bottom' },
-          tooltip: {
-            callbacks: {
-              label: (context: any) => {
-                if (context.dataset.label === 'Staff Count') {
-                  return `${context.dataset.label}: ${Math.round(context.raw)}`;
-                }
-                return `${context.dataset.label}: ${this.formatTooltipValue(context.raw)}`;
-              }
-            }
-          }
+          tooltip: { callbacks: { label: (context: any) => {
+            if (context.dataset.label === 'Staff Count') return `${context.dataset.label}: ${Math.round(context.raw)}`;
+            return `${context.dataset.label}: ${this.formatTooltipValue(context.raw)}`;
+          } } }
         },
         scales: {
-          y: { 
-            type: 'linear', 
-            position: 'left', 
-            title: { display: true, text: 'Staff Count' },
-            ticks: {
-              callback: (value: any) => Math.round(value).toString()
-            }
-          },
-          y1: {
-            type: 'linear',
-            position: 'right',
-            grid: { drawOnChartArea: false },
-            title: { display: true, text: 'Annual Productivity ($)' },
-            ticks: {
-              callback: (value: any) => '$' + this.formatNumber(value)
-            }
-          }
+          y: { type: 'linear', position: 'left', title: { display: true, text: 'Staff Count' }, ticks: { callback: (value: any) => Math.round(value).toString() } },
+          y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'Annual Productivity ($)' }, ticks: { callback: (value: any) => '$' + this.formatNumber(value) } }
+        }
+      }
+    });
+  }
+
+  private initHeadcountChart() {
+    const canvas = document.getElementById('productProductivityChart') as HTMLCanvasElement;
+    if (!canvas) return;
+    this.charts.productivity = new Chart(canvas, {
+      type: 'bar',
+      data: this.getProductProductivityData(),
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom' },
+          tooltip: { callbacks: { label: (context: any) => {
+            if (context.dataset.label === 'Staff Count') return `${context.dataset.label}: ${Math.round(context.raw)}`;
+            return `${context.dataset.label}: ${this.formatTooltipValue(context.raw)}`;
+          } } }
+        },
+        scales: {
+          y: { type: 'linear', position: 'left', title: { display: true, text: 'Staff Count' } },
+          y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'Productivity ($)' }, ticks: { callback: (value: any) => '$' + this.formatNumber(value) } }
         }
       }
     });
   }
 
   private updateCharts() {
-    if (this.charts.main) {
-      this.charts.main.data = this.getMainChartData();
-      this.charts.main.update();
-    }
-
-    if (this.charts.donut) {
-      this.charts.donut.data = this.getDonutData();
-      this.charts.donut.update();
-    }
-
-    if (this.charts.targetVsActual) {
-      this.charts.targetVsActual.data = this.getTargetVsActualData();
-      this.charts.targetVsActual.update();
-    }
-
-    if (this.charts.multiYear) {
-      this.charts.multiYear.data = this.getMultiYearData();
-      this.charts.multiYear.update();
-    }
-
-    if (this.charts.geo) {
-      this.charts.geo.data = this.getGeoData();
-      this.charts.geo.update();
-    }
-
-    if (this.charts.profitability) {
-      this.charts.profitability.data = this.getProfitabilityData();
-      this.charts.profitability.update();
-    }
-
-    if (this.charts.allYearsMonthly) {
-      this.charts.allYearsMonthly.data = this.getAllYearsMonthlyData();
-      this.charts.allYearsMonthly.update();
-    }
-
-    if (this.charts.productComparison) {
-      this.charts.productComparison.data = this.getProductComparisonData();
-      this.charts.productComparison.update();
-    }
-
-    if (this.charts.salaryType) {
-      this.charts.salaryType.data = this.getSalaryTypeData();
-      this.charts.salaryType.update();
-    }
-
-    // ✅ تحديث شارت الإنتاجية للفرد
-    if (this.charts.productivity) {
-      this.charts.productivity.destroy();
-      this.charts.productivity = new Chart('productProductivityChart', {
-        type: 'bar',
-        data: this.getProductProductivityData(),
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { position: 'bottom' },
-            tooltip: {
-              callbacks: {
-                label: (context: any) => {
-                  if (context.dataset.label === 'Staff Count') {
-                    return `${context.dataset.label}: ${Math.round(context.raw)}`;
-                  }
-                  return `${context.dataset.label}: ${this.formatTooltipValue(context.raw)}`;
-                }
-              }
-            }
-          },
-          scales: {
-            y: { type: 'linear', position: 'left', title: { display: true, text: 'Staff Count' } },
-            y1: {
-              type: 'linear',
-              position: 'right',
-              grid: { drawOnChartArea: false },
-              title: { display: true, text: 'Productivity ($)' },
-              ticks: {
-                callback: (value: any) => '$' + this.formatNumber(value)
-              }
-            }
-          }
-        }
-      });
-    }
-
-    // ✅ تحديث شارت الإنتاجية السنوية للقسم
+    if (this.charts.main) { this.charts.main.data = this.getMainChartData(); this.charts.main.update(); }
+    if (this.charts.donut) { this.charts.donut.data = this.getDonutData(); this.charts.donut.update(); }
+    if (this.charts.targetVsActual) { this.charts.targetVsActual.data = this.getTargetVsActualData(); this.charts.targetVsActual.update(); }
+    if (this.charts.multiYear) { this.charts.multiYear.data = this.getMultiYearData(); this.charts.multiYear.update(); }
+    if (this.charts.geo) { this.charts.geo.data = this.getGeoData(); this.charts.geo.update(); }
+    if (this.charts.profitability) { this.charts.profitability.data = this.getProfitabilityData(); this.charts.profitability.update(); }
+    if (this.charts.allYearsMonthly) { this.charts.allYearsMonthly.data = this.getAllYearsMonthlyData(); this.charts.allYearsMonthly.update(); }
+    this.updateProductComparisonChart();
+    if (this.charts.salaryType) { this.charts.salaryType.data = this.getSalaryTypeData(); this.charts.salaryType.update(); }
+    this.updateHeadcountChart();
     this.updateProductivityChart();
   }
 
-  // ✅ دالة منفصلة لتحديث شارت الإنتاجية السنوية للقسم
+  private updateProductComparisonChart() {
+    if (this.charts.productComparison) {
+      this.charts.productComparison.destroy();
+      this.charts.productComparison = new Chart('productComparisonChart', {
+        type: 'bar',
+        data: this.getProductComparisonData(),
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: (context: any) => `${context.dataset.label}: ${this.formatTooltipValue(context.raw)}` } } },
+          scales: { y: { ticks: { callback: (value: any) => '$' + this.formatNumber(value) } } }
+        }
+      });
+    }
+  }
+
+  private updateHeadcountChart() {
+    const canvas = document.getElementById('productProductivityChart') as HTMLCanvasElement;
+    if (this.isYear2025()) {
+      if (this.charts.productivity) { this.charts.productivity.destroy(); this.charts.productivity = null; }
+      return;
+    }
+    if (!canvas) return;
+    if (this.charts.productivity) { this.charts.productivity.destroy(); }
+    this.charts.productivity = new Chart(canvas, {
+      type: 'bar',
+      data: this.getProductProductivityData(),
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom' },
+          tooltip: { callbacks: { label: (context: any) => {
+            if (context.dataset.label === 'Staff Count') return `${context.dataset.label}: ${Math.round(context.raw)}`;
+            return `${context.dataset.label}: ${this.formatTooltipValue(context.raw)}`;
+          } } }
+        },
+        scales: {
+          y: { type: 'linear', position: 'left', title: { display: true, text: 'Staff Count' } },
+          y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'Productivity ($)' }, ticks: { callback: (value: any) => '$' + this.formatNumber(value) } }
+        }
+      }
+    });
+  }
+
   private updateProductivityChart() {
     if (this.charts.deptAnnualProductivity) {
       this.charts.deptAnnualProductivity.destroy();
@@ -648,39 +452,17 @@ export class DashboardComponent implements AfterViewInit {
         type: 'bar',
         data: this.getDeptAnnualProductivityData(),
         options: {
-          responsive: true,
-          maintainAspectRatio: false,
+          responsive: true, maintainAspectRatio: false,
           plugins: {
             legend: { position: 'bottom' },
-            tooltip: {
-              callbacks: {
-                label: (context: any) => {
-                  if (context.dataset.label === 'Staff Count') {
-                    return `${context.dataset.label}: ${Math.round(context.raw)}`;
-                  }
-                  return `${context.dataset.label}: ${this.formatTooltipValue(context.raw)}`;
-                }
-              }
-            }
+            tooltip: { callbacks: { label: (context: any) => {
+              if (context.dataset.label === 'Staff Count') return `${context.dataset.label}: ${Math.round(context.raw)}`;
+              return `${context.dataset.label}: ${this.formatTooltipValue(context.raw)}`;
+            } } }
           },
           scales: {
-            y: { 
-              type: 'linear', 
-              position: 'left', 
-              title: { display: true, text: 'Staff Count' },
-              ticks: {
-                callback: (value: any) => Math.round(value).toString()
-              }
-            },
-            y1: {
-              type: 'linear',
-              position: 'right',
-              grid: { drawOnChartArea: false },
-              title: { display: true, text: 'Annual Productivity ($)' },
-              ticks: {
-                callback: (value: any) => '$' + this.formatNumber(value)
-              }
-            }
+            y: { type: 'linear', position: 'left', title: { display: true, text: 'Staff Count' }, ticks: { callback: (value: any) => Math.round(value).toString() } },
+            y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'Annual Productivity ($)' }, ticks: { callback: (value: any) => '$' + this.formatNumber(value) } }
           }
         }
       });
@@ -696,58 +478,42 @@ export class DashboardComponent implements AfterViewInit {
     });
     const values = labels.map(l => Math.round(data[l]));
     const colors = ['#1e3a8a', '#2563eb', '#60a5fa', '#93c5fd', '#bae6fd', '#0ea5e9'];
-
-    return {
-      labels: labels,
-      datasets: [{ data: values, backgroundColor: colors.slice(0, labels.length), borderWidth: 0 }]
-    };
+    return { labels, datasets: [{ data: values, backgroundColor: colors.slice(0, labels.length), borderWidth: 0 }] };
   }
 
-  // ✅ شارت الإنتاجية للفرد (الأصلي)
+  // ✅ شارت الإنتاجية للفرد - مع فلتر وألوان سلبي/إيجابي
   private getProductProductivityData() {
-    const data = this.productStats().filter(d => d.empCount > 0).sort((a, b) => a.name.localeCompare(b.name));
+    let data = this.productStats();
+    data = this.filterDataByDeptType(data);
+    data = data.filter(d => d.empCount > 0).sort((a, b) => a.name.localeCompare(b.name));
     return {
       labels: data.map(d => d.name),
       datasets: [
-        { label: 'Staff Count', data: data.map(d => d.empCount), backgroundColor: '#cbd5e1', yAxisID: 'y', order: 2 },
-        { label: 'Monthly Productivity ($)', data: data.map(d => d.productivityPerPerson), type: 'line' as const, borderColor: '#1e3a8a', backgroundColor: '#1e3a8a', yAxisID: 'y1', tension: 0.4, pointRadius: 4, order: 1 }
+        { label: 'Staff Count', data: data.map(d => d.empCount), backgroundColor: '#cbd5e1', yAxisID: 'y', order: 2, borderRadius: 4 },
+        { 
+          label: 'Monthly Productivity ($)', 
+          data: data.map(d => d.productivityPerPerson), 
+          type: 'line' as const, 
+          borderColor: '#1e3a8a', 
+          backgroundColor: '#1e3a8a', 
+          yAxisID: 'y1', 
+          tension: 0.4, 
+          pointRadius: 6,
+          pointBackgroundColor: data.map(d => d.productivityPerPerson >= 0 ? '#10b981' : '#ef4444'),
+          order: 1 
+        }
       ]
     };
   }
 
-  // ✅ شارت جديد: الإنتاجية السنوية للقسم مع فلتر نوع القسم
   private getDeptAnnualProductivityData() {
     let data = this.productStats();
-
-    // ✅ فلترة حسب نوع القسم
-    if (this.showRevenueDepartments() && !this.showCostDepartments()) {
-      // فقط Revenue Departments
-      data = data.filter(d => d.department_type === 'Revenue');
-    } else if (!this.showRevenueDepartments() && this.showCostDepartments()) {
-      // فقط Cost Departments
-      data = data.filter(d => d.department_type === 'Cost');
-    } else if (this.showRevenueDepartments() && this.showCostDepartments()) {
-      // كلاهما
-      // لا نفلتر
-    } else {
-      // لا شيء مختار - نعرض Revenue فقط كافتراضي
-      data = data.filter(d => d.department_type === 'Revenue');
-    }
-
-    // فقط الأقسام التي لديها موظفين
+    data = this.filterDataByDeptType(data);
     data = data.filter(d => d.empCount > 0).sort((a, b) => a.name.localeCompare(b.name));
-
     return {
       labels: data.map(d => d.name),
       datasets: [
-        { 
-          label: 'Staff Count', 
-          data: data.map(d => d.empCount), 
-          backgroundColor: '#cbd5e1', 
-          yAxisID: 'y', 
-          order: 2,
-          borderRadius: 4
-        },
+        { label: 'Staff Count', data: data.map(d => d.empCount), backgroundColor: '#cbd5e1', yAxisID: 'y', order: 2, borderRadius: 4 },
         { 
           label: 'Annual Dept. Productivity ($)', 
           data: data.map(d => d.annualDeptProductivity), 
@@ -764,21 +530,18 @@ export class DashboardComponent implements AfterViewInit {
     };
   }
 
-  // ✅ Department Financial Performance Analysis - Revenue, Salaries, Costs, Net Profit
+  // ✅ Department Financial Performance - مع فلتر وألوان سلبي/إيجابي
   private getProductComparisonData() {
-    const data = this.productStats().filter(d => d.revenue > 0 || d.totalCost > 0).sort((a, b) => a.name.localeCompare(b.name));
+    let data = this.productStats();
+    data = this.filterDataByDeptType(data);
+    data = data.filter(d => d.revenue > 0 || d.totalCost > 0).sort((a, b) => a.name.localeCompare(b.name));
     return {
       labels: data.map(d => d.name),
       datasets: [
         { label: 'Revenue', data: data.map(d => d.revenue), backgroundColor: '#1e3a8a', borderRadius: 4 },
         { label: 'Salaries', data: data.map(d => d.salaries), backgroundColor: '#f59e0b', borderRadius: 4 },
         { label: 'Costs', data: data.map(d => d.opCost), backgroundColor: '#8b5cf6', borderRadius: 4 },
-        {
-          label: 'Net Profit',
-          data: data.map(d => d.profit),
-          backgroundColor: data.map(d => d.profit >= 0 ? '#10b981' : '#ef4444'),
-          borderRadius: 4
-        }
+        { label: 'Net Profit', data: data.map(d => d.profit), backgroundColor: data.map(d => d.profit >= 0 ? '#10b981' : '#ef4444'), borderRadius: 4 }
       ]
     };
   }
@@ -797,10 +560,7 @@ export class DashboardComponent implements AfterViewInit {
     const data = this.summaryData().filter(p => p.total > 0).sort((a, b) => b.total - a.total);
     return {
       labels: data.map(p => p.name),
-      datasets: [{
-        data: data.map(p => p.total),
-        backgroundColor: ['#1e3a8a', '#2563eb', '#60a5fa', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6', '#06b6d4']
-      }]
+      datasets: [{ data: data.map(p => p.total), backgroundColor: ['#1e3a8a', '#2563eb', '#60a5fa', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6', '#06b6d4'] }]
     };
   }
 
@@ -839,80 +599,46 @@ export class DashboardComponent implements AfterViewInit {
   private getGeoData() {
     const revs = this.dataService.revenues().filter(r => new Date(r.date).getFullYear() === this.selectedYear());
     const geoTotals: { [key: string]: number } = {};
-
     revs.forEach(r => {
       const country = r.country || 'Other';
       geoTotals[country] = (geoTotals[country] || 0) + Number(r.gross_amount || 0);
     });
-
     const sortedKeys = Object.keys(geoTotals).filter(k => geoTotals[k] > 0).sort((a, b) => {
       if (a.toLowerCase() === 'other') return 1;
       if (b.toLowerCase() === 'other') return -1;
       return a.localeCompare(b);
     });
-
-    const colorMap: { [key: string]: string } = {
-      'UAE': '#10b981',
-      'KSA': '#f59e0b',
-      'SYR': '#3b82f6',
-      'JOR': '#8b5cf6',
-      'Other': '#64748b'
-    };
-
-    const labels = sortedKeys;
-    const data = sortedKeys.map(k => Math.round(geoTotals[k]));
-    const colors = sortedKeys.map(k => colorMap[k] || '#64748b');
-
+    const colorMap: { [key: string]: string } = { 'UAE': '#10b981', 'KSA': '#f59e0b', 'SYR': '#3b82f6', 'JOR': '#8b5cf6', 'Other': '#64748b' };
     return {
-      labels: labels,
-      datasets: [{ data: data, backgroundColor: colors }]
+      labels: sortedKeys,
+      datasets: [{ data: sortedKeys.map(k => Math.round(geoTotals[k])), backgroundColor: sortedKeys.map(k => colorMap[k] || '#64748b') }]
     };
   }
 
-  // Department Profitability Index - حساب الكوست من fact_salary + fact_cost
   private getProfitabilityData() {
     const year = this.selectedYear();
     const products = this.dataService.products();
     const salaries = this.dataService.salaries();
     const revenues = this.dataService.revenues();
     const costs = this.dataService.costs();
-
     const data = products.map(p => {
-      const rev = revenues
-        .filter(r => r.product_id === p.product_id && new Date(r.date).getFullYear() === year)
-        .reduce((s, r) => s + (Number(r.gross_amount) || 0), 0);
-
-      // حساب الرواتب من fact_salary للقسم
+      const rev = revenues.filter(r => r.product_id === p.product_id && new Date(r.date).getFullYear() === year).reduce((s, r) => s + (Number(r.gross_amount) || 0), 0);
       const productSalaries = salaries.filter(s => {
         const emp = this.dataService.employees().find(e => e.employee_id === s.employee_id);
         return emp?.product_id === p.product_id && s.year === year;
       });
       const salaryTotal = productSalaries.reduce((s, sal) => s + (Number(sal.net_salary) || 0), 0);
-
-      // ✅ حساب التكاليف التشغيلية من fact_cost
-      const opCostTotal = costs
-        .filter(c => c.product_id === p.product_id && c.year === year)
-        .reduce((s, c) => s + (Number(c.amount) || 0), 0);
-
+      const opCostTotal = costs.filter(c => c.product_id === p.product_id && c.year === year).reduce((s, c) => s + (Number(c.amount) || 0), 0);
       const totalCost = salaryTotal + opCostTotal;
-
-      return {
-        name: p.product_name,
-        margin: rev > 0 ? ((rev - totalCost) / rev) * 100 : 0
-      };
+      return { name: p.product_name, margin: rev > 0 ? ((rev - totalCost) / rev) * 100 : 0 };
     }).filter(x => x.margin !== 0).sort((a, b) => {
       if (a.name.toLowerCase() === 'other') return 1;
       if (b.name.toLowerCase() === 'other') return -1;
       return a.name.localeCompare(b.name);
     });
-
     return {
       labels: data.map(d => d.name),
-      datasets: [{
-        label: 'Margin %',
-        data: data.map(d => Math.round(d.margin)),
-        backgroundColor: data.map(d => d.margin >= 0 ? '#10b981' : '#ef4444')
-      }]
+      datasets: [{ label: 'Margin %', data: data.map(d => Math.round(d.margin)), backgroundColor: data.map(d => d.margin >= 0 ? '#10b981' : '#ef4444') }]
     };
   }
 
@@ -923,9 +649,7 @@ export class DashboardComponent implements AfterViewInit {
       datasets: [{
         label: 'Annual Revenue',
         data: years.map(year => {
-          const val = this.dataService.revenues()
-            .filter(r => new Date(r.date).getFullYear() === year)
-            .reduce((sum, r) => sum + (Number(r.gross_amount) || 0), 0);
+          const val = this.dataService.revenues().filter(r => new Date(r.date).getFullYear() === year).reduce((sum, r) => sum + (Number(r.gross_amount) || 0), 0);
           return Math.round(val);
         }),
         backgroundColor: '#1e3a8a',

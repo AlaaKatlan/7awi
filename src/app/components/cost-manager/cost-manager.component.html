@@ -6,7 +6,36 @@
       <p class="text-slate-500 text-sm">Track and manage operational expenses</p>
     </div>
 
+    <!-- <div class="flex gap-2">
+      <button (click)="exportToExcel()"
+              class="bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition flex items-center gap-2 text-sm">
+        <span class="material-icons text-base">file_download</span> Export
+      </button>
+<button (click)="downloadTemplate()"
+              class="bg-slate-100 text-slate-600 border border-slate-200 px-5 py-2.5 rounded-xl font-bold shadow-sm hover:bg-slate-200 transition flex items-center gap-2 text-sm">
+        <span class="material-icons text-base">download</span> Template
+      </button>
+      <button (click)="openGenerateModal()"
+              class="bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg hover:bg-emerald-700 transition flex items-center gap-2 text-sm">
+        <span class="material-icons text-base">auto_fix_high</span> Generate Monthly Costs
+      </button>
+    </div> -->
+
+
     <div class="flex gap-2">
+
+      <button (click)="downloadTemplate()"
+              class="bg-slate-100 text-slate-600 border border-slate-200 px-5 py-2.5 rounded-xl font-bold shadow-sm hover:bg-slate-200 transition flex items-center gap-2 text-sm">
+        <span class="material-icons text-base">download</span> Template
+      </button>
+
+      <input type="file" #fileInput (change)="onFileChange($event)" style="display: none;" accept=".xlsx, .xls" />
+
+      <button (click)="fileInput.click()"
+              class="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg hover:bg-indigo-700 transition flex items-center gap-2 text-sm">
+        <span class="material-icons text-base">upload_file</span> Import
+      </button>
+
       <button (click)="exportToExcel()"
               class="bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition flex items-center gap-2 text-sm">
         <span class="material-icons text-base">file_download</span> Export

@@ -30,6 +30,52 @@ export class DataService {
     this.fetchInitialData();
   }
 
+  // =============================================
+  // ✅ دالة مساعدة لجلب جميع الصفوف بدون حد الـ 1000
+  // =============================================
+  private async fetchAllRows<T>(
+    tableName: string,
+    orderBy?: { column: string; ascending: boolean }
+  ): Promise<T[]> {
+    const PAGE_SIZE = 1000;
+    let allData: T[] = [];
+    let from = 0;
+    let hasMore = true;
+
+    while (hasMore) {
+      let query = this.supabase
+        .from(tableName)
+        .select('*')
+        .range(from, from + PAGE_SIZE - 1);
+
+      if (orderBy) {
+        query = query.order(orderBy.column, { ascending: orderBy.ascending });
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error(`Error fetching ${tableName}:`, error);
+        break;
+      }
+
+      if (data && data.length > 0) {
+        allData = [...allData, ...data];
+        from += PAGE_SIZE;
+
+        // إذا كان عدد الصفوف أقل من PAGE_SIZE، فلا يوجد المزيد
+        if (data.length < PAGE_SIZE) {
+          hasMore = false;
+        }
+      } else {
+        hasMore = false;
+      }
+    }
+
+    console.log(`[DataService] Fetched ${allData.length} rows from ${tableName}`);
+    return allData;
+  }
+
   async fetchInitialData() {
     this.loading.set(true);
     try {
@@ -50,47 +96,67 @@ export class DataService {
     }
   }
 
-  // --- Fetch Methods ---
+  // --- Fetch Methods (Updated with pagination) ---
   async fetchProducts() {
-    const { data } = await this.supabase.from('dim_product').select('*');
+    const data = await this.fetchAllRows<DimProduct>('dim_product');
     if (data) this.products.set(data);
   }
 
   async fetchClients() {
-    const { data } = await this.supabase.from('dim_client').select('*');
+    const data = await this.fetchAllRows<DimClient>('dim_client');
     if (data) this.clients.set(data);
   }
 
   async fetchEmployees() {
-    const { data } = await this.supabase.from('dim_employee').select('*').order('name', { ascending: true });
+    const data = await this.fetchAllRows<DimEmployee>('dim_employee', { column: 'name', ascending: true });
     if (data) this.employees.set(data);
   }
 
   async fetchRevenues() {
-    const { data } = await this.supabase.from('fact_revenue').select('*').order('date', { ascending: false });
+    const data = await this.fetchAllRows<FactRevenue>('fact_revenue', { column: 'date', ascending: false });
     if (data) this.revenues.set(data);
   }
 
   async fetchPipelines() {
-    const { data } = await this.supabase.from('fact_pipeline').select('*').order('created_at', { ascending: false });
+    const data = await this.fetchAllRows<FactPipeline>('fact_pipeline', { column: 'created_at', ascending: false });
     if (data) this.pipelines.set(data);
   }
 
   async fetchTargets() {
-    const { data } = await this.supabase.from('fact_target_annual').select('*');
+    const data = await this.fetchAllRows<FactTarget>('fact_target_annual');
     if (data) this.targets.set(data);
   }
 
   async fetchCosts() {
-    const { data } = await this.supabase.from('fact_cost').select('*');
+    const data = await this.fetchAllRows<FactCost>('fact_cost');
     if (data) this.costs.set(data);
   }
 
   async fetchSalaries() {
-    const { data } = await this.supabase.from('fact_salary').select('*').order('year', { ascending: false }).order('month', { ascending: false });
+    const data = await this.fetchAllRows<FactSalary>('fact_salary', { column: 'year', ascending: false });
     if (data) this.salaries.set(data);
   }
+  // =============================================
+  // BULK INSERT (For Excel Import)
+  // =============================================
+  async addCostsBulk(items: Partial<FactCost>[]) {
+    // Supabase يسمح بإدخال مصفوفة من الكائنات دفعة واحدة
+    const { data, error } = await this.supabase
+      .from('fact_cost')
+      .insert(items)
+      .select();
 
+    if (data) {
+      // تحديث البيانات المحلية مباشرة ليراها المستخدم
+      this.costs.update(current => [...data, ...current]);
+    }
+
+    return {
+      success: !error,
+      error: error?.message,
+      count: data?.length || 0
+    };
+  }
   // --- Helper Methods ---
   getClientName(id: number | undefined): string {
     if (!id) return '-';
@@ -109,50 +175,29 @@ export class DataService {
 
   // =============================================
   // ✅ نظام ترقيم الطلبات التسلسلي الجديد
-  // Format: [COUNTRY]-[PRODUCT_CODE]-[SEQUENTIAL_NUMBER]
-  // Example: UAE-DOPX-0001, KSA-SCAM-0002
-  // الرقم التسلسلي يبدأ من 1 ويزيد تلقائياً
   // =============================================
-
-  /**
-   * توليد رقم الطلب التسلسلي
-   * يعتمد على أعلى رقم موجود في قاعدة البيانات + 1
-   */
   generateBookingRef(country: string, productId: number): string {
-    // A. Country Code (3 chars uppercase)
     const countryCode = (country || 'UAE').substring(0, 3).toUpperCase();
-
-    // B. Product Code
     const product = this.products().find(p => p.product_id == productId);
     const prodCode = product?.product_code || 'GEN';
-
-    // C. الحصول على أعلى رقم تسلسلي من جميع الطلبات
     const nextSeq = this.getNextSequentialNumber();
     const increment = nextSeq.toString().padStart(4, '0');
-
     return `${countryCode}-${prodCode}-${increment}`;
   }
 
-  /**
-   * الحصول على الرقم التسلسلي التالي
-   * يستخرج أعلى رقم من order_number الحالية ويضيف 1
-   */
   private getNextSequentialNumber(): number {
     const allRevenues = this.revenues();
-    
+
     if (allRevenues.length === 0) {
-      return 1; // أول طلب
+      return 1;
     }
 
-    // استخراج الأرقام التسلسلية من جميع order_numbers
     const sequenceNumbers = allRevenues
       .map(r => {
         if (!r.order_number) return 0;
-        // استخراج الجزء الأخير (الرقم) من order_number
-        // Format: UAE-DOPX-0001
         const parts = r.order_number.split('-');
         if (parts.length >= 3) {
-          const numPart = parts[parts.length - 1]; // آخر جزء
+          const numPart = parts[parts.length - 1];
           const num = parseInt(numPart, 10);
           return isNaN(num) ? 0 : num;
         }
@@ -164,20 +209,14 @@ export class DataService {
       return 1;
     }
 
-    // إرجاع أعلى رقم + 1
     return Math.max(...sequenceNumbers) + 1;
   }
 
-  /**
-   * إعادة توليد رقم الطلب عند تغيير الدولة أو المنتج (للتعديل)
-   * الرقم التسلسلي يبقى كما هو، فقط البادئة تتغير
-   */
   regenerateBookingRefForEdit(country: string, productId: number, currentOrderNumber: string): string {
     const countryCode = (country || 'UAE').substring(0, 3).toUpperCase();
     const product = this.products().find(p => p.product_id == productId);
     const prodCode = product?.product_code || 'GEN';
 
-    // استخراج الرقم التسلسلي الحالي
     let seqNum = '0001';
     if (currentOrderNumber) {
       const parts = currentOrderNumber.split('-');
@@ -293,7 +332,7 @@ export class DataService {
   // CRUD Operations
   // =============================================
 
-  // --- REVENUE (معدّل مع حقول start_date و end_date) ---
+  // --- REVENUE ---
   async addRevenue(item: Partial<FactRevenue>) {
     const payload = {
       date: item.date,
@@ -304,8 +343,8 @@ export class DataService {
       country: item.country,
       lead_id: item.lead_id,
       owner_id: item.owner_id,
-      start_date: item.start_date || null,  // ✅ حقل جديد
-      end_date: item.end_date || null       // ✅ حقل جديد
+      start_date: item.start_date || null,
+      end_date: item.end_date || null
     };
 
     const { data, error } = await this.supabase.from('fact_revenue').insert([payload]).select();
@@ -329,8 +368,8 @@ export class DataService {
     if (rest.country !== undefined) payload.country = rest.country;
     if (rest.lead_id !== undefined) payload.lead_id = rest.lead_id;
     if (rest.owner_id !== undefined) payload.owner_id = rest.owner_id;
-    if (rest.start_date !== undefined) payload.start_date = rest.start_date || null;  // ✅
-    if (rest.end_date !== undefined) payload.end_date = rest.end_date || null;        // ✅
+    if (rest.start_date !== undefined) payload.start_date = rest.start_date || null;
+    if (rest.end_date !== undefined) payload.end_date = rest.end_date || null;
 
     const { data, error } = await this.supabase.from('fact_revenue').update(payload).eq('id', id).select();
 

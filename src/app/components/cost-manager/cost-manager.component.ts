@@ -4,7 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { DataService } from '../../services/data.service';
 import { FactCost } from '../../models/data.models';
 import * as XLSX from 'xlsx';
-
+import * as ExcelJS from 'exceljs';
+import * as fs from 'file-saver';
 @Component({
   selector: 'app-cost-manager',
   standalone: true,
@@ -157,7 +158,7 @@ export class CostManagerComponent {
   openModal() {
     this.isEditMode = false;
     this.currentCost = this.getEmptyCost();
-    
+
     // ✅ تعيين المنتج الافتراضي وتحديث Signal
     const products = this.sortedProducts();
     if (products.length > 0) {
@@ -166,7 +167,7 @@ export class CostManagerComponent {
     } else {
       this.selectedProductIdForDropdown.set(undefined);
     }
-    
+
     this.showModal = true;
   }
 
@@ -238,7 +239,91 @@ export class CostManagerComponent {
     XLSX.utils.book_append_sheet(wb, ws, 'Costs');
     XLSX.writeFile(wb, `Costs_Export_${new Date().toISOString().slice(0, 10)}.xlsx`);
   }
+  // =========================================================
+  // 1. دالة تنزيل القالب (Template) - تصميم ذكي صفحة واحدة
+  // =========================================================
+  async downloadTemplate() {
+    const workbook = new ExcelJS.Workbook();
 
+    // 1. ورقة الإدخال الرئيسية
+    const worksheet = workbook.addWorksheet('Cost Entry');
+
+    // 2. ورقة البيانات المرجعية (مخفية)
+    const refSheet = workbook.addWorksheet('ReferenceData');
+    refSheet.state = 'hidden'; // إخفاء الورقة حتى لا يغيرها المستخدم
+
+    // --- تحضير البيانات ---
+    const departments = this.dataService.products().map(p => p.product_name);
+    const clients = this.dataService.clients().map(c => c.client_name);
+    const orders = this.dataService.revenues()
+      .filter(r => r.order_number)
+      .map(r => r.order_number);
+
+    // ملء ورقة المراجع بالبيانات (كل قائمة في عمود)
+    refSheet.getColumn(1).values = ['Departments', ...departments]; // Column A
+    refSheet.getColumn(2).values = ['Clients', ...clients];       // Column B
+    refSheet.getColumn(3).values = ['Orders', ...orders];         // Column C
+
+    // --- تصميم ورقة الإدخال ---
+    worksheet.columns = [
+      { header: 'Date (YYYY-MM-DD)', key: 'date', width: 15 },
+      { header: 'Amount', key: 'amount', width: 12 },
+      { header: 'Description', key: 'description', width: 30 },
+      { header: 'Department', key: 'department', width: 20 },
+      { header: 'Client', key: 'client', width: 20 },
+      { header: 'Booking Order', key: 'order', width: 25 }
+    ];
+
+    // إضافة سطر مثال (اختياري)
+    worksheet.addRow({
+      date: new Date().toISOString().split('T')[0],
+      amount: 1000,
+      description: 'Server Hosting Fees',
+      department: departments[0] || '',
+      client: clients[0] || '',
+      order: orders[0] || ''
+    });
+
+    // --- إضافة القوائم المنسدلة (Data Validation) ---
+    // نطبقها على أول 100 سطر مثلاً
+    for (let i = 2; i <= 100; i++) {
+
+      // عمود Department (D)
+      worksheet.getCell(`D${i}`).dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        // الإشارة إلى العمود A في الورقة المخفية
+        formulae: [`=ReferenceData!$A$2:$A$${departments.length + 1}`]
+      };
+
+      // عمود Client (E)
+      worksheet.getCell(`E${i}`).dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: [`=ReferenceData!$B$2:$B$${clients.length + 1}`]
+      };
+
+      // عمود Booking Order (F)
+      worksheet.getCell(`F${i}`).dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: [`=ReferenceData!$C$2:$C$${orders.length + 1}`]
+      };
+    }
+
+    // تنسيق الهيدر
+    worksheet.getRow(1).font = { bold: true };
+    worksheet.getRow(1).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE0E0E0' }
+    };
+
+    // الحفظ والتنزيل
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    fs.saveAs(blob, 'Smart_Cost_Template.xlsx');
+  }
   // --- Save & Delete ---
   async save() {
     if (this.currentCost.amount === undefined || this.currentCost.amount === null) {
@@ -283,5 +368,110 @@ export class CostManagerComponent {
 
     this.showDeleteModal = false;
     this.costToDelete = null;
+  }
+
+  // =========================================================
+  // ✅ 2. دالة الاستيراد (Import) - قراءة الملف وربط البيانات
+  // =========================================================
+  onFileChange(evt: any) {
+    // 1. التأكد من وجود ملف
+    const target: DataTransfer = <DataTransfer>(evt.target);
+    if (target.files.length !== 1) return;
+
+    this.loading.set(true);
+
+    const reader: FileReader = new FileReader();
+    reader.onload = async (e: any) => {
+      try {
+        // 2. قراءة البيانات الخام
+        const bstr: string = e.target.result;
+        const wb: XLSX.WorkBook = XLSX.read(bstr, { type: 'binary' });
+
+        // قراءة الورقة الأولى (Cost Entry)
+        const wsname: string = wb.SheetNames[0];
+        const ws: XLSX.WorkSheet = wb.Sheets[wsname];
+
+        // تحويل البيانات إلى JSON (مصفوفة كائنات)
+        const data: any[] = XLSX.utils.sheet_to_json(ws);
+
+        const costsToInsert: Partial<FactCost>[] = [];
+
+        // 3. تحضير قوائم البيانات الموجودة للمطابقة (Mapping)
+        // نقوم بتنظيف النصوص (trim + lowercase) لضمان دقة البحث
+        const productsList = this.dataService.products();
+        const clientsList = this.dataService.clients();
+        const revenuesList = this.dataService.revenues();
+
+        // 4. المرور على كل سطر في الإكسل
+        data.forEach((row) => {
+          // A. معالجة التاريخ (إكسل يخزن التاريخ أحياناً كرقم)
+          let dateStr = row['Date (YYYY-MM-DD)'] || row['Date'];
+
+          if (typeof dateStr === 'number') {
+            // معادلة تحويل تاريخ إكسل الرقمي إلى تاريخ JS
+            const jsDate = new Date((dateStr - (25567 + 2)) * 86400 * 1000);
+            dateStr = jsDate.toISOString().split('T')[0];
+          } else if (dateStr) {
+            // محاولة تنسيق النص إذا كان تاريخاً نصياً
+            try {
+              dateStr = new Date(dateStr).toISOString().split('T')[0];
+            } catch {
+              dateStr = null;
+            }
+          }
+
+          // إذا لم يوجد تاريخ أو مبلغ، نتجاهل السطر (أو كان سطراً فارغاً)
+          if (!dateStr || !row['Amount']) return;
+
+          // B. البحث عن ID القسم (Department)
+          // نأخذ الاسم من الإكسل ونبحث عن الـ ID المقابل له في النظام
+          const deptName = (row['Department'] || '').toString().trim().toLowerCase();
+          const matchedProduct = productsList.find(p => p.product_name.toLowerCase().trim() === deptName);
+
+          // C. البحث عن ID العميل (Client)
+          const clientName = (row['Client'] || '').toString().trim().toLowerCase();
+          const matchedClient = clientsList.find(c => c.client_name.toLowerCase().trim() === clientName);
+
+          // D. البحث عن ID الطلب (Booking Order)
+          const orderRef = (row['Booking Order'] || '').toString().trim().toLowerCase();
+          const matchedRevenue = revenuesList.find(r => (r.order_number || '').toLowerCase().trim() === orderRef);
+
+          // E. بناء كائن التكلفة الجاهز للإرسال
+          const newCost: Partial<FactCost> = {
+            date: dateStr,
+            year: new Date(dateStr).getFullYear(),
+            month: new Date(dateStr).getMonth() + 1,
+            amount: Number(row['Amount']), // ضمان أنه رقم
+            description: row['Description'] || '',
+            product_id: matchedProduct?.product_id, // ✅ نستخدم الـ ID الذي وجدناه (أو undefined)
+            client_id: matchedClient?.client_id,    // ✅
+            revenue_id: matchedRevenue?.id          // ✅
+          };
+
+          costsToInsert.push(newCost);
+        });
+
+        // 5. إرسال البيانات للمعالجة
+        if (costsToInsert.length > 0) {
+          const result = await this.dataService.addCostsBulk(costsToInsert);
+
+          if (result.success) {
+            alert(`Success! Imported ${result.count} costs successfully.`);
+            evt.target.value = ''; // تصفير حقل الملف ليسمح برفع ملف آخر
+          } else {
+            alert('Database Error: ' + result.error);
+          }
+        } else {
+          alert('No valid data found in the file. Please use the Template.');
+        }
+
+      } catch (error: any) {
+        console.error(error);
+        alert('File Error: ' + error.message);
+      } finally {
+        this.loading.set(false);
+      }
+    };
+    reader.readAsBinaryString(target.files[0]);
   }
 }
