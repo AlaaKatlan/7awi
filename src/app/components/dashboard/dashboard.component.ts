@@ -42,7 +42,6 @@ export class DashboardComponent implements AfterViewInit {
     const employees = this.dataService.employees();
     const breakdown: { [key: string]: number } = {};
 
-    // جلب سجلات الرواتب للسنة المحددة
     const yearSalaries = salaries.filter(s => s.year === year);
 
     yearSalaries.forEach(salary => {
@@ -58,7 +57,7 @@ export class DashboardComponent implements AfterViewInit {
     return breakdown;
   });
 
-  // 3. إحصائيات المنتجات مع الإنتاجية - الاعتماد على fact_salary
+  // 3. إحصائيات المنتجات مع الإنتاجية والتكاليف التشغيلية
   productStats = computed(() => {
     const year = this.selectedYear();
     const currentYear = new Date().getFullYear();
@@ -67,6 +66,7 @@ export class DashboardComponent implements AfterViewInit {
     const products = this.dataService.products();
     const salaries = this.dataService.salaries();
     const revenues = this.dataService.revenues();
+    const costs = this.dataService.costs();
 
     return products.map(prod => {
       // عدد الموظفين الفريدين من fact_salary لهذا القسم في السنة المحددة
@@ -87,16 +87,26 @@ export class DashboardComponent implements AfterViewInit {
       // حساب الرواتب من fact_salary
       const totalSalaries = productSalaries.reduce((sum, s) => sum + Number(s.net_salary || 0), 0);
 
-      const profit = totalRev - totalSalaries;
+      // ✅ حساب التكاليف التشغيلية من fact_cost للقسم
+      const totalOpCost = costs
+        .filter(c => c.product_id === prod.product_id && c.year === year)
+        .reduce((sum, c) => sum + Number(c.amount || 0), 0);
+
+      // ✅ إجمالي التكلفة = الرواتب + التكاليف التشغيلية
+      const totalCost = totalSalaries + totalOpCost;
+
+      const profit = totalRev - totalCost;
       const productivity = (empCount > 0 && monthsToCount > 0) ? (profit / monthsToCount / empCount) : 0;
 
       return {
         name: prod.product_name,
         empCount,
-        revenue: totalRev,
-        salaries: totalSalaries,
-        profit,
-        productivity
+        revenue: Math.round(totalRev),
+        salaries: Math.round(totalSalaries),
+        opCost: Math.round(totalOpCost),
+        totalCost: Math.round(totalCost),
+        profit: Math.round(profit),
+        productivity: Math.round(productivity)
       };
     });
   });
@@ -118,12 +128,12 @@ export class DashboardComponent implements AfterViewInit {
 
     const profit = revenue - totalCost;
     return {
-      revenue,
-      cost: totalCost,
-      profit,
+      revenue: Math.round(revenue),
+      cost: Math.round(totalCost),
+      profit: Math.round(profit),
       margin: revenue > 0 ? Math.round((profit / revenue) * 100) : 0,
-      salaries,
-      opCost
+      salaries: Math.round(salaries),
+      opCost: Math.round(opCost)
     };
   });
 
@@ -135,11 +145,23 @@ export class DashboardComponent implements AfterViewInit {
     const targets = this.dataService.targets();
 
     return products.map(p => {
-      const monthlyValues = Array.from({ length: 12 }, (_, m) => revenues.filter(r => r.product_id === p.product_id && new Date(r.date).getFullYear() === year && new Date(r.date).getMonth() === m).reduce((s, r) => s + (Number(r.gross_amount) || 0), 0));
+      const monthlyValues = Array.from({ length: 12 }, (_, m) => {
+        const val = revenues
+          .filter(r => r.product_id === p.product_id && new Date(r.date).getFullYear() === year && new Date(r.date).getMonth() === m)
+          .reduce((s, r) => s + (Number(r.gross_amount) || 0), 0);
+        return Math.round(val);
+      });
       const total = monthlyValues.reduce((a, b) => a + b, 0);
       const targetObj = targets.find(t => t.product_id === p.product_id && t.year === year);
-      const target = targetObj ? Number(targetObj.annual_target) : 0;
-      return { name: p.product_name, monthlyValues, total, target, achievement: target > 0 ? (total / target) * 100 : 0, product_id: p.product_id };
+      const target = targetObj ? Math.round(Number(targetObj.annual_target)) : 0;
+      return {
+        name: p.product_name,
+        monthlyValues,
+        total,
+        target,
+        achievement: target > 0 ? Math.round((total / target) * 100) : 0,
+        product_id: p.product_id
+      };
     });
   });
 
@@ -153,12 +175,12 @@ export class DashboardComponent implements AfterViewInit {
     const monthlyOpCost = Array.from({ length: 12 }, (_, m) =>
       this.dataService.costs().filter(c => c.year === year && c.month === (m + 1)).reduce((s, c) => s + Number(c.amount), 0)
     );
-    const monthlyCost = Array.from({ length: 12 }, (_, m) => monthlySalariesData[m] + monthlyOpCost[m]);
+    const monthlyCost = Array.from({ length: 12 }, (_, m) => Math.round(monthlySalariesData[m] + monthlyOpCost[m]));
 
     return {
       monthlyRevenue,
       monthlyCost,
-      monthlyNet: monthlyRevenue.map((rev, i) => rev - monthlyCost[i])
+      monthlyNet: monthlyRevenue.map((rev, i) => Math.round(rev - monthlyCost[i]))
     };
   });
 
@@ -188,7 +210,6 @@ export class DashboardComponent implements AfterViewInit {
           const value = dataset.data[index];
           const percentage = ((value / total) * 100).toFixed(1);
 
-          // لا تعرض إذا كانت النسبة صغيرة جداً
           if (parseFloat(percentage) < 3) return;
 
           const { x, y } = element.tooltipPosition();
@@ -199,7 +220,6 @@ export class DashboardComponent implements AfterViewInit {
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
 
-          // إضافة ظل للنص ليكون واضح
           ctx.shadowColor = 'rgba(0,0,0,0.5)';
           ctx.shadowBlur = 3;
           ctx.shadowOffsetX = 1;
@@ -212,6 +232,16 @@ export class DashboardComponent implements AfterViewInit {
     }
   };
 
+  // ✅ دالة تنسيق الأرقام الكبيرة
+  private formatNumber(value: number): string {
+    if (Math.abs(value) >= 1000000) {
+      return (value / 1000000).toFixed(1) + 'M';
+    } else if (Math.abs(value) >= 1000) {
+      return (value / 1000).toFixed(0) + 'K';
+    }
+    return value.toFixed(0);
+  }
+
   private initCharts() {
     // تسجيل الـ Plugin
     Chart.register(this.percentagePlugin);
@@ -219,7 +249,24 @@ export class DashboardComponent implements AfterViewInit {
     this.charts.main = new Chart('mainChart', {
       type: 'line',
       data: this.getMainChartData(),
-      options: { responsive: true, maintainAspectRatio: false }
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            ticks: {
+              callback: (value: any) => '$' + this.formatNumber(value)
+            }
+          }
+        },
+        plugins: {
+          tooltip: {
+            callbacks: {
+              label: (context: any) => `${context.dataset.label}: $${context.raw.toLocaleString()}`
+            }
+          }
+        }
+      }
     });
 
     // ✅ Doughnut مع نسب مئوية
@@ -249,13 +296,34 @@ export class DashboardComponent implements AfterViewInit {
     this.charts.targetVsActual = new Chart('targetVsActualChart', {
       type: 'bar',
       data: this.getTargetVsActualData(),
-      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom' } },
+        scales: {
+          y: {
+            ticks: {
+              callback: (value: any) => '$' + this.formatNumber(value)
+            }
+          }
+        }
+      }
     });
 
     this.charts.multiYear = new Chart('multiYearChart', {
       type: 'bar',
       data: this.getMultiYearData(),
-      options: { responsive: true, maintainAspectRatio: false }
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            ticks: {
+              callback: (value: any) => '$' + this.formatNumber(value)
+            }
+          }
+        }
+      }
     });
 
     // ✅ Pie Chart مع نسب مئوية - Geographical
@@ -284,19 +352,52 @@ export class DashboardComponent implements AfterViewInit {
     this.charts.profitability = new Chart('profitabilityChart', {
       type: 'bar',
       data: this.getProfitabilityData(),
-      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false }
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          tooltip: {
+            callbacks: {
+              label: (context: any) => `Margin: ${context.raw.toFixed(1)}%`
+            }
+          }
+        }
+      }
     });
 
     this.charts.allYearsMonthly = new Chart('allYearsMonthlyChart', {
       type: 'line',
       data: this.getAllYearsMonthlyData(),
-      options: { responsive: true, maintainAspectRatio: false }
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            ticks: {
+              callback: (value: any) => '$' + this.formatNumber(value)
+            }
+          }
+        }
+      }
     });
 
+    // ✅ Department Financial Performance Analysis - مع Cost
     this.charts.productComparison = new Chart('productComparisonChart', {
       type: 'bar',
       data: this.getProductComparisonData(),
-      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom' } },
+        scales: {
+          y: {
+            ticks: {
+              callback: (value: any) => '$' + this.formatNumber(value)
+            }
+          }
+        }
+      }
     });
 
     // ✅ Doughnut مع نسب مئوية - Salary
@@ -331,8 +432,16 @@ export class DashboardComponent implements AfterViewInit {
         maintainAspectRatio: false,
         plugins: { legend: { position: 'bottom' } },
         scales: {
-          y: { type: 'linear', position: 'left' },
-          y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false } }
+          y: { type: 'linear', position: 'left', title: { display: true, text: 'Staff Count' } },
+          y1: {
+            type: 'linear',
+            position: 'right',
+            grid: { drawOnChartArea: false },
+            title: { display: true, text: 'Productivity ($)' },
+            ticks: {
+              callback: (value: any) => '$' + this.formatNumber(value)
+            }
+          }
         }
       }
     });
@@ -395,7 +504,15 @@ export class DashboardComponent implements AfterViewInit {
           plugins: { legend: { position: 'bottom' } },
           scales: {
             y: { type: 'linear', position: 'left', title: { display: true, text: 'Staff Count' } },
-            y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'Productivity ($)' } }
+            y1: {
+              type: 'linear',
+              position: 'right',
+              grid: { drawOnChartArea: false },
+              title: { display: true, text: 'Productivity ($)' },
+              ticks: {
+                callback: (value: any) => '$' + this.formatNumber(value)
+              }
+            }
           }
         }
       });
@@ -404,13 +521,12 @@ export class DashboardComponent implements AfterViewInit {
 
   private getSalaryTypeData() {
     const data = this.salaryBreakdown();
-    // ترتيب أبجدي مع وضع Other في النهاية
     const labels = Object.keys(data).sort((a, b) => {
       if (a.toLowerCase() === 'other') return 1;
       if (b.toLowerCase() === 'other') return -1;
       return a.localeCompare(b);
     });
-    const values = labels.map(l => data[l]);
+    const values = labels.map(l => Math.round(data[l]));
     const colors = ['#1e3a8a', '#2563eb', '#60a5fa', '#93c5fd', '#bae6fd', '#0ea5e9'];
 
     return {
@@ -430,13 +546,15 @@ export class DashboardComponent implements AfterViewInit {
     };
   }
 
+  // ✅ Department Financial Performance Analysis - مع Cost (رواتب + تكاليف تشغيلية)
   private getProductComparisonData() {
-    const data = this.productStats().filter(d => d.revenue > 0 || d.salaries > 0).sort((a, b) => a.name.localeCompare(b.name));
+    const data = this.productStats().filter(d => d.revenue > 0 || d.totalCost > 0).sort((a, b) => a.name.localeCompare(b.name));
     return {
       labels: data.map(d => d.name),
       datasets: [
         { label: 'Revenue', data: data.map(d => d.revenue), backgroundColor: '#1e3a8a', borderRadius: 4 },
         { label: 'Salaries', data: data.map(d => d.salaries), backgroundColor: '#f59e0b', borderRadius: 4 },
+        { label: 'Op. Cost', data: data.map(d => d.opCost), backgroundColor: '#8b5cf6', borderRadius: 4 },
         {
           label: 'Net Profit',
           data: data.map(d => d.profit),
@@ -486,8 +604,16 @@ export class DashboardComponent implements AfterViewInit {
       labels: this.monthNames,
       datasets: years.map((year, idx) => ({
         label: `Year ${year}`,
-        data: Array.from({ length: 12 }, (_, m) => this.dataService.revenues().filter(r => new Date(r.date).getFullYear() === year && new Date(r.date).getMonth() === m).reduce((sum, r) => sum + (Number(r.gross_amount) || 0), 0)),
-        borderColor: colors[idx % colors.length], tension: 0.4, fill: false, borderWidth: year === this.selectedYear() ? 4 : 2
+        data: Array.from({ length: 12 }, (_, m) => {
+          const val = this.dataService.revenues()
+            .filter(r => new Date(r.date).getFullYear() === year && new Date(r.date).getMonth() === m)
+            .reduce((sum, r) => sum + (Number(r.gross_amount) || 0), 0);
+          return Math.round(val);
+        }),
+        borderColor: colors[idx % colors.length],
+        tension: 0.4,
+        fill: false,
+        borderWidth: year === this.selectedYear() ? 4 : 2
       }))
     };
   }
@@ -501,7 +627,6 @@ export class DashboardComponent implements AfterViewInit {
       geoTotals[country] = (geoTotals[country] || 0) + Number(r.gross_amount || 0);
     });
 
-    // ترتيب أبجدي مع وضع Other في النهاية
     const sortedKeys = Object.keys(geoTotals).filter(k => geoTotals[k] > 0).sort((a, b) => {
       if (a.toLowerCase() === 'other') return 1;
       if (b.toLowerCase() === 'other') return -1;
@@ -517,7 +642,7 @@ export class DashboardComponent implements AfterViewInit {
     };
 
     const labels = sortedKeys;
-    const data = sortedKeys.map(k => geoTotals[k]);
+    const data = sortedKeys.map(k => Math.round(geoTotals[k]));
     const colors = sortedKeys.map(k => colorMap[k] || '#64748b');
 
     return {
@@ -526,12 +651,13 @@ export class DashboardComponent implements AfterViewInit {
     };
   }
 
-  // Department Profitability Index - حساب الكوست من fact_salary
+  // Department Profitability Index - حساب الكوست من fact_salary + fact_cost
   private getProfitabilityData() {
     const year = this.selectedYear();
     const products = this.dataService.products();
     const salaries = this.dataService.salaries();
     const revenues = this.dataService.revenues();
+    const costs = this.dataService.costs();
 
     const data = products.map(p => {
       const rev = revenues
@@ -543,14 +669,20 @@ export class DashboardComponent implements AfterViewInit {
         const emp = this.dataService.employees().find(e => e.employee_id === s.employee_id);
         return emp?.product_id === p.product_id && s.year === year;
       });
-      const cost = productSalaries.reduce((s, sal) => s + (Number(sal.net_salary) || 0), 0);
+      const salaryTotal = productSalaries.reduce((s, sal) => s + (Number(sal.net_salary) || 0), 0);
+
+      // ✅ حساب التكاليف التشغيلية من fact_cost
+      const opCostTotal = costs
+        .filter(c => c.product_id === p.product_id && c.year === year)
+        .reduce((s, c) => s + (Number(c.amount) || 0), 0);
+
+      const totalCost = salaryTotal + opCostTotal;
 
       return {
         name: p.product_name,
-        margin: rev > 0 ? ((rev - cost) / rev) * 100 : 0
+        margin: rev > 0 ? ((rev - totalCost) / rev) * 100 : 0
       };
     }).filter(x => x.margin !== 0).sort((a, b) => {
-      // ترتيب أبجدي مع وضع Other في النهاية
       if (a.name.toLowerCase() === 'other') return 1;
       if (b.name.toLowerCase() === 'other') return -1;
       return a.name.localeCompare(b.name);
@@ -560,7 +692,7 @@ export class DashboardComponent implements AfterViewInit {
       labels: data.map(d => d.name),
       datasets: [{
         label: 'Margin %',
-        data: data.map(d => d.margin),
+        data: data.map(d => Math.round(d.margin * 10) / 10),
         backgroundColor: data.map(d => d.margin >= 0 ? '#10b981' : '#ef4444')
       }]
     };
@@ -572,7 +704,12 @@ export class DashboardComponent implements AfterViewInit {
       labels: years.map(String),
       datasets: [{
         label: 'Annual Revenue',
-        data: years.map(year => this.dataService.revenues().filter(r => new Date(r.date).getFullYear() === year).reduce((sum, r) => sum + (Number(r.gross_amount) || 0), 0)),
+        data: years.map(year => {
+          const val = this.dataService.revenues()
+            .filter(r => new Date(r.date).getFullYear() === year)
+            .reduce((sum, r) => sum + (Number(r.gross_amount) || 0), 0);
+          return Math.round(val);
+        }),
         backgroundColor: '#1e3a8a',
         borderRadius: 10
       }]

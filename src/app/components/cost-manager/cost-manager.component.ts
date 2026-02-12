@@ -63,6 +63,22 @@ export class CostManagerComponent {
     );
   });
 
+  // ✅ قائمة الـ Revenues المفلترة حسب القسم المختار
+  filteredRevenuesForDropdown = computed(() => {
+    let revenues = this.dataService.revenues();
+
+    // فلترة حسب القسم المختار
+    if (this.currentCost.product_id) {
+      revenues = revenues.filter(r => r.product_id === this.currentCost.product_id);
+    }
+
+    // ترتيب حسب التاريخ (الأحدث أولاً)
+    return revenues
+      .filter(r => r.order_number) // فقط الـ revenues التي لها order_number
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 50); // أول 50 فقط للأداء
+  });
+
   // --- Filter Logic ---
   filteredCosts = computed(() => {
     let data = this.dataService.costs();
@@ -85,15 +101,15 @@ export class CostManagerComponent {
       data = data.filter(c =>
         (c.description?.toLowerCase().includes(text)) ||
         (this.dataService.getProductName(c.product_id).toLowerCase().includes(text)) ||
-        (this.dataService.getClientName(c.client_id).toLowerCase().includes(text))
+        (this.dataService.getClientName(c.client_id).toLowerCase().includes(text)) ||
+        (this.getRevenueOrderNumber(c.revenue_id).toLowerCase().includes(text))
       );
     }
 
     return data.sort((a, b) => {
-        // ترتيب حسب التاريخ ثم حسب القسم لسهولة الإدخال
-        const dateDiff = new Date(b.date).getTime() - new Date(a.date).getTime();
-        if (dateDiff !== 0) return dateDiff;
-        return (a.product_id || 0) - (b.product_id || 0); // لمقارنة تقريبية
+      const dateDiff = new Date(b.date).getTime() - new Date(a.date).getTime();
+      if (dateDiff !== 0) return dateDiff;
+      return (a.product_id || 0) - (b.product_id || 0);
     });
   });
 
@@ -111,12 +127,25 @@ export class CostManagerComponent {
       amount: 0,
       description: '',
       product_id: undefined,
-      client_id: undefined
+      client_id: undefined,
+      revenue_id: undefined
     };
   }
 
   getMonthName(m: number) {
     return this.months.find(x => x.value === m)?.name || m;
+  }
+
+  // ✅ جلب رقم الطلب من revenue_id
+  getRevenueOrderNumber(revenueId: number | undefined): string {
+    if (!revenueId) return '-';
+    const revenue = this.dataService.revenues().find(r => r.id === revenueId);
+    return revenue?.order_number || '-';
+  }
+
+  // ✅ عند تغيير القسم - إعادة تعيين الـ revenue_id
+  onProductChange() {
+    this.currentCost.revenue_id = undefined;
   }
 
   // --- Actions ---
@@ -145,7 +174,6 @@ export class CostManagerComponent {
 
   // --- Generate Zero Costs Logic ---
   openGenerateModal() {
-    // تعيين الشهر الحالي كافتراضي
     const today = new Date();
     this.generateTargetYear = today.getFullYear();
     this.generateTargetMonth = today.getMonth() + 1;
@@ -164,16 +192,15 @@ export class CostManagerComponent {
     this.showGenerateModal = false;
 
     if (result.success) {
-        if(result.generated > 0) {
-            alert(`Success! Generated ${result.generated} records with 0 amount for ${this.getMonthName(this.generateTargetMonth)}.`);
-            // الانتقال للفلتر المختار لرؤية النتائج فوراً
-            this.filterYear.set(this.generateTargetYear);
-            this.filterMonth.set(this.generateTargetMonth);
-        } else {
-            alert('All departments already have cost records for this month.');
-        }
+      if (result.generated > 0) {
+        alert(`Success! Generated ${result.generated} records with 0 amount for ${this.getMonthName(this.generateTargetMonth)}.`);
+        this.filterYear.set(this.generateTargetYear);
+        this.filterMonth.set(this.generateTargetMonth);
+      } else {
+        alert('All departments already have cost records for this month.');
+      }
     } else {
-        alert('Error: ' + result.error);
+      alert('Error: ' + result.error);
     }
   }
 
@@ -183,6 +210,7 @@ export class CostManagerComponent {
       'Date': c.date,
       'Description': c.description,
       'Department': this.dataService.getProductName(c.product_id),
+      'Booking Order': this.getRevenueOrderNumber(c.revenue_id),
       'Client': this.dataService.getClientName(c.client_id),
       'Amount': c.amount,
       'Year': c.year,
@@ -192,12 +220,11 @@ export class CostManagerComponent {
     const ws: XLSX.WorkSheet = XLSX.utils.json_to_sheet(data);
     const wb: XLSX.WorkBook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Costs');
-    XLSX.writeFile(wb, `Costs_Export_${new Date().toISOString().slice(0,10)}.xlsx`);
+    XLSX.writeFile(wb, `Costs_Export_${new Date().toISOString().slice(0, 10)}.xlsx`);
   }
 
   // --- Save & Delete ---
   async save() {
-    // السماح بالقيمة 0 الآن لأننا قد نعدل السجلات المولدة
     if (this.currentCost.amount === undefined || this.currentCost.amount === null) {
       alert('Valid amount is required');
       return;
@@ -229,17 +256,13 @@ export class CostManagerComponent {
 
   async deleteCost() {
     if (!this.costToDelete?.id) return;
-    // نتأكد من وجود دالة الحذف في السيرفس أو نستدعيها مباشرة
-    // هنا سأفترض أنك أضفتها كما اتفقنا، أو سأستخدم الحذف المباشر هنا للأمان
     try {
-        const { error } = await this.dataService['supabase'].from('fact_cost').delete().eq('id', this.costToDelete.id);
-        if (!error) {
-            this.dataService.costs.update(v => v.filter(c => c.id !== this.costToDelete?.id));
-        } else {
-            alert('Error deleting: ' + error.message);
-        }
-    } catch(e: any) {
-        alert('Error: ' + e.message);
+      const result = await this.dataService.deleteCost(this.costToDelete.id);
+      if (!result.success) {
+        alert('Error deleting: ' + result.error);
+      }
+    } catch (e: any) {
+      alert('Error: ' + e.message);
     }
 
     this.showDeleteModal = false;

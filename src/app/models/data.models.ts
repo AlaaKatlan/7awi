@@ -79,6 +79,7 @@ export interface FactCost {
   amount: number;
   product_id?: number;
   client_id?: number;
+  revenue_id?: number;  // ✅ ربط بـ Booking Order (fact_revenue)
   description?: string;
 }
 

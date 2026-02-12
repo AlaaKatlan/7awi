@@ -95,6 +95,7 @@
           <th class="p-5">Date</th>
           <th class="p-5">Description</th>
           <th class="p-5">Department</th>
+          <th class="p-5">Booking Order</th>
           <th class="p-5">Client</th>
           <th class="p-5 text-right">Amount</th>
           <th class="p-5 text-center">Actions</th>
@@ -113,6 +114,16 @@
               <span class="bg-blue-50 text-[#1e3a8a] px-3 py-1 rounded-full text-[11px] font-black uppercase">
                 {{ dataService.getProductName(cost.product_id) }}
               </span>
+            </td>
+            <!-- ✅ عمود Booking Order جديد -->
+            <td class="p-5">
+              @if (cost.revenue_id) {
+                <span class="font-mono text-xs bg-purple-50 text-purple-700 px-2 py-1 rounded">
+                  {{ getRevenueOrderNumber(cost.revenue_id) }}
+                </span>
+              } @else {
+                <span class="text-slate-300 text-xs">—</span>
+              }
             </td>
             <td class="p-5 text-slate-600">
               {{ dataService.getClientName(cost.client_id) }}
@@ -133,7 +144,7 @@
           </tr>
         } @empty {
           <tr>
-            <td colspan="6" class="p-10 text-center text-slate-400 italic">
+            <td colspan="7" class="p-10 text-center text-slate-400 italic">
               No cost records found matching your criteria.
             </td>
           </tr>
@@ -143,9 +154,10 @@
   </div>
 </div>
 
+<!-- Add/Edit Modal -->
 @if (showModal) {
   <div class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-    <div class="bg-white p-8 rounded-[2rem] w-full max-w-lg shadow-2xl">
+    <div class="bg-white p-8 rounded-[2rem] w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
       <div class="flex justify-between items-center mb-6">
         <h3 class="font-black text-xl text-slate-800 uppercase tracking-tight">
           {{ isEditMode ? 'Update Cost' : 'New Cost' }}
@@ -161,14 +173,16 @@
           <input type="number" [(ngModel)]="currentCost.amount"
                  class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a] font-bold text-lg">
         </div>
+
         <div>
           <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Date *</label>
           <input type="date" [(ngModel)]="currentCost.date"
                  class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a]">
         </div>
+
         <div>
           <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Department</label>
-          <select [(ngModel)]="currentCost.product_id"
+          <select [(ngModel)]="currentCost.product_id" (ngModelChange)="onProductChange()"
                   class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a] cursor-pointer">
             <option [ngValue]="undefined">-- Select Department --</option>
             @for (prod of sortedProducts(); track prod.product_id) {
@@ -176,6 +190,27 @@
             }
           </select>
         </div>
+
+        <!-- ✅ Booking Order Dropdown جديد -->
+        <div class="border-t border-slate-100 pt-4 mt-4">
+          <h4 class="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-2">
+            <span class="material-icons text-sm">receipt_long</span> Link to Booking Order (Optional)
+          </h4>
+          <div>
+            <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Booking Order</label>
+            <select [(ngModel)]="currentCost.revenue_id"
+                    class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer">
+              <option [ngValue]="undefined">-- No Booking Order --</option>
+              @for (rev of filteredRevenuesForDropdown(); track rev.id) {
+                <option [ngValue]="rev.id">{{ rev.order_number }} - {{ rev.gross_amount | currency:'USD':'symbol':'1.0-0' }}</option>
+              }
+            </select>
+            <p class="text-[10px] text-slate-400 mt-1 italic">
+              Link this cost to a specific booking order for tracking
+            </p>
+          </div>
+        </div>
+
         <div>
           <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Client (Optional)</label>
           <select [(ngModel)]="currentCost.client_id"
@@ -186,6 +221,7 @@
             }
           </select>
         </div>
+
         <div>
           <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Description</label>
           <textarea [(ngModel)]="currentCost.description" rows="3"
@@ -211,6 +247,7 @@
   </div>
 }
 
+<!-- Generate Modal -->
 @if (showGenerateModal) {
   <div class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
     <div class="bg-white p-8 rounded-[2rem] w-full max-w-md shadow-2xl">
@@ -261,6 +298,7 @@
   </div>
 }
 
+<!-- Delete Confirmation Modal -->
 @if (showDeleteModal) {
   <div class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
     <div class="bg-white p-8 rounded-[2rem] w-full max-w-md shadow-2xl text-center">
