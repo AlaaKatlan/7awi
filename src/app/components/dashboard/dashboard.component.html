@@ -157,7 +157,7 @@
   </div>
 </div>
 
-<!-- Department Productivity -->
+<!-- Department Productivity (Per Person - الأصلي) -->
 <div class="lg:col-span-12 bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 mb-8">
    <div class="flex justify-between items-center mb-6">
      <h3 class="font-black text-slate-800 flex items-center gap-2 italic uppercase text-sm tracking-widest">
@@ -170,6 +170,43 @@
    </div>
    <p class="mt-4 text-[10px] text-slate-400 italic text-center">
      * Productivity = (Annual Department Revenue - Annual Salaries) / 12 Months / Total Staff in Department
+   </p>
+</div>
+
+<!-- ✅ شارت جديد: الإنتاجية السنوية للقسم مع فلتر -->
+<div class="lg:col-span-12 bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 mb-8">
+   <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+     <h3 class="font-black text-slate-800 flex items-center gap-2 italic uppercase text-sm tracking-widest">
+       <span class="w-2 h-6 bg-purple-500 rounded-full"></span> Annual Department Productivity
+     </h3>
+     
+     <!-- ✅ فلتر نوع الأقسام -->
+     <div class="flex items-center gap-4 bg-slate-50 p-3 rounded-xl border border-slate-200">
+       <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Filter:</span>
+       
+       <label class="flex items-center gap-2 cursor-pointer">
+         <input type="checkbox" 
+                [checked]="showRevenueDepartments()" 
+                (change)="showRevenueDepartments.set(!showRevenueDepartments()); onDeptFilterChange()"
+                class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+         <span class="text-xs font-bold text-blue-600">Revenue Departments</span>
+       </label>
+       
+       <label class="flex items-center gap-2 cursor-pointer">
+         <input type="checkbox" 
+                [checked]="showCostDepartments()" 
+                (change)="showCostDepartments.set(!showCostDepartments()); onDeptFilterChange()"
+                class="w-4 h-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500">
+         <span class="text-xs font-bold text-purple-600">Cost Departments</span>
+       </label>
+     </div>
+   </div>
+   
+   <div class="h-[400px]">
+     <canvas id="deptAnnualProductivityChart"></canvas>
+   </div>
+   <p class="mt-4 text-[10px] text-slate-400 italic text-center">
+     * Annual Department Productivity = Total Revenue - (Salaries + Operational Costs) = Net Profit
    </p>
 </div>
 

@@ -17,6 +17,10 @@ export class DashboardComponent implements AfterViewInit {
   charts: any = {};
   monthNames = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 
+  // ✅ فلتر لنوع الأقسام في شارت الإنتاجية
+  showRevenueDepartments = signal(true);
+  showCostDepartments = signal(false);
+
   yearsList = computed(() => {
     const dbYears = this.dataService.revenues().map(r => new Date(r.date).getFullYear());
     return Array.from(new Set([...dbYears, new Date().getFullYear()])).sort((a, b) => b - a);
@@ -96,17 +100,25 @@ export class DashboardComponent implements AfterViewInit {
       const totalCost = totalSalaries + totalOpCost;
 
       const profit = totalRev - totalCost;
-      const productivity = (empCount > 0 && monthsToCount > 0) ? (profit / monthsToCount / empCount) : 0;
+      
+      // ✅ الإنتاجية للفرد = (الإيراد - التكلفة) / عدد الأشهر / عدد الموظفين
+      const productivityPerPerson = (empCount > 0 && monthsToCount > 0) ? (profit / monthsToCount / empCount) : 0;
+      
+      // ✅ الإنتاجية السنوية للقسم = الإيراد - التكلفة (صافي الربح)
+      const annualDeptProductivity = profit;
 
       return {
         name: prod.product_name,
+        product_id: prod.product_id,
+        department_type: prod.department_type || 'Revenue', // ✅ نوع القسم
         empCount,
         revenue: Math.round(totalRev),
         salaries: Math.round(totalSalaries),
         opCost: Math.round(totalOpCost),
         totalCost: Math.round(totalCost),
         profit: Math.round(profit),
-        productivity: Math.round(productivity)
+        productivityPerPerson: Math.round(productivityPerPerson),
+        annualDeptProductivity: Math.round(annualDeptProductivity)
       };
     });
   });
@@ -191,6 +203,11 @@ export class DashboardComponent implements AfterViewInit {
     this.updateCharts();
   }
 
+  // ✅ دالة لتحديث شارت الإنتاجية عند تغيير الفلتر
+  onDeptFilterChange() {
+    this.updateProductivityChart();
+  }
+
   // ✅ Plugin لإظهار النسب المئوية داخل الـ Pie/Doughnut Charts
   private percentagePlugin = {
     id: 'percentagePlugin',
@@ -239,7 +256,12 @@ export class DashboardComponent implements AfterViewInit {
     } else if (Math.abs(value) >= 1000) {
       return (value / 1000).toFixed(0) + 'K';
     }
-    return value.toFixed(0);
+    return Math.round(value).toString();
+  }
+
+  // ✅ دالة تنسيق الأرقام للـ Tooltip - Integer فقط
+  private formatTooltipValue(value: number): string {
+    return '$' + Math.round(value).toLocaleString();
   }
 
   private initCharts() {
@@ -262,7 +284,7 @@ export class DashboardComponent implements AfterViewInit {
         plugins: {
           tooltip: {
             callbacks: {
-              label: (context: any) => `${context.dataset.label}: $${context.raw.toLocaleString()}`
+              label: (context: any) => `${context.dataset.label}: ${this.formatTooltipValue(context.raw)}`
             }
           }
         }
@@ -285,7 +307,7 @@ export class DashboardComponent implements AfterViewInit {
                 const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0);
                 const value = context.raw;
                 const percentage = ((value / total) * 100).toFixed(1);
-                return `${context.label}: $${value.toLocaleString()} (${percentage}%)`;
+                return `${context.label}: ${this.formatTooltipValue(value)} (${percentage}%)`;
               }
             }
           }
@@ -299,7 +321,14 @@ export class DashboardComponent implements AfterViewInit {
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { position: 'bottom' } },
+        plugins: {
+          legend: { position: 'bottom' },
+          tooltip: {
+            callbacks: {
+              label: (context: any) => `${context.dataset.label}: ${this.formatTooltipValue(context.raw)}`
+            }
+          }
+        },
         scales: {
           y: {
             ticks: {
@@ -316,6 +345,13 @@ export class DashboardComponent implements AfterViewInit {
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        plugins: {
+          tooltip: {
+            callbacks: {
+              label: (context: any) => `${context.dataset.label}: ${this.formatTooltipValue(context.raw)}`
+            }
+          }
+        },
         scales: {
           y: {
             ticks: {
@@ -341,7 +377,7 @@ export class DashboardComponent implements AfterViewInit {
                 const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0);
                 const value = context.raw;
                 const percentage = ((value / total) * 100).toFixed(1);
-                return `${context.label}: $${value.toLocaleString()} (${percentage}%)`;
+                return `${context.label}: ${this.formatTooltipValue(value)} (${percentage}%)`;
               }
             }
           }
@@ -359,7 +395,7 @@ export class DashboardComponent implements AfterViewInit {
         plugins: {
           tooltip: {
             callbacks: {
-              label: (context: any) => `Margin: ${context.raw.toFixed(1)}%`
+              label: (context: any) => `Margin: ${Math.round(context.raw)}%`
             }
           }
         }
@@ -372,6 +408,13 @@ export class DashboardComponent implements AfterViewInit {
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        plugins: {
+          tooltip: {
+            callbacks: {
+              label: (context: any) => `${context.dataset.label}: ${this.formatTooltipValue(context.raw)}`
+            }
+          }
+        },
         scales: {
           y: {
             ticks: {
@@ -382,14 +425,21 @@ export class DashboardComponent implements AfterViewInit {
       }
     });
 
-    // ✅ Department Financial Performance Analysis - مع Cost
+    // ✅ Department Financial Performance Analysis - Revenue, Salaries, Costs, Net Profit
     this.charts.productComparison = new Chart('productComparisonChart', {
       type: 'bar',
       data: this.getProductComparisonData(),
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { position: 'bottom' } },
+        plugins: {
+          legend: { position: 'bottom' },
+          tooltip: {
+            callbacks: {
+              label: (context: any) => `${context.dataset.label}: ${this.formatTooltipValue(context.raw)}`
+            }
+          }
+        },
         scales: {
           y: {
             ticks: {
@@ -416,7 +466,7 @@ export class DashboardComponent implements AfterViewInit {
                 const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0);
                 const value = context.raw;
                 const percentage = ((value / total) * 100).toFixed(1);
-                return `${context.label}: $${value.toLocaleString()} (${percentage}%)`;
+                return `${context.label}: ${this.formatTooltipValue(value)} (${percentage}%)`;
               }
             }
           }
@@ -424,13 +474,26 @@ export class DashboardComponent implements AfterViewInit {
       }
     });
 
+    // ✅ شارت الإنتاجية للفرد (الأصلي)
     this.charts.productivity = new Chart('productProductivityChart', {
       type: 'bar',
       data: this.getProductProductivityData(),
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { position: 'bottom' } },
+        plugins: {
+          legend: { position: 'bottom' },
+          tooltip: {
+            callbacks: {
+              label: (context: any) => {
+                if (context.dataset.label === 'Staff Count') {
+                  return `${context.dataset.label}: ${Math.round(context.raw)}`;
+                }
+                return `${context.dataset.label}: ${this.formatTooltipValue(context.raw)}`;
+              }
+            }
+          }
+        },
         scales: {
           y: { type: 'linear', position: 'left', title: { display: true, text: 'Staff Count' } },
           y1: {
@@ -438,6 +501,48 @@ export class DashboardComponent implements AfterViewInit {
             position: 'right',
             grid: { drawOnChartArea: false },
             title: { display: true, text: 'Productivity ($)' },
+            ticks: {
+              callback: (value: any) => '$' + this.formatNumber(value)
+            }
+          }
+        }
+      }
+    });
+
+    // ✅ شارت جديد: الإنتاجية السنوية للقسم
+    this.charts.deptAnnualProductivity = new Chart('deptAnnualProductivityChart', {
+      type: 'bar',
+      data: this.getDeptAnnualProductivityData(),
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom' },
+          tooltip: {
+            callbacks: {
+              label: (context: any) => {
+                if (context.dataset.label === 'Staff Count') {
+                  return `${context.dataset.label}: ${Math.round(context.raw)}`;
+                }
+                return `${context.dataset.label}: ${this.formatTooltipValue(context.raw)}`;
+              }
+            }
+          }
+        },
+        scales: {
+          y: { 
+            type: 'linear', 
+            position: 'left', 
+            title: { display: true, text: 'Staff Count' },
+            ticks: {
+              callback: (value: any) => Math.round(value).toString()
+            }
+          },
+          y1: {
+            type: 'linear',
+            position: 'right',
+            grid: { drawOnChartArea: false },
+            title: { display: true, text: 'Annual Productivity ($)' },
             ticks: {
               callback: (value: any) => '$' + this.formatNumber(value)
             }
@@ -493,6 +598,7 @@ export class DashboardComponent implements AfterViewInit {
       this.charts.salaryType.update();
     }
 
+    // ✅ تحديث شارت الإنتاجية للفرد
     if (this.charts.productivity) {
       this.charts.productivity.destroy();
       this.charts.productivity = new Chart('productProductivityChart', {
@@ -501,7 +607,19 @@ export class DashboardComponent implements AfterViewInit {
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          plugins: { legend: { position: 'bottom' } },
+          plugins: {
+            legend: { position: 'bottom' },
+            tooltip: {
+              callbacks: {
+                label: (context: any) => {
+                  if (context.dataset.label === 'Staff Count') {
+                    return `${context.dataset.label}: ${Math.round(context.raw)}`;
+                  }
+                  return `${context.dataset.label}: ${this.formatTooltipValue(context.raw)}`;
+                }
+              }
+            }
+          },
           scales: {
             y: { type: 'linear', position: 'left', title: { display: true, text: 'Staff Count' } },
             y1: {
@@ -509,6 +627,56 @@ export class DashboardComponent implements AfterViewInit {
               position: 'right',
               grid: { drawOnChartArea: false },
               title: { display: true, text: 'Productivity ($)' },
+              ticks: {
+                callback: (value: any) => '$' + this.formatNumber(value)
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // ✅ تحديث شارت الإنتاجية السنوية للقسم
+    this.updateProductivityChart();
+  }
+
+  // ✅ دالة منفصلة لتحديث شارت الإنتاجية السنوية للقسم
+  private updateProductivityChart() {
+    if (this.charts.deptAnnualProductivity) {
+      this.charts.deptAnnualProductivity.destroy();
+      this.charts.deptAnnualProductivity = new Chart('deptAnnualProductivityChart', {
+        type: 'bar',
+        data: this.getDeptAnnualProductivityData(),
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom' },
+            tooltip: {
+              callbacks: {
+                label: (context: any) => {
+                  if (context.dataset.label === 'Staff Count') {
+                    return `${context.dataset.label}: ${Math.round(context.raw)}`;
+                  }
+                  return `${context.dataset.label}: ${this.formatTooltipValue(context.raw)}`;
+                }
+              }
+            }
+          },
+          scales: {
+            y: { 
+              type: 'linear', 
+              position: 'left', 
+              title: { display: true, text: 'Staff Count' },
+              ticks: {
+                callback: (value: any) => Math.round(value).toString()
+              }
+            },
+            y1: {
+              type: 'linear',
+              position: 'right',
+              grid: { drawOnChartArea: false },
+              title: { display: true, text: 'Annual Productivity ($)' },
               ticks: {
                 callback: (value: any) => '$' + this.formatNumber(value)
               }
@@ -535,18 +703,68 @@ export class DashboardComponent implements AfterViewInit {
     };
   }
 
+  // ✅ شارت الإنتاجية للفرد (الأصلي)
   private getProductProductivityData() {
     const data = this.productStats().filter(d => d.empCount > 0).sort((a, b) => a.name.localeCompare(b.name));
     return {
       labels: data.map(d => d.name),
       datasets: [
         { label: 'Staff Count', data: data.map(d => d.empCount), backgroundColor: '#cbd5e1', yAxisID: 'y', order: 2 },
-        { label: 'Monthly Productivity ($)', data: data.map(d => d.productivity), type: 'line' as const, borderColor: '#1e3a8a', backgroundColor: '#1e3a8a', yAxisID: 'y1', tension: 0.4, pointRadius: 4, order: 1 }
+        { label: 'Monthly Productivity ($)', data: data.map(d => d.productivityPerPerson), type: 'line' as const, borderColor: '#1e3a8a', backgroundColor: '#1e3a8a', yAxisID: 'y1', tension: 0.4, pointRadius: 4, order: 1 }
       ]
     };
   }
 
-  // ✅ Department Financial Performance Analysis - مع Cost (رواتب + تكاليف تشغيلية)
+  // ✅ شارت جديد: الإنتاجية السنوية للقسم مع فلتر نوع القسم
+  private getDeptAnnualProductivityData() {
+    let data = this.productStats();
+
+    // ✅ فلترة حسب نوع القسم
+    if (this.showRevenueDepartments() && !this.showCostDepartments()) {
+      // فقط Revenue Departments
+      data = data.filter(d => d.department_type === 'Revenue');
+    } else if (!this.showRevenueDepartments() && this.showCostDepartments()) {
+      // فقط Cost Departments
+      data = data.filter(d => d.department_type === 'Cost');
+    } else if (this.showRevenueDepartments() && this.showCostDepartments()) {
+      // كلاهما
+      // لا نفلتر
+    } else {
+      // لا شيء مختار - نعرض Revenue فقط كافتراضي
+      data = data.filter(d => d.department_type === 'Revenue');
+    }
+
+    // فقط الأقسام التي لديها موظفين
+    data = data.filter(d => d.empCount > 0).sort((a, b) => a.name.localeCompare(b.name));
+
+    return {
+      labels: data.map(d => d.name),
+      datasets: [
+        { 
+          label: 'Staff Count', 
+          data: data.map(d => d.empCount), 
+          backgroundColor: '#cbd5e1', 
+          yAxisID: 'y', 
+          order: 2,
+          borderRadius: 4
+        },
+        { 
+          label: 'Annual Dept. Productivity ($)', 
+          data: data.map(d => d.annualDeptProductivity), 
+          type: 'line' as const, 
+          borderColor: '#8b5cf6', 
+          backgroundColor: '#8b5cf6', 
+          yAxisID: 'y1', 
+          tension: 0.4, 
+          pointRadius: 6,
+          pointBackgroundColor: data.map(d => d.annualDeptProductivity >= 0 ? '#10b981' : '#ef4444'),
+          order: 1 
+        }
+      ]
+    };
+  }
+
+  // ✅ Department Financial Performance Analysis - Revenue, Salaries, Costs, Net Profit
   private getProductComparisonData() {
     const data = this.productStats().filter(d => d.revenue > 0 || d.totalCost > 0).sort((a, b) => a.name.localeCompare(b.name));
     return {
@@ -554,7 +772,7 @@ export class DashboardComponent implements AfterViewInit {
       datasets: [
         { label: 'Revenue', data: data.map(d => d.revenue), backgroundColor: '#1e3a8a', borderRadius: 4 },
         { label: 'Salaries', data: data.map(d => d.salaries), backgroundColor: '#f59e0b', borderRadius: 4 },
-        { label: 'Op. Cost', data: data.map(d => d.opCost), backgroundColor: '#8b5cf6', borderRadius: 4 },
+        { label: 'Costs', data: data.map(d => d.opCost), backgroundColor: '#8b5cf6', borderRadius: 4 },
         {
           label: 'Net Profit',
           data: data.map(d => d.profit),
@@ -692,7 +910,7 @@ export class DashboardComponent implements AfterViewInit {
       labels: data.map(d => d.name),
       datasets: [{
         label: 'Margin %',
-        data: data.map(d => Math.round(d.margin * 10) / 10),
+        data: data.map(d => Math.round(d.margin)),
         backgroundColor: data.map(d => d.margin >= 0 ? '#10b981' : '#ef4444')
       }]
     };

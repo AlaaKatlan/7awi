@@ -32,6 +32,9 @@ export class CostManagerComponent {
   costToDelete: FactCost | null = null;
   currentCost: FactCost = this.getEmptyCost();
 
+  // ✅ Signal لتتبع القسم المختار في Modal (منفصل عن currentCost)
+  selectedProductIdForDropdown = signal<number | undefined>(undefined);
+
   // --- Generate Options ---
   generateTargetYear = new Date().getFullYear();
   generateTargetMonth = new Date().getMonth() + 1;
@@ -63,18 +66,19 @@ export class CostManagerComponent {
     );
   });
 
-  // ✅ قائمة الـ Revenues المفلترة حسب القسم المختار
+  // ✅ قائمة الـ Revenues المفلترة حسب القسم المختار - استخدام Signal منفصل
   filteredRevenuesForDropdown = computed(() => {
     let revenues = this.dataService.revenues();
+    const productId = this.selectedProductIdForDropdown();
 
-    // فلترة حسب القسم المختار
-    if (this.currentCost.product_id) {
-      revenues = revenues.filter(r => r.product_id === this.currentCost.product_id);
+    // فلترة حسب القسم المختار إذا وجد
+    if (productId) {
+      revenues = revenues.filter(r => r.product_id === productId);
     }
 
-    // ترتيب حسب التاريخ (الأحدث أولاً)
+    // ترتيب حسب التاريخ (الأحدث أولاً) + فقط التي لها order_number
     return revenues
-      .filter(r => r.order_number) // فقط الـ revenues التي لها order_number
+      .filter(r => r.order_number)
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .slice(0, 50); // أول 50 فقط للأداء
   });
@@ -143,8 +147,9 @@ export class CostManagerComponent {
     return revenue?.order_number || '-';
   }
 
-  // ✅ عند تغيير القسم - إعادة تعيين الـ revenue_id
+  // ✅ عند تغيير القسم - تحديث Signal وإعادة تعيين الـ revenue_id
   onProductChange() {
+    this.selectedProductIdForDropdown.set(this.currentCost.product_id);
     this.currentCost.revenue_id = undefined;
   }
 
@@ -152,19 +157,30 @@ export class CostManagerComponent {
   openModal() {
     this.isEditMode = false;
     this.currentCost = this.getEmptyCost();
+    
+    // ✅ تعيين المنتج الافتراضي وتحديث Signal
     const products = this.sortedProducts();
-    if (products.length > 0) this.currentCost.product_id = products[0].product_id;
+    if (products.length > 0) {
+      this.currentCost.product_id = products[0].product_id;
+      this.selectedProductIdForDropdown.set(products[0].product_id);
+    } else {
+      this.selectedProductIdForDropdown.set(undefined);
+    }
+    
     this.showModal = true;
   }
 
   editCost(cost: FactCost) {
     this.isEditMode = true;
     this.currentCost = { ...cost };
+    // ✅ تحديث Signal عند التعديل
+    this.selectedProductIdForDropdown.set(cost.product_id);
     this.showModal = true;
   }
 
   closeModal() {
     this.showModal = false;
+    this.selectedProductIdForDropdown.set(undefined);
   }
 
   confirmDelete(cost: FactCost) {

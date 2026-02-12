@@ -46,8 +46,8 @@ export interface FactRevenue {
   owner_id?: number;
   booking_order?: string;
   notes?: string;
-  start_date?: string | null;  // ✅ تاريخ بداية المشروع
-  end_date?: string | null;    // ✅ تاريخ نهاية المشروع
+  start_date?: string | null;
+  end_date?: string | null;
 }
 
 export interface FactPipeline {
@@ -79,7 +79,7 @@ export interface FactCost {
   amount: number;
   product_id?: number;
   client_id?: number;
-  revenue_id?: number;  // ✅ ربط بـ Booking Order (fact_revenue)
+  revenue_id?: number;
   description?: string;
 }
 
