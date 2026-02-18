@@ -55,7 +55,7 @@
     </div>
     <div class="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-rose-500">
       <h3 class="text-gray-400 text-sm font-medium uppercase">Total Costs (Filtered)</h3>
-      <p class="text-3xl font-black text-gray-800 mt-2">{{ totalCost() | currency:'USD ':'symbol':'1.0-0' }}</p>
+      <p class="text-3xl font-black text-gray-800 mt-2">{{ totalCost() | currency:'USD ':'symbol':'1.2-2' }}</p>
     </div>
   </div>
 
@@ -158,7 +158,7 @@
               {{ dataService.getClientName(cost.client_id) }}
             </td>
             <td class="p-5 text-right font-black" [class.text-gray-400]="cost.amount === 0" [class.text-rose-600]="cost.amount > 0">
-              {{ cost.amount | currency:'USD':'symbol':'1.0-0' }}
+              {{ cost.amount | currency:'USD':'symbol':'1.2-2' }}
             </td>
             <td class="p-5 text-center">
               <div class="flex items-center justify-center gap-2">
