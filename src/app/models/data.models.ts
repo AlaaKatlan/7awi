@@ -14,6 +14,25 @@ export interface DimClient {
   lead_id?: number;
   relationship_manager_id?: number;
   created_at?: string;
+
+  // ✅ CRM Fields
+  company_type?: 'Direct' | 'Agency';
+  first_contact_date?: string;
+  account_manager_id?: number;
+  poc_name?: string;
+  contact_email?: string;
+  contact_phone?: string;
+  status?: 'New Lead' | 'Attempted Contact' | 'Contacted' | 'Qualified' | 'Meeting Scheduled' | 'Proposal Out' | 'Follow Up' | 'Negotiation' | 'Verbal Commitment' | 'PO Received' | 'Closed Won' | 'Closed Lost' | 'On Hold';
+  lead_source?: 'Research' | 'Referral' | 'Database' | 'Website' | 'Inbound Inquiry' | 'Event' | 'Social Media';
+  industry?: 'Research' | 'Banking' | 'Automotive' | 'FMCG' | 'Real Estate' | 'Technology' | 'Healthcare' | 'Retail' | 'Others';
+  estimated_deal_value?: number;
+  expected_closing_date?: string;
+  notes?: string;
+  last_followup_date?: string;
+  next_action_date?: string;
+
+  // Legacy fields for compatibility
+  contact_person?: string;
 }
 
 export interface DimEmployee {
@@ -102,6 +121,6 @@ export interface UserProfile {
   id: string;
   email: string;
   full_name?: string;
-  role: 'admin' | 'manager' | 'viewer';
+  role: 'admin' | 'manager' | 'viewer'| 'viewer' | 'finance';
   created_at?: string;
 }

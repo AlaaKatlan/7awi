@@ -1,0 +1,651 @@
+<!-- ==================== LIST VIEW ==================== -->
+@if (currentView() === 'list') {
+<div class="p-6 bg-[#f8fafc] min-h-screen">
+
+  <!-- Stats Cards -->
+  <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
+    <div class="bg-white p-5 rounded-2xl shadow-sm border-l-4 border-[#1e3a8a]">
+      <h3 class="text-gray-400 text-xs font-bold uppercase">Total Clients</h3>
+      <p class="text-2xl font-black text-gray-800 mt-1">{{ totalClients() }}</p>
+    </div>
+    <div class="bg-white p-5 rounded-2xl shadow-sm border-l-4 border-blue-500">
+      <h3 class="text-gray-400 text-xs font-bold uppercase">New Leads</h3>
+      <p class="text-2xl font-black text-blue-600 mt-1">{{ newLeadsCount() }}</p>
+    </div>
+    <div class="bg-white p-5 rounded-2xl shadow-sm border-l-4 border-amber-500">
+      <h3 class="text-gray-400 text-xs font-bold uppercase">In Pipeline</h3>
+      <p class="text-2xl font-black text-amber-600 mt-1">{{ qualifiedCount() }}</p>
+    </div>
+    <div class="bg-white p-5 rounded-2xl shadow-sm border-l-4 border-emerald-500">
+      <h3 class="text-gray-400 text-xs font-bold uppercase">Closed Won</h3>
+      <p class="text-2xl font-black text-emerald-600 mt-1">{{ closedWonCount() }}</p>
+    </div>
+    <div class="bg-white p-5 rounded-2xl shadow-sm border-l-4 border-purple-500">
+      <h3 class="text-gray-400 text-xs font-bold uppercase">Pipeline Value</h3>
+      <p class="text-2xl font-black text-purple-600 mt-1">{{ formatCurrency(totalPipelineValue()) }}</p>
+    </div>
+  </div>
+
+  <!-- Filters & Actions -->
+  <div class="bg-white p-4 rounded-xl shadow-sm mb-6 border border-gray-100">
+    <div class="flex flex-wrap gap-4 items-end">
+      <div class="flex-1 min-w-[200px]">
+        <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Search</label>
+        <div class="relative">
+          <span class="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">search</span>
+          <input type="text" [ngModel]="searchText()" (ngModelChange)="searchText.set($event)"
+                 placeholder="Search company, contact, email..."
+                 class="w-full bg-slate-50 border-0 rounded-lg pl-10 pr-4 py-2.5 focus:ring-2 focus:ring-[#1e3a8a] outline-none text-sm">
+        </div>
+      </div>
+
+      <div class="w-36">
+        <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Status</label>
+        <select [ngModel]="filterStatus()" (ngModelChange)="filterStatus.set($event)"
+                class="w-full bg-slate-50 border-0 rounded-lg px-3 py-2.5 outline-none cursor-pointer text-sm">
+          <option value="ALL">All Status</option>
+          @for (status of statusOptions; track status) {
+            <option [value]="status">{{ status }}</option>
+          }
+        </select>
+      </div>
+
+      <div class="w-36">
+        <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Industry</label>
+        <select [ngModel]="filterIndustry()" (ngModelChange)="filterIndustry.set($event)"
+                class="w-full bg-slate-50 border-0 rounded-lg px-3 py-2.5 outline-none cursor-pointer text-sm">
+          <option value="ALL">All Industries</option>
+          @for (ind of industries; track ind) {
+            <option [value]="ind">{{ ind }}</option>
+          }
+        </select>
+      </div>
+
+      <div class="w-32">
+        <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Country</label>
+        <select [ngModel]="filterCountry()" (ngModelChange)="filterCountry.set($event)"
+                class="w-full bg-slate-50 border-0 rounded-lg px-3 py-2.5 outline-none cursor-pointer text-sm">
+          <option value="ALL">All</option>
+          @for (country of countries; track country) {
+            <option [value]="country">{{ country }}</option>
+          }
+        </select>
+      </div>
+
+      <button (click)="openAddForm()"
+              class="bg-[#1e3a8a] text-white px-6 py-2.5 rounded-lg font-bold shadow-md hover:bg-blue-900 transition flex items-center gap-2">
+        <span class="material-icons text-sm">add</span> Add Client
+      </button>
+    </div>
+  </div>
+
+  <!-- Clients Table -->
+  <div class="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100">
+    <div class="overflow-x-auto">
+      <table class="w-full text-left border-collapse">
+        <thead class="bg-slate-50 text-[10px] text-gray-400 font-black uppercase tracking-widest border-b border-slate-100">
+          <tr>
+            <th class="p-4">Company</th>
+            <th class="p-4">Contact</th>
+            <th class="p-4 text-center">Status</th>
+            <th class="p-4">Industry</th>
+            <th class="p-4 text-right">Deal Value</th>
+            <th class="p-4 text-center">Expected Close</th>
+            <th class="p-4">Account Manager</th>
+            <th class="p-4 text-center">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-50 text-sm">
+          @for (client of filteredClients(); track client.client_id) {
+            <tr class="hover:bg-blue-50/50 transition duration-150 cursor-pointer" (click)="editClient(client)">
+              <td class="p-4">
+                <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-sm">
+                    {{ client.client_name.charAt(0).toUpperCase() }}
+                  </div>
+                  <div>
+                    <span class="font-bold text-slate-800 block">{{ client.client_name }}</span>
+                    <span class="text-[10px] text-slate-400 font-medium">
+                      {{ client.company_type || 'Direct' }} • {{ client.country }}
+                    </span>
+                  </div>
+                </div>
+              </td>
+              <td class="p-4">
+                <div class="text-slate-700 font-medium">{{ client.poc_name || '-' }}</div>
+                <div class="text-[11px] text-slate-400">{{ client.contact_email || '' }}</div>
+              </td>
+              <td class="p-4 text-center">
+                <span [class]="getStatusClass(client.status)"
+                      class="px-2.5 py-1 rounded-full text-[10px] font-black uppercase whitespace-nowrap">
+                  {{ client.status || 'New Lead' }}
+                </span>
+              </td>
+              <td class="p-4">
+                <span class="text-slate-600 text-xs">{{ client.industry || '-' }}</span>
+              </td>
+              <td class="p-4 text-right">
+                <span class="font-bold text-slate-800">{{ formatCurrency(client.estimated_deal_value) }}</span>
+              </td>
+              <td class="p-4 text-center">
+                <span class="text-xs text-slate-500">{{ formatDate(client.expected_closing_date) }}</span>
+              </td>
+              <td class="p-4">
+                <span class="text-slate-600 text-xs">{{ dataService.getEmployeeName(client.account_manager_id) }}</span>
+              </td>
+              <td class="p-4 text-center" (click)="$event.stopPropagation()">
+                <div class="flex items-center justify-center gap-1">
+                  <button (click)="editClient(client)" class="text-slate-400 hover:text-[#1e3a8a] transition p-1.5 rounded-lg hover:bg-blue-50">
+                    <span class="material-icons text-base">edit</span>
+                  </button>
+                  <button (click)="confirmDelete(client)" class="text-slate-400 hover:text-red-500 transition p-1.5 rounded-lg hover:bg-red-50">
+                    <span class="material-icons text-base">delete</span>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="8" class="p-12 text-center">
+                <div class="flex flex-col items-center">
+                  <span class="material-icons text-6xl text-slate-200 mb-4">business</span>
+                  <p class="text-slate-400 italic">No clients found matching your criteria.</p>
+                  <button (click)="openAddForm()" class="mt-4 text-[#1e3a8a] font-bold hover:underline flex items-center gap-1">
+                    <span class="material-icons text-sm">add</span> Add your first client
+                  </button>
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+}
+
+<!-- ==================== FORM VIEW (Full Page) ==================== -->
+@if (currentView() === 'form') {
+<div class="min-h-screen bg-[#f8fafc]">
+
+  <!-- Header -->
+  <div class="bg-white border-b border-slate-200 sticky top-0 z-10">
+    <div class="max-w-6xl mx-auto px-6 py-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-4">
+          <button (click)="goBackToList()"
+                  class="p-2 rounded-xl hover:bg-slate-100 transition text-slate-500 hover:text-slate-700">
+            <span class="material-icons">arrow_back</span>
+          </button>
+          <div>
+            <h1 class="text-xl font-black text-slate-800">
+              {{ isEditMode ? 'Edit Client' : 'New Client' }}
+            </h1>
+            <p class="text-sm text-slate-400">{{ isEditMode ? 'Update client information' : 'Add a new client to your CRM' }}</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <button (click)="goBackToList()"
+                  class="px-5 py-2.5 text-slate-500 font-bold text-sm hover:bg-slate-100 rounded-xl transition">
+            Cancel
+          </button>
+          <button (click)="save()"
+                  [disabled]="!currentClient.client_name || saving()"
+                  class="px-6 py-2.5 bg-[#1e3a8a] text-white font-bold text-sm rounded-xl shadow-lg hover:bg-blue-900 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+            @if (saving()) {
+              <span class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
+            }
+            <span>{{ isEditMode ? 'Update Client' : 'Save Client' }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Form Content -->
+  <div class="max-w-6xl mx-auto px-6 py-8">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+      <!-- Main Form Column -->
+      <div class="lg:col-span-2 space-y-6">
+
+        <!-- Section: Company Information -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+          <div class="bg-gradient-to-r from-slate-800 to-slate-700 px-6 py-4">
+            <h2 class="text-white font-bold flex items-center gap-2">
+              <span class="material-icons text-lg">business</span>
+              Company Information
+            </h2>
+          </div>
+          <div class="p-6 space-y-5">
+
+            <!-- Company Name -->
+            <div>
+              <label class="block text-[11px] font-black text-slate-500 uppercase mb-2">
+                Company Name <span class="text-red-500">*</span>
+              </label>
+              <input type="text" [(ngModel)]="currentClient.client_name"
+                     class="w-full p-3.5 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-[#1e3a8a] focus:border-transparent text-slate-800 font-medium transition"
+                     placeholder="Enter company name">
+            </div>
+
+            <!-- Company Type & Country -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-[11px] font-black text-slate-500 uppercase mb-2">Company Type</label>
+                <select [(ngModel)]="currentClient.company_type"
+                        class="w-full p-3.5 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-[#1e3a8a] cursor-pointer transition">
+                  @for (type of companyTypes; track type) {
+                    <option [value]="type">{{ type }}</option>
+                  }
+                </select>
+              </div>
+              <div>
+                <label class="block text-[11px] font-black text-slate-500 uppercase mb-2">Country / Region</label>
+                <select [(ngModel)]="currentClient.country"
+                        class="w-full p-3.5 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-[#1e3a8a] cursor-pointer transition">
+                  @for (country of countries; track country) {
+                    <option [value]="country">{{ country }}</option>
+                  }
+                </select>
+              </div>
+            </div>
+
+            <!-- Industry & Department -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-[11px] font-black text-slate-500 uppercase mb-2">Industry</label>
+                <select [(ngModel)]="currentClient.industry"
+                        class="w-full p-3.5 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-[#1e3a8a] cursor-pointer transition">
+                  <option [ngValue]="undefined">— Select Industry —</option>
+                  @for (ind of industries; track ind) {
+                    <option [value]="ind">{{ ind }}</option>
+                  }
+                </select>
+              </div>
+              <div>
+                <label class="block text-[11px] font-black text-slate-500 uppercase mb-2">Department</label>
+                <select [(ngModel)]="currentClient.product_id"
+                        class="w-full p-3.5 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-[#1e3a8a] cursor-pointer transition">
+                  <option [ngValue]="undefined">— Select Department —</option>
+                  @for (prod of sortedProducts(); track prod.product_id) {
+                    <option [ngValue]="prod.product_id">{{ prod.product_name }}</option>
+                  }
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section: Contact Information -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+          <div class="bg-gradient-to-r from-blue-600 to-blue-500 px-6 py-4">
+            <h2 class="text-white font-bold flex items-center gap-2">
+              <span class="material-icons text-lg">person</span>
+              Point of Contact (POC)
+            </h2>
+          </div>
+          <div class="p-6 space-y-5">
+
+            <!-- POC Name -->
+            <div>
+              <label class="block text-[11px] font-black text-slate-500 uppercase mb-2">Contact Name</label>
+              <input type="text" [(ngModel)]="currentClient.poc_name"
+                     class="w-full p-3.5 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                     placeholder="Full name of primary contact">
+            </div>
+
+            <!-- Email & Phone -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-[11px] font-black text-slate-500 uppercase mb-2">Email Address</label>
+                <div class="relative">
+                  <span class="material-icons absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-lg">email</span>
+                  <input type="email" [(ngModel)]="currentClient.contact_email"
+                         class="w-full p-3.5 pl-11 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 transition"
+                         placeholder="email@company.com">
+                </div>
+              </div>
+              <div>
+                <label class="block text-[11px] font-black text-slate-500 uppercase mb-2">Phone Number</label>
+                <div class="relative">
+                  <span class="material-icons absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-lg">phone</span>
+                  <input type="tel" [(ngModel)]="currentClient.contact_phone"
+                         class="w-full p-3.5 pl-11 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 transition"
+                         placeholder="+971 50 000 0000">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ✅ NEW Section: Assigned Team -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+          <div class="bg-gradient-to-r from-indigo-600 to-indigo-500 px-6 py-4">
+            <h2 class="text-white font-bold flex items-center gap-2">
+              <span class="material-icons text-lg">groups</span>
+              Assigned Team
+            </h2>
+          </div>
+          <div class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <!-- Lead -->
+              <div class="bg-gradient-to-br from-slate-50 to-slate-100 p-5 rounded-xl border border-slate-200">
+                <div class="flex items-center gap-3 mb-4">
+                  <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center">
+                    <span class="material-icons text-indigo-600">person_outline</span>
+                  </div>
+                  <div>
+                    <label class="block text-[11px] font-black text-slate-500 uppercase">Lead</label>
+                    <p class="text-[10px] text-slate-400">Primary sales contact</p>
+                  </div>
+                </div>
+                <select [(ngModel)]="currentClient.lead_id"
+                        class="w-full p-3 bg-white rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer transition text-sm font-medium">
+                  <option [ngValue]="undefined">— Select Lead —</option>
+                  @for (emp of sortedEmployees(); track emp.employee_id) {
+                    <option [ngValue]="emp.employee_id">{{ emp.name }}</option>
+                  }
+                </select>
+              </div>
+
+              <!-- Relationship Manager -->
+              <div class="bg-gradient-to-br from-slate-50 to-slate-100 p-5 rounded-xl border border-slate-200">
+                <div class="flex items-center gap-3 mb-4">
+                  <div class="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
+                    <span class="material-icons text-purple-600">support_agent</span>
+                  </div>
+                  <div>
+                    <label class="block text-[11px] font-black text-slate-500 uppercase">Relationship Manager</label>
+                    <p class="text-[10px] text-slate-400">Account relationship owner</p>
+                  </div>
+                </div>
+                <select [(ngModel)]="currentClient.relationship_manager_id"
+                        class="w-full p-3 bg-white rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer transition text-sm font-medium">
+                  <option [ngValue]="undefined">— Select RM —</option>
+                  @for (emp of sortedEmployees(); track emp.employee_id) {
+                    <option [ngValue]="emp.employee_id">{{ emp.name }}</option>
+                  }
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section: Deal Information -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+          <div class="bg-gradient-to-r from-emerald-600 to-emerald-500 px-6 py-4">
+            <h2 class="text-white font-bold flex items-center gap-2">
+              <span class="material-icons text-lg">payments</span>
+              Deal Information
+            </h2>
+          </div>
+          <div class="p-6 space-y-5">
+
+            <!-- Estimated Value & Expected Close -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-[11px] font-black text-slate-500 uppercase mb-2">Estimated Deal Value (USD)</label>
+                <div class="relative">
+                  <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
+                  <input type="number" [(ngModel)]="currentClient.estimated_deal_value"
+                         class="w-full p-3.5 pl-8 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-slate-800 transition"
+                         placeholder="0">
+                </div>
+              </div>
+              <div>
+                <label class="block text-[11px] font-black text-slate-500 uppercase mb-2">Expected Closing Date</label>
+                <div class="relative">
+                  <span class="material-icons absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-lg pointer-events-none z-10">event</span>
+                  <input type="text" id="expected_closing_date"
+                         class="w-full p-3.5 pl-11 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-emerald-500 transition cursor-pointer"
+                         placeholder="Select date" readonly>
+                </div>
+              </div>
+            </div>
+
+            <!-- Notes -->
+            <div>
+              <label class="block text-[11px] font-black text-slate-500 uppercase mb-2">Notes</label>
+              <textarea [(ngModel)]="currentClient.notes" rows="4"
+                        class="w-full p-3.5 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-emerald-500 resize-none transition"
+                        placeholder="Additional notes about this client or deal..."></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sidebar Column -->
+      <div class="space-y-6">
+
+        <!-- Section: Sales Status -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+          <div class="bg-gradient-to-r from-purple-600 to-purple-500 px-6 py-4">
+            <h2 class="text-white font-bold flex items-center gap-2">
+              <span class="material-icons text-lg">timeline</span>
+              Sales Pipeline
+            </h2>
+          </div>
+          <div class="p-6 space-y-5">
+
+            <!-- Status -->
+            <div>
+              <label class="block text-[11px] font-black text-slate-500 uppercase mb-2">Current Status</label>
+              <select [(ngModel)]="currentClient.status"
+                      class="w-full p-3.5 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer font-medium transition">
+                @for (status of statusOptions; track status) {
+                  <option [value]="status">{{ status }}</option>
+                }
+              </select>
+            </div>
+
+            <!-- Lead Source -->
+            <div>
+              <label class="block text-[11px] font-black text-slate-500 uppercase mb-2">Lead Source</label>
+              <select [(ngModel)]="currentClient.lead_source"
+                      class="w-full p-3.5 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer transition">
+                <option [ngValue]="undefined">— Select Source —</option>
+                @for (source of leadSources; track source) {
+                  <option [value]="source">{{ source }}</option>
+                }
+              </select>
+            </div>
+
+            <!-- Account Manager -->
+            <div>
+              <label class="block text-[11px] font-black text-slate-500 uppercase mb-2">Account Manager</label>
+              <select [(ngModel)]="currentClient.account_manager_id"
+                      class="w-full p-3.5 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer transition">
+                <option [ngValue]="undefined">— Select Manager —</option>
+                @for (emp of sortedEmployees(); track emp.employee_id) {
+                  <option [ngValue]="emp.employee_id">{{ emp.name }}</option>
+                }
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section: Key Dates with Flatpickr -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+          <div class="bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-4">
+            <h2 class="text-white font-bold flex items-center gap-2">
+              <span class="material-icons text-lg">calendar_month</span>
+              Key Dates
+            </h2>
+          </div>
+          <div class="p-6 space-y-5">
+
+            <!-- First Contact Date -->
+            <div>
+              <label class="block text-[11px] font-black text-slate-500 uppercase mb-2">First Contact Date</label>
+              <div class="relative group">
+                <span class="material-icons absolute left-3.5 top-1/2 -translate-y-1/2 text-amber-500 text-lg pointer-events-none z-10">event_available</span>
+                <input type="text" id="first_contact_date"
+                       class="w-full p-3.5 pl-11 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200 outline-none focus:ring-2 focus:ring-amber-500 transition cursor-pointer font-medium text-slate-700"
+                       placeholder="Select date" readonly>
+              </div>
+            </div>
+
+            <!-- Last Follow-up -->
+            <div>
+              <label class="block text-[11px] font-black text-slate-500 uppercase mb-2">Last Follow-up</label>
+              <div class="relative">
+                <span class="material-icons absolute left-3.5 top-1/2 -translate-y-1/2 text-blue-500 text-lg pointer-events-none z-10">history</span>
+                <input type="text" id="last_followup_date"
+                       class="w-full p-3.5 pl-11 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 outline-none focus:ring-2 focus:ring-blue-500 transition cursor-pointer font-medium text-slate-700"
+                       placeholder="Select date" readonly>
+              </div>
+            </div>
+
+            <!-- Next Action Date -->
+            <div>
+              <label class="block text-[11px] font-black text-slate-500 uppercase mb-2">Next Action Date</label>
+              <div class="relative">
+                <span class="material-icons absolute left-3.5 top-1/2 -translate-y-1/2 text-emerald-500 text-lg pointer-events-none z-10">upcoming</span>
+                <input type="text" id="next_action_date"
+                       class="w-full p-3.5 pl-11 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl border border-emerald-200 outline-none focus:ring-2 focus:ring-emerald-500 transition cursor-pointer font-medium text-slate-700"
+                       placeholder="Select date" readonly>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Tips -->
+        <!-- <div class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-5 border border-slate-200">
+          <div class="flex items-start gap-3">
+            <div class="p-2 bg-white rounded-xl shadow-sm">
+              <span class="material-icons text-[#1e3a8a]">lightbulb</span>
+            </div>
+            <div>
+              <h4 class="font-bold text-slate-700 text-sm mb-1">Quick Tips</h4>
+              <ul class="text-xs text-slate-500 space-y-1">
+                <li>• Keep the status updated for accurate pipeline tracking</li>
+                <li>• Set next action dates to stay on top of follow-ups</li>
+                <li>• Add deal values for revenue forecasting</li>
+              </ul>
+            </div>
+          </div>
+        </div> -->
+      </div>
+    </div>
+  </div>
+</div>
+}
+
+<!-- Delete Confirmation Modal -->
+@if (showDeleteModal) {
+  <div class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div class="bg-white p-8 rounded-[2rem] w-full max-w-md shadow-2xl text-center animate-fade-in">
+      <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+        <span class="material-icons text-red-500 text-3xl">warning</span>
+      </div>
+      <h3 class="font-black text-xl text-slate-800 mb-2">Delete Client?</h3>
+      <p class="text-slate-500 mb-6">
+        Are you sure you want to delete <strong>{{ clientToDelete?.client_name }}</strong>?
+        This action cannot be undone.
+      </p>
+      <div class="flex gap-3">
+        <button (click)="showDeleteModal = false"
+                class="flex-1 py-3 text-slate-400 font-bold uppercase text-[10px] tracking-widest hover:bg-slate-50 rounded-xl transition">
+          Cancel
+        </button>
+        <button (click)="deleteClient()"
+                class="flex-1 py-3 bg-red-500 text-white rounded-xl font-black shadow-lg uppercase text-[10px] tracking-widest hover:bg-red-600 transition">
+          Delete
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Custom Flatpickr Styles -->
+<style>
+  /* Enhanced Flatpickr Calendar Styling */
+  :global(.flatpickr-calendar) {
+    border-radius: 16px !important;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+    border: 1px solid #e2e8f0 !important;
+    font-family: 'Inter', sans-serif !important;
+    padding: 8px !important;
+  }
+
+  :global(.flatpickr-months) {
+    padding: 8px 0 !important;
+  }
+
+  :global(.flatpickr-current-month) {
+    font-weight: 700 !important;
+    font-size: 1.1rem !important;
+  }
+
+  :global(.flatpickr-day) {
+    border-radius: 10px !important;
+    font-weight: 500 !important;
+    transition: all 0.2s ease !important;
+  }
+
+  :global(.flatpickr-day:hover) {
+    background: #e0e7ff !important;
+    border-color: #e0e7ff !important;
+  }
+
+  :global(.flatpickr-day.selected) {
+    background: #1e3a8a !important;
+    border-color: #1e3a8a !important;
+    font-weight: 700 !important;
+  }
+
+  :global(.flatpickr-day.today) {
+    border-color: #1e3a8a !important;
+    color: #1e3a8a !important;
+    font-weight: 700 !important;
+  }
+
+  :global(.flatpickr-day.today:hover) {
+    background: #1e3a8a !important;
+    color: white !important;
+  }
+
+  :global(.flatpickr-weekday) {
+    color: #64748b !important;
+    font-weight: 700 !important;
+    font-size: 0.75rem !important;
+  }
+
+  :global(.flatpickr-monthDropdown-months),
+  :global(.numInputWrapper) {
+    font-weight: 600 !important;
+  }
+
+  :global(.flatpickr-prev-month),
+  :global(.flatpickr-next-month) {
+    padding: 8px !important;
+  }
+
+  :global(.flatpickr-prev-month:hover svg),
+  :global(.flatpickr-next-month:hover svg) {
+    fill: #1e3a8a !important;
+  }
+
+  /* Alt input styling */
+  :global(.flatpickr-input.active + .form-control),
+  :global(input.flatpickr-input[readonly]) {
+    cursor: pointer !important;
+  }
+
+  :global(.flatpickr-calendar.open) {
+    animation: fadeInDown 0.2s ease-out;
+  }
+
+  @keyframes fadeInDown {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+</style>

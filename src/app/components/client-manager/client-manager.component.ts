@@ -1,263 +1,31 @@
-import { Component, inject, computed, signal } from '@angular/core';
+import { Component, inject, computed, signal, AfterViewInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DataService } from '../../services/data.service';
 import { DimClient } from '../../models/data.models';
 
+// Declare flatpickr for TypeScript
+declare var flatpickr: any;
+
 @Component({
   selector: 'app-client-manager',
   standalone: true,
   imports: [CommonModule, FormsModule],
-  template: `
-    <div class="p-6 bg-[#f8fafc] min-h-screen">
-      <!-- Stats Cards -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div class="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-[#1e3a8a]">
-          <h3 class="text-gray-400 text-sm font-medium uppercase">Total Clients</h3>
-          <p class="text-3xl font-black text-gray-800 mt-2">{{ filteredClients().length }}</p>
-        </div>
-        <div class="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-emerald-500">
-          <h3 class="text-gray-400 text-sm font-medium uppercase">UAE Clients</h3>
-          <p class="text-3xl font-black text-gray-800 mt-2">{{ uaeClientsCount() }}</p>
-        </div>
-        <div class="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-amber-500">
-          <h3 class="text-gray-400 text-sm font-medium uppercase">KSA Clients</h3>
-          <p class="text-3xl font-black text-gray-800 mt-2">{{ ksaClientsCount() }}</p>
-        </div>
-      </div>
-
-      <!-- Filters & Actions -->
-      <div class="bg-white p-4 rounded-xl shadow-sm mb-6 border border-gray-100 flex flex-wrap gap-4 items-end">
-        <div class="flex-1 min-w-[250px]">
-          <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Search Clients</label>
-          <input type="text" [ngModel]="searchText()" (ngModelChange)="searchText.set($event)"
-                 placeholder="Search by name..."
-                 class="w-full bg-slate-50 border-0 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#1e3a8a] outline-none">
-        </div>
-
-        <div class="w-40">
-          <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Country</label>
-          <select [ngModel]="filterCountry()" (ngModelChange)="filterCountry.set($event)"
-                  class="w-full bg-slate-50 border-0 rounded-lg px-3 py-2 outline-none cursor-pointer">
-            <option value="ALL">All Countries</option>
-            @for (country of sortedCountries(); track country) {
-              <option [value]="country">{{ country }}</option>
-            }
-          </select>
-        </div>
-        <div class="w-48">
-          <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Department</label>
-          <select [ngModel]="filterProduct()" (ngModelChange)="filterProduct.set($event)"
-                  class="w-full bg-slate-50 border-0 rounded-lg px-3 py-2 outline-none cursor-pointer">
-            <option [ngValue]="null">All Departments</option>
-            @for (prod of sortedProducts(); track prod.product_id) {
-              <option [ngValue]="prod.product_id">{{ prod.product_name }}</option>
-            }
-          </select>
-        </div>
-        <button (click)="openModal()"
-                class="bg-[#1e3a8a] text-white px-6 py-2 rounded-lg font-bold shadow-md hover:bg-blue-900 transition flex items-center gap-2">
-          <span class="material-icons text-sm">add</span> Add Client
-        </button>
-      </div>
-
-      <!-- Clients Table -->
-      <div class="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100">
-        <table class="w-full text-left border-collapse">
-          <thead class="bg-slate-50 text-[10px] text-gray-400 font-black uppercase tracking-widest border-b border-slate-100">
-            <tr>
-              <th class="p-5">Client Name</th>
-              <th class="p-5 text-center">Country</th>
-              <th class="p-5">Department</th>
-              <th class="p-5">Lead</th>
-              <th class="p-5">Relationship Manager</th>
-              <th class="p-5 text-center">Actions</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-50 text-sm">
-            @for (client of filteredClients(); track client.client_id) {
-              <tr class="hover:bg-blue-50/50 transition duration-150">
-                <td class="p-5">
-                  <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white font-bold text-sm">
-                      {{ client.client_name.charAt(0).toUpperCase() }}
-                    </div>
-                    <span class="font-bold text-slate-700">{{ client.client_name }}</span>
-                  </div>
-                </td>
-                <td class="p-5 text-center">
-                  <span [class]="client.country === 'UAE' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'"
-                        class="px-3 py-1 rounded-full text-[10px] font-black uppercase">
-                    {{ client.country }}
-                  </span>
-                </td>
-                <td class="p-5">
-                  @if (client.product_id) {
-                    <span class="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-[10px] font-black uppercase">
-                      {{ dataService.getProductName(client.product_id) }}
-                    </span>
-                  } @else {
-                    <span class="text-slate-300">—</span>
-                  }
-                </td>
-                <td class="p-5 text-slate-600">
-                  {{ dataService.getEmployeeName(client.lead_id) }}
-                </td>
-                <td class="p-5 text-slate-600">
-                  {{ dataService.getEmployeeName(client.relationship_manager_id) }}
-                </td>
-                <td class="p-5 text-center">
-                  <div class="flex items-center justify-center gap-2">
-                    <button (click)="editClient(client)" class="text-slate-400 hover:text-[#1e3a8a] transition p-2">
-                      <span class="material-icons text-base">edit</span>
-                    </button>
-                    <button (click)="confirmDelete(client)" class="text-slate-400 hover:text-red-500 transition p-2">
-                      <span class="material-icons text-base">delete</span>
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            } @empty {
-              <tr>
-                <td colspan="6" class="p-10 text-center text-slate-400 italic">No clients found matching your criteria.</td>
-              </tr>
-            }
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Add/Edit Modal -->
-    @if (showModal) {
-      <div class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div class="bg-white p-8 rounded-[2rem] w-full max-w-lg shadow-2xl">
-          <div class="flex justify-between items-center mb-6">
-            <h3 class="font-black text-xl text-slate-800 uppercase tracking-tight">
-              {{ isEditMode ? 'Update Client' : 'New Client' }}
-            </h3>
-            <button (click)="closeModal()" class="text-slate-400 hover:text-rose-500 transition">
-              <span class="material-icons">close</span>
-            </button>
-          </div>
-
-          <div class="space-y-4">
-            <!-- Client Name -->
-            <div>
-              <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Client / Company Name *</label>
-              <input type="text" [(ngModel)]="currentClient.client_name"
-                     class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a]"
-                     placeholder="Enter client name">
-            </div>
-
-            <!-- Country -->
-            <div>
-              <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Country *</label>
-              <select [(ngModel)]="currentClient.country"
-                      class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a] cursor-pointer">
-                @for (country of sortedCountries(); track country) {
-                  <option [value]="country">{{ country }}</option>
-                }
-              </select>
-            </div>
-
-            <!-- Product -->
-            <div>
-              <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Department</label>
-              <select [(ngModel)]="currentClient.product_id"
-                      class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a] cursor-pointer">
-                <option [ngValue]="null">— Select Department —</option>
-                @for (prod of sortedProducts(); track prod.product_id) {
-                  <option [ngValue]="prod.product_id">{{ prod.product_name }}</option>
-                }
-              </select>
-            </div>
-
-            <!-- Lead & Relationship Manager -->
-            <div class="border-t border-slate-100 pt-4 mt-4">
-              <h4 class="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-2">
-                <span class="material-icons text-sm">person</span> Assigned Team
-              </h4>
-
-              <div class="grid grid-cols-2 gap-4">
-                <div>
-                  <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Lead</label>
-                  <select [(ngModel)]="currentClient.lead_id"
-                          class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a] cursor-pointer">
-                    <option [ngValue]="null">— Select Lead —</option>
-                    @for (emp of sortedEmployees(); track emp.employee_id) {
-                      <option [ngValue]="emp.employee_id">{{ emp.name }}</option>
-                    }
-                  </select>
-                </div>
-
-                <div>
-                  <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Relationship Manager</label>
-                  <select [(ngModel)]="currentClient.relationship_manager_id"
-                          class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a] cursor-pointer">
-                    <option [ngValue]="null">— Select RM —</option>
-                    @for (emp of sortedEmployees(); track emp.employee_id) {
-                      <option [ngValue]="emp.employee_id">{{ emp.name }}</option>
-                    }
-                  </select>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="mt-8 flex gap-3">
-            <button (click)="closeModal()"
-                    class="flex-1 py-3 text-slate-400 font-bold uppercase text-[10px] tracking-widest hover:bg-slate-50 rounded-xl transition">
-              Cancel
-            </button>
-            <button (click)="save()" [disabled]="!currentClient.client_name || saving()"
-                    class="flex-[2] py-3 bg-[#1e3a8a] text-white rounded-xl font-black shadow-lg shadow-blue-200 uppercase text-[10px] tracking-widest hover:bg-blue-900 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-              @if (saving()) {
-                <span class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
-                <span>Saving...</span>
-              } @else {
-                <span>{{ isEditMode ? 'Update Client' : 'Save Client' }}</span>
-              }
-            </button>
-          </div>
-        </div>
-      </div>
-    }
-
-    <!-- Delete Confirmation Modal -->
-    @if (showDeleteModal) {
-      <div class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div class="bg-white p-8 rounded-[2rem] w-full max-w-md shadow-2xl text-center">
-          <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <span class="material-icons text-red-500 text-3xl">warning</span>
-          </div>
-          <h3 class="font-black text-xl text-slate-800 mb-2">Delete Client?</h3>
-          <p class="text-slate-500 mb-6">
-            Are you sure you want to delete <strong>{{ clientToDelete?.client_name }}</strong>?
-            This action cannot be undone.
-          </p>
-          <div class="flex gap-3">
-            <button (click)="showDeleteModal = false"
-                    class="flex-1 py-3 text-slate-400 font-bold uppercase text-[10px] tracking-widest hover:bg-slate-50 rounded-xl transition">
-              Cancel
-            </button>
-            <button (click)="deleteClient()"
-                    class="flex-1 py-3 bg-red-500 text-white rounded-xl font-black shadow-lg uppercase text-[10px] tracking-widest hover:bg-red-600 transition">
-              Delete
-            </button>
-          </div>
-        </div>
-      </div>
-    }
-  `
+  templateUrl: './client-manager.component.html'
 })
-export class ClientManagerComponent {
+export class ClientManagerComponent implements AfterViewInit, OnDestroy {
   dataService = inject(DataService);
 
+  // View State
+  currentView = signal<'list' | 'form'>('list');
+  
+  // Filters
   searchText = signal('');
   filterCountry = signal('ALL');
+  filterStatus = signal('ALL');
+  filterIndustry = signal('ALL');
   saving = signal(false);
 
-  showModal = false;
   showDeleteModal = false;
   isEditMode = false;
   clientToDelete: DimClient | null = null;
@@ -265,14 +33,61 @@ export class ClientManagerComponent {
 
   currentClient: DimClient = this.getEmptyClient();
 
-  // Computed: الموظفين مرتبين أبجدياً
+  // Flatpickr instances
+  private flatpickrInstances: any[] = [];
+
+  // Dropdown Options
+  companyTypes = ['Direct', 'Agency'];
+  
+  statusOptions = [
+    'New Lead',
+    'Attempted Contact',
+    'Contacted',
+    'Qualified',
+    'Meeting Scheduled',
+    'Proposal Out',
+    'Follow Up',
+    'Negotiation',
+    'Verbal Commitment',
+    'PO Received',
+    'Closed Won',
+    'Closed Lost',
+    'On Hold'
+  ];
+
+  leadSources = [
+    'Research',
+    'Referral',
+    'Database',
+    'Website',
+    'Inbound Inquiry',
+    'Event',
+    'Social Media'
+  ];
+
+  industries = [
+    'Research',
+    'Banking',
+    'Automotive',
+    'FMCG',
+    'Real Estate',
+    'Technology',
+    'Healthcare',
+    'Retail',
+    'Others'
+  ];
+
+  countries = ['UAE', 'KSA', 'JOR', 'SYR', 'EGY', 'QAT', 'KWT', 'BHR', 'OMN', 'Other'];
+
+  // Computed: Active employees sorted alphabetically
   sortedEmployees = computed(() => {
-    return this.dataService.employees().filter(e => !e.end_date).slice().sort((a, b) =>
-      a.name.localeCompare(b.name)
-    );
+    return this.dataService.employees()
+      .filter(e => !e.end_date)
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name));
   });
 
-  // Computed: المنتجات/الأقسام مرتبة أبجدياً مع Other في النهاية
+  // Computed: Products sorted alphabetically
   sortedProducts = computed(() => {
     return this.dataService.products().slice().sort((a, b) => {
       if (a.product_name.toLowerCase() === 'others') return 1;
@@ -281,74 +96,168 @@ export class ClientManagerComponent {
     });
   });
 
-  // Computed: الدول مرتبة أبجدياً مع Other في النهاية
-  sortedCountries = computed(() => {
-    const countries = ['JOR', 'KSA', 'SYR', 'UAE'];
-    return countries.sort((a, b) => {
-      if (a.toLowerCase() === 'other') return 1;
-      if (b.toLowerCase() === 'other') return -1;
-      return a.localeCompare(b);
-    });
-  });
-
+  // Computed: Filtered clients
   filteredClients = computed(() => {
     let data = this.dataService.clients();
 
-    // فلتر الدولة
     if (this.filterCountry() !== 'ALL') {
       data = data.filter(c => c.country === this.filterCountry());
     }
-    // فلتر المنتج
+    
+    if (this.filterStatus() !== 'ALL') {
+      data = data.filter(c => c.status === this.filterStatus());
+    }
+    
+    if (this.filterIndustry() !== 'ALL') {
+      data = data.filter(c => c.industry === this.filterIndustry());
+    }
+    
     if (this.filterProduct() !== null) {
       data = data.filter(c => c.product_id === this.filterProduct());
     }
-    // البحث
+    
     const text = this.searchText().toLowerCase();
     if (text) {
       data = data.filter(c =>
-        c.client_name.toLowerCase().includes(text)
+        c.client_name.toLowerCase().includes(text) ||
+        c.poc_name?.toLowerCase().includes(text) ||
+        c.contact_email?.toLowerCase().includes(text)
       );
     }
 
-    // الترتيب الأبجدي
     return data.sort((a, b) => a.client_name.localeCompare(b.client_name));
   });
 
-  uaeClientsCount = computed(() => this.dataService.clients().filter(c => c.country === 'UAE').length);
-  ksaClientsCount = computed(() => this.dataService.clients().filter(c => c.country === 'KSA').length);
+  // Stats
+  totalClients = computed(() => this.dataService.clients().length);
+  newLeadsCount = computed(() => this.dataService.clients().filter(c => c.status === 'New Lead').length);
+  qualifiedCount = computed(() => this.dataService.clients().filter(c => c.status === 'Qualified' || c.status === 'Meeting Scheduled' || c.status === 'Proposal Out').length);
+  closedWonCount = computed(() => this.dataService.clients().filter(c => c.status === 'Closed Won').length);
+  totalPipelineValue = computed(() => {
+    return this.dataService.clients()
+      .filter(c => c.status !== 'Closed Won' && c.status !== 'Closed Lost')
+      .reduce((sum, c) => sum + (c.estimated_deal_value || 0), 0);
+  });
+
+  ngAfterViewInit() {
+    this.loadFlatpickrStyles();
+  }
+
+  ngOnDestroy() {
+    this.destroyFlatpickrInstances();
+  }
+
+  private loadFlatpickrStyles() {
+    if (!document.getElementById('flatpickr-css')) {
+      const link = document.createElement('link');
+      link.id = 'flatpickr-css';
+      link.rel = 'stylesheet';
+      link.href = 'https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css';
+      document.head.appendChild(link);
+    }
+
+    if (!document.getElementById('flatpickr-js')) {
+      const script = document.createElement('script');
+      script.id = 'flatpickr-js';
+      script.src = 'https://cdn.jsdelivr.net/npm/flatpickr';
+      script.onload = () => {
+        if (this.currentView() === 'form') {
+          this.initializeFlatpickr();
+        }
+      };
+      document.head.appendChild(script);
+    }
+  }
+
+  private initializeFlatpickr() {
+    this.destroyFlatpickrInstances();
+
+    setTimeout(() => {
+      if (typeof flatpickr === 'undefined') return;
+
+      const config = {
+        dateFormat: 'Y-m-d',
+        altInput: true,
+        altFormat: 'F j, Y',
+        animate: true,
+        disableMobile: true,
+        wrap: false
+      };
+
+      const dateInputs = [
+        { id: 'first_contact_date', field: 'first_contact_date' },
+        { id: 'last_followup_date', field: 'last_followup_date' },
+        { id: 'next_action_date', field: 'next_action_date' },
+        { id: 'expected_closing_date', field: 'expected_closing_date' }
+      ];
+
+      dateInputs.forEach(input => {
+        const el = document.getElementById(input.id);
+        if (el) {
+          const instance = flatpickr(el, {
+            ...config,
+            defaultDate: (this.currentClient as any)[input.field] || null,
+            onChange: (selectedDates: Date[], dateStr: string) => {
+              (this.currentClient as any)[input.field] = dateStr || null;
+            }
+          });
+          this.flatpickrInstances.push(instance);
+        }
+      });
+    }, 150);
+  }
+
+  private destroyFlatpickrInstances() {
+    this.flatpickrInstances.forEach(instance => {
+      if (instance && instance.destroy) {
+        instance.destroy();
+      }
+    });
+    this.flatpickrInstances = [];
+  }
 
   getEmptyClient(): DimClient {
     return {
       client_id: 0,
       client_name: '',
       country: 'UAE',
+      company_type: 'Direct',
+      first_contact_date: new Date().toISOString().split('T')[0],
+      status: 'New Lead',
+      lead_source: undefined,
+      industry: undefined,
+      poc_name: '',
+      contact_email: '',
+      contact_phone: '',
+      account_manager_id: undefined,
       product_id: undefined,
+      estimated_deal_value: undefined,
+      expected_closing_date: undefined,
+      notes: '',
+      last_followup_date: undefined,
+      next_action_date: undefined,
       lead_id: undefined,
       relationship_manager_id: undefined
     };
   }
 
-  openModal() {
+  openAddForm() {
     this.isEditMode = false;
     this.currentClient = this.getEmptyClient();
-    this.showModal = true;
+    this.currentView.set('form');
+    setTimeout(() => this.initializeFlatpickr(), 250);
   }
 
   editClient(client: DimClient) {
     this.isEditMode = true;
-    this.currentClient = {
-      client_id: client.client_id,
-      client_name: client.client_name,
-      country: client.country,
-      product_id: client.product_id || undefined,
-      lead_id: client.lead_id || undefined,
-      relationship_manager_id: client.relationship_manager_id || undefined
-    };
-    this.showModal = true;
+    this.currentClient = { ...client };
+    this.currentView.set('form');
+    setTimeout(() => this.initializeFlatpickr(), 250);
   }
 
-  closeModal() {
-    this.showModal = false;
+  goBackToList() {
+    this.destroyFlatpickrInstances();
+    this.currentView.set('list');
     this.currentClient = this.getEmptyClient();
   }
 
@@ -357,9 +266,50 @@ export class ClientManagerComponent {
     this.showDeleteModal = true;
   }
 
+  getStatusClass(status: string | undefined): string {
+    if (!status) return 'bg-slate-100 text-slate-600';
+    
+    const statusClasses: Record<string, string> = {
+      'New Lead': 'bg-blue-50 text-blue-700',
+      'Attempted Contact': 'bg-indigo-50 text-indigo-700',
+      'Contacted': 'bg-cyan-50 text-cyan-700',
+      'Qualified': 'bg-emerald-50 text-emerald-700',
+      'Meeting Scheduled': 'bg-purple-50 text-purple-700',
+      'Proposal Out': 'bg-amber-50 text-amber-700',
+      'Follow Up': 'bg-orange-50 text-orange-700',
+      'Negotiation': 'bg-pink-50 text-pink-700',
+      'Verbal Commitment': 'bg-lime-50 text-lime-700',
+      'PO Received': 'bg-teal-50 text-teal-700',
+      'Closed Won': 'bg-green-100 text-green-800',
+      'Closed Lost': 'bg-red-50 text-red-700',
+      'On Hold': 'bg-slate-100 text-slate-600'
+    };
+    
+    return statusClasses[status] || 'bg-slate-100 text-slate-600';
+  }
+
+  formatCurrency(value: number | undefined): string {
+    if (!value) return '-';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(value);
+  }
+
+  formatDate(dateStr: string | undefined): string {
+    if (!dateStr) return '-';
+    return new Date(dateStr).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  }
+
   async save() {
-    if (!this.currentClient.client_name.trim()) {
-      alert('Client Name is required');
+    if (!this.currentClient.client_name?.trim()) {
+      alert('Company Name is required');
       return;
     }
 
@@ -369,12 +319,24 @@ export class ClientManagerComponent {
       const payload: any = {
         client_name: this.currentClient.client_name.trim(),
         country: this.currentClient.country,
-        contact_person: '',
-        contact_email: '',
-        contact_phone: '',
+        company_type: this.currentClient.company_type || null,
+        first_contact_date: this.currentClient.first_contact_date || null,
+        account_manager_id: this.currentClient.account_manager_id ? Number(this.currentClient.account_manager_id) : null,
+        poc_name: this.currentClient.poc_name || null,
+        contact_email: this.currentClient.contact_email || null,
+        contact_phone: this.currentClient.contact_phone || null,
+        status: this.currentClient.status || 'New Lead',
+        lead_source: this.currentClient.lead_source || null,
+        industry: this.currentClient.industry || null,
         product_id: this.currentClient.product_id ? Number(this.currentClient.product_id) : null,
+        estimated_deal_value: this.currentClient.estimated_deal_value ? Number(this.currentClient.estimated_deal_value) : null,
+        expected_closing_date: this.currentClient.expected_closing_date || null,
+        notes: this.currentClient.notes || null,
+        last_followup_date: this.currentClient.last_followup_date || null,
+        next_action_date: this.currentClient.next_action_date || null,
         lead_id: this.currentClient.lead_id ? Number(this.currentClient.lead_id) : null,
-        relationship_manager_id: this.currentClient.relationship_manager_id ? Number(this.currentClient.relationship_manager_id) : null
+        relationship_manager_id: this.currentClient.relationship_manager_id ? Number(this.currentClient.relationship_manager_id) : null,
+        contact_person: this.currentClient.poc_name || ''
       };
 
       let result;
@@ -386,7 +348,7 @@ export class ClientManagerComponent {
       }
 
       if (result.success) {
-        this.closeModal();
+        this.goBackToList();
       } else {
         console.error('Save error:', result.error);
         alert('Failed to save: ' + result.error);

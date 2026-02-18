@@ -20,6 +20,7 @@ export class AuthService {
   isAuthenticated = computed(() => !!this.currentUser());
   isAdmin = computed(() => this.userProfile()?.role === 'admin');
   isManager = computed(() => ['admin', 'manager'].includes(this.userProfile()?.role || ''));
+  isFinance = computed(() => ['finance'].includes(this.userProfile()?.role || ''));
 
   constructor() {
     this.supabase = createClient(environment.supabaseUrl, environment.supabaseKey, {

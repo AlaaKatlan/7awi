@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DataService } from '../../services/data.service';
 import { AuthService } from '../../services/auth.service';
+// ... imports (كما هي)
 import { DashboardComponent } from '../dashboard/dashboard.component';
 import { RevenueManagerComponent } from '../revenue-manager/revenue-manager.component';
 import { PipelineManagerComponent } from '../pipeline-manager/pipeline-manager.component';
@@ -16,44 +17,28 @@ import { SalaryManagerComponent } from '../salary-manager/salary-manager.compone
   selector: 'app-main-layout',
   standalone: true,
   imports: [
-    CommonModule,
-    FormsModule,
-    DashboardComponent,
-    RevenueManagerComponent,
-    PipelineManagerComponent,
-    TargetManagerComponent,
-    CostManagerComponent,
-    ClientManagerComponent,
-    EmployeeManagerComponent,
-    SalaryManagerComponent
+    CommonModule, FormsModule, DashboardComponent, RevenueManagerComponent,
+    PipelineManagerComponent, TargetManagerComponent, CostManagerComponent,
+    ClientManagerComponent, EmployeeManagerComponent, SalaryManagerComponent
   ],
   template: `
     <div class="flex h-screen bg-surface font-sans text-slate-800">
 
-      <aside
-        [class.sidebar-collapsed]="!sidebarOpen"
-        class="sidebar bg-white shadow-xl flex flex-col z-20 border-r border-gray-100 transition-all duration-300">
+      <aside [class.sidebar-collapsed]="!sidebarOpen"
+             class="sidebar bg-white shadow-xl flex flex-col z-20 border-r border-gray-100 transition-all duration-300">
 
         <div class="h-24 flex items-center justify-center border-b border-gray-100 p-4">
-          <img
-            *ngIf="sidebarOpen"
-            src="assets/7awi_Logo.jpg"
-            alt="7awi Logo"
-            class="max-h-16 w-auto object-contain transition-opacity duration-300">
-          <span
-            *ngIf="!sidebarOpen"
-            class="material-icons text-hawy-blue text-3xl">
-            business
-          </span>
+          <img *ngIf="sidebarOpen" src="assets/7awi_Logo.jpg" alt="7awi Logo" class="max-h-16 w-auto object-contain transition-opacity duration-300">
+          <span *ngIf="!sidebarOpen" class="material-icons text-hawy-blue text-3xl">business</span>
         </div>
 
         <nav class="flex-1 p-4 space-y-1 mt-4 overflow-y-auto">
+
           <button (click)="activeTab = 'dashboard'"
-              [class]="activeTab === 'dashboard' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
-              [title]="!sidebarOpen ? 'Dashboard' : ''"
-              class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
-              <span class="material-icons" [class.mr-3]="sidebarOpen">dashboard</span>
-              <span *ngIf="sidebarOpen">Dashboard</span>
+                  [class]="activeTab === 'dashboard' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
+                  class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
+            <span class="material-icons" [class.mr-3]="sidebarOpen">dashboard</span>
+            <span *ngIf="sidebarOpen">Dashboard</span>
           </button>
 
           <div *ngIf="sidebarOpen" class="pt-4 pb-2">
@@ -61,66 +46,62 @@ import { SalaryManagerComponent } from '../salary-manager/salary-manager.compone
           </div>
 
           <button (click)="activeTab = 'revenue'"
-              [class]="activeTab === 'revenue' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
-              [title]="!sidebarOpen ? 'Revenue' : ''"
-              class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
-              <span class="material-icons" [class.mr-3]="sidebarOpen">attach_money</span>
-              <span *ngIf="sidebarOpen">BO / Revenue</span>
+                  [class]="activeTab === 'revenue' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
+                  class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
+            <span class="material-icons" [class.mr-3]="sidebarOpen">attach_money</span>
+            <span *ngIf="sidebarOpen">BO / Revenue</span>
           </button>
 
           <button (click)="activeTab = 'pipeline'"
-              [class]="activeTab === 'pipeline' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
-              [title]="!sidebarOpen ? 'Pipeline' : ''"
-              class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
-              <span class="material-icons" [class.mr-3]="sidebarOpen">insights</span>
-              <span *ngIf="sidebarOpen">Pipeline</span>
+                  [class]="activeTab === 'pipeline' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
+                  class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
+            <span class="material-icons" [class.mr-3]="sidebarOpen">insights</span>
+            <span *ngIf="sidebarOpen">Pipeline</span>
           </button>
 
           <button (click)="activeTab = 'target'"
-              [class]="activeTab === 'target' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
-              [title]="!sidebarOpen ? 'Targets' : ''"
-              class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
-              <span class="material-icons" [class.mr-3]="sidebarOpen">flag</span>
-              <span *ngIf="sidebarOpen">Targets</span>
+                  [class]="activeTab === 'target' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
+                  class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
+            <span class="material-icons" [class.mr-3]="sidebarOpen">flag</span>
+            <span *ngIf="sidebarOpen">Targets</span>
           </button>
 
           <button (click)="activeTab = 'cost'"
-              [class]="activeTab === 'cost' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
-              [title]="!sidebarOpen ? 'Costs' : ''"
-              class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
-              <span class="material-icons" [class.mr-3]="sidebarOpen">money_off</span>
-              <span *ngIf="sidebarOpen">Costs</span>
+                  [class]="activeTab === 'cost' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
+                  class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
+            <span class="material-icons" [class.mr-3]="sidebarOpen">money_off</span>
+            <span *ngIf="sidebarOpen">Costs</span>
           </button>
 
-          <ng-container *ngIf="authService.isAdmin()">
+          <ng-container *ngIf="authService.isAdmin() || authService.isFinance()">
             <div *ngIf="sidebarOpen" class="pt-4 pb-2">
               <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">People</span>
             </div>
 
             <button (click)="activeTab = 'clients'"
-                [class]="activeTab === 'clients' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
-                [title]="!sidebarOpen ? 'Clients' : ''"
-                class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
-                <span class="material-icons" [class.mr-3]="sidebarOpen">business</span>
-                <span *ngIf="sidebarOpen">Clients</span>
+                    [class]="activeTab === 'clients' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
+                    class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
+              <span class="material-icons" [class.mr-3]="sidebarOpen">business</span>
+              <span *ngIf="sidebarOpen">Clients</span>
             </button>
 
-            <button (click)="activeTab = 'employees'"
-                [class]="activeTab === 'employees' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
-                [title]="!sidebarOpen ? 'Employees' : ''"
-                class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
-                <span class="material-icons" [class.mr-3]="sidebarOpen">people</span>
-                <span *ngIf="sidebarOpen">Employees</span>
+            <button *ngIf="authService.isAdmin()"
+                    (click)="activeTab = 'employees'"
+                    [class]="activeTab === 'employees' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
+                    class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
+              <span class="material-icons" [class.mr-3]="sidebarOpen">people</span>
+              <span *ngIf="sidebarOpen">Employees</span>
             </button>
 
-            <button (click)="activeTab = 'salaries'"
-                [class]="activeTab === 'salaries' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
-                [title]="!sidebarOpen ? 'Salaries' : ''"
-                class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
-                <span class="material-icons" [class.mr-3]="sidebarOpen">account_balance_wallet</span>
-                <span *ngIf="sidebarOpen">Salaries</span>
+            <button *ngIf="authService.isAdmin()"
+                    (click)="activeTab = 'salaries'"
+                    [class]="activeTab === 'salaries' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
+                    class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
+              <span class="material-icons" [class.mr-3]="sidebarOpen">account_balance_wallet</span>
+              <span *ngIf="sidebarOpen">Salaries</span>
             </button>
           </ng-container>
+
         </nav>
 
         <div class="p-4 border-t border-gray-100">
@@ -138,7 +119,6 @@ import { SalaryManagerComponent } from '../salary-manager/salary-manager.compone
             </div>
           </div>
           <button (click)="logout()"
-                  [title]="!sidebarOpen ? 'Logout' : ''"
                   class="w-full flex items-center justify-center gap-2 px-4 py-2 text-rose-500 hover:bg-rose-50 rounded-xl transition font-medium border border-transparent hover:border-rose-100">
             <span class="material-icons text-sm">logout</span>
             <span *ngIf="sidebarOpen">Logout</span>
@@ -146,13 +126,10 @@ import { SalaryManagerComponent } from '../salary-manager/salary-manager.compone
         </div>
       </aside>
 
-      <button
-        (click)="toggleSidebar()"
-        class="fixed top-6 z-30 bg-hawy-blue text-white p-[5px] rounded-r-xl shadow-lg hover:bg-hawy-dark transition-all duration-300"
-        [style.left]="sidebarOpen ? '256px' : '72px'">
-        <span class="material-icons text-xl">
-          {{ sidebarOpen ? 'chevron_left' : 'chevron_right' }}
-        </span>
+      <button (click)="toggleSidebar()"
+              class="fixed top-6 z-30 bg-hawy-blue text-white p-[5px] rounded-r-xl shadow-lg hover:bg-hawy-dark transition-all duration-300"
+              [style.left]="sidebarOpen ? '256px' : '72px'">
+        <span class="material-icons text-xl">{{ sidebarOpen ? 'chevron_left' : 'chevron_right' }}</span>
       </button>
 
       <main class="flex-1 overflow-auto p-8 relative transition-all duration-300">
@@ -161,7 +138,6 @@ import { SalaryManagerComponent } from '../salary-manager/salary-manager.compone
                 <h1 class="text-3xl font-black text-gray-800 capitalize tracking-tight">{{ getPageTitle() }}</h1>
                 <p class="text-gray-500 font-medium text-sm mt-1">7awi Financial System</p>
              </div>
-
              <button (click)="showProfileModal.set(true)"
                      class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition text-slate-600 font-bold text-xs uppercase tracking-wider">
                <span class="material-icons text-hawy-blue">manage_accounts</span>
@@ -175,8 +151,9 @@ import { SalaryManagerComponent } from '../salary-manager/salary-manager.compone
             @case ('pipeline') { <app-pipeline-manager></app-pipeline-manager> }
             @case ('target') { <app-target-manager></app-target-manager> }
             @case ('cost') { <app-cost-manager></app-cost-manager> }
+
             @case ('clients') {
-              @if (authService.isAdmin()) {
+              @if (authService.isAdmin() || authService.isFinance()) {
                 <app-client-manager></app-client-manager>
               } @else {
                 <div class="bg-white rounded-2xl p-12 text-center shadow-sm">
@@ -186,6 +163,7 @@ import { SalaryManagerComponent } from '../salary-manager/salary-manager.compone
                 </div>
               }
             }
+
             @case ('employees') {
               @if (authService.isAdmin()) {
                 <app-employee-manager></app-employee-manager>
@@ -197,6 +175,7 @@ import { SalaryManagerComponent } from '../salary-manager/salary-manager.compone
                 </div>
               }
             }
+
             @case ('salaries') {
               @if (authService.isAdmin()) {
                 <app-salary-manager></app-salary-manager>
@@ -219,7 +198,6 @@ import { SalaryManagerComponent } from '../salary-manager/salary-manager.compone
               <span class="material-icons">close</span>
             </button>
           </div>
-
           <div class="space-y-6">
             <div class="bg-slate-50 p-6 rounded-3xl border border-slate-100">
               <div class="mb-4">
@@ -231,14 +209,12 @@ import { SalaryManagerComponent } from '../salary-manager/salary-manager.compone
                 <div class="font-black text-slate-700">{{ currentUser()?.email }}</div>
               </div>
             </div>
-
             <div class="space-y-4">
               <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Change Password</label>
               <input [(ngModel)]="newPassValue" type="password" placeholder="New Password"
                      class="w-full p-4 bg-slate-50 rounded-2xl border-0 outline-none font-bold focus:ring-2 focus:ring-hawy-blue">
               <input [(ngModel)]="confirmPassValue" type="password" placeholder="Confirm Password"
                      class="w-full p-4 bg-slate-50 rounded-2xl border-0 outline-none font-bold focus:ring-2 focus:ring-hawy-blue">
-
               <button (click)="handleUpdatePassword()"
                       [disabled]="!newPassValue || isUpdatingPassword()"
                       class="w-full py-4 bg-hawy-blue text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg hover:bg-hawy-dark transition-all flex justify-center items-center gap-2">
@@ -253,21 +229,10 @@ import { SalaryManagerComponent } from '../salary-manager/salary-manager.compone
     </div>
   `,
   styles: [`
-    .sidebar {
-      width: 256px;
-    }
-
-    .sidebar-collapsed {
-      width: 72px;
-    }
-
-    .sidebar-collapsed nav button span:not(.material-icons) {
-      display: none;
-    }
-
-    .sidebar-collapsed nav button {
-      justify-content: center;
-    }
+    .sidebar { width: 256px; }
+    .sidebar-collapsed { width: 72px; }
+    .sidebar-collapsed nav button span:not(.material-icons) { display: none; }
+    .sidebar-collapsed nav button { justify-content: center; }
   `]
 })
 export class MainLayoutComponent {
@@ -277,11 +242,8 @@ export class MainLayoutComponent {
   dataService = inject(DataService);
   authService = inject(AuthService);
 
-  // Signals for Modal State
   showProfileModal = signal(false);
   isUpdatingPassword = signal(false);
-
-  // Properties for ngModel
   newPassValue = '';
   confirmPassValue = '';
 
@@ -294,9 +256,7 @@ export class MainLayoutComponent {
     });
   }
 
-  toggleSidebar() {
-    this.sidebarOpen = !this.sidebarOpen;
-  }
+  toggleSidebar() { this.sidebarOpen = !this.sidebarOpen; }
 
   getPageTitle(): string {
     const titles: Record<string, string> = {
@@ -321,20 +281,16 @@ export class MainLayoutComponent {
     return name.charAt(0).toUpperCase();
   }
 
-  async logout() {
-    await this.authService.signOut();
-  }
+  async logout() { await this.authService.signOut(); }
 
   async handleUpdatePassword() {
     if (this.newPassValue !== this.confirmPassValue) {
       alert('Passwords do not match!');
       return;
     }
-
     this.isUpdatingPassword.set(true);
     const result = await this.authService.updatePassword(this.newPassValue);
     this.isUpdatingPassword.set(false);
-
     if (result.success) {
       alert('Password updated successfully!');
       this.closeProfileModal();
