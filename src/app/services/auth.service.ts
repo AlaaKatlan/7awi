@@ -21,6 +21,7 @@ export class AuthService {
   isAdmin = computed(() => this.userProfile()?.role === 'admin');
   isManager = computed(() => ['admin', 'manager'].includes(this.userProfile()?.role || ''));
   isFinance = computed(() => ['finance'].includes(this.userProfile()?.role || ''));
+  isSales = computed(() => ['sales'].includes(this.userProfile()?.role || ''));
 
   constructor() {
     this.supabase = createClient(environment.supabaseUrl, environment.supabaseKey, {
@@ -41,7 +42,7 @@ export class AuthService {
   private async initializeAuth() {
     this.loading.set(true);
     try {
-      // 1. محاولة استعادة الجلسة
+      // 1. Try to restore session
       const { data, error } = await this.supabase.auth.getSession();
 
       if (error) {
@@ -51,11 +52,11 @@ export class AuthService {
       if (data?.session) {
         this.session.set(data.session);
         this.currentUser.set(data.session.user);
-        // جلب البروفايل فوراً
+        // Load profile immediately
         await this.loadUserProfile(data.session.user.id);
       }
 
-      // 2. الاستماع للتغييرات
+      // 2. Listen for auth changes
       this.supabase.auth.onAuthStateChange(async (event, session) => {
         if (session) {
           this.session.set(session);
@@ -72,7 +73,7 @@ export class AuthService {
       });
 
     } catch (error: any) {
-      // ✅ الحل هنا: تجاهل خطأ AbortError لأنه لا يؤثر على العمل
+      // Ignore AbortError as it doesn't affect functionality
       if (error.name === 'AbortError' || error.message?.includes('AbortError')) {
         console.warn('Supabase fetch aborted (safe to ignore in dev mode).');
       } else {
@@ -94,7 +95,7 @@ export class AuthService {
       if (data) {
         this.userProfile.set(data as UserProfile);
       } else {
-        // Fallback: إنشاء بروفايل محلي مؤقت
+        // Fallback: Create temporary local profile
         const user = this.currentUser();
         if (user) {
           this.userProfile.set({

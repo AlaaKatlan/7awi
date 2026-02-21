@@ -3,7 +3,8 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { AuthService } from './auth.service';
 import {
   DimClient, DimProduct, DimEmployee,
-  FactPipeline, FactRevenue, FactTarget, FactCost, FactSalary
+  FactPipeline, FactRevenue, FactTarget, FactCost, FactSalary,
+  FactRevenueMonthly
 } from '../models/data.models';
 
 @Injectable({
@@ -31,7 +32,7 @@ export class DataService {
   }
 
   // =============================================
-  // ✅ دالة مساعدة لجلب جميع الصفوف بدون حد الـ 1000
+  // Helper: Fetch all rows with pagination
   // =============================================
   private async fetchAllRows<T>(
     tableName: string,
@@ -62,8 +63,6 @@ export class DataService {
       if (data && data.length > 0) {
         allData = [...allData, ...data];
         from += PAGE_SIZE;
-
-        // إذا كان عدد الصفوف أقل من PAGE_SIZE، فلا يوجد المزيد
         if (data.length < PAGE_SIZE) {
           hasMore = false;
         }
@@ -96,7 +95,7 @@ export class DataService {
     }
   }
 
-  // --- Fetch Methods (Updated with pagination) ---
+  // --- Fetch Methods ---
   async fetchProducts() {
     const data = await this.fetchAllRows<DimProduct>('dim_product');
     if (data) this.products.set(data);
@@ -136,28 +135,10 @@ export class DataService {
     const data = await this.fetchAllRows<FactSalary>('fact_salary', { column: 'year', ascending: false });
     if (data) this.salaries.set(data);
   }
-  // =============================================
-  // BULK INSERT (For Excel Import)
-  // =============================================
-  async addCostsBulk(items: Partial<FactCost>[]) {
-    // Supabase يسمح بإدخال مصفوفة من الكائنات دفعة واحدة
-    const { data, error } = await this.supabase
-      .from('fact_cost')
-      .insert(items)
-      .select();
 
-    if (data) {
-      // تحديث البيانات المحلية مباشرة ليراها المستخدم
-      this.costs.update(current => [...data, ...current]);
-    }
-
-    return {
-      success: !error,
-      error: error?.message,
-      count: data?.length || 0
-    };
-  }
-  // --- Helper Methods ---
+  // =============================================
+  // Helper Methods
+  // =============================================
   getClientName(id: number | undefined): string {
     if (!id) return '-';
     return this.clients().find(c => c.client_id == id)?.client_name || 'Unknown';
@@ -174,44 +155,36 @@ export class DataService {
   }
 
   // =============================================
-  // ✅ نظام ترقيم الطلبات التسلسلي الجديد
+  // Booking Order Number Generation
   // =============================================
-  generateBookingRef(country: string, productId: number): string {
+generateBookingRef(country: string, productId: number): string {
     const countryCode = (country || 'UAE').substring(0, 3).toUpperCase();
     const product = this.products().find(p => p.product_id == productId);
     const prodCode = product?.product_code || 'GEN';
+
+    // جلب الرقم التالي مباشرة
     const nextSeq = this.getNextSequentialNumber();
     const increment = nextSeq.toString().padStart(4, '0');
+
     return `${countryCode}-${prodCode}-${increment}`;
   }
-
-  private getNextSequentialNumber(): number {
+// =============================================
+  // حساب الرقم التسلسلي القادم (يخص 2026 وما بعد)
+  // =============================================
+  // =============================================
+  // حساب الرقم التسلسلي القادم (أعلى رقم + 1)
+  // =============================================
+  getNextSequentialNumber(): number {
     const allRevenues = this.revenues();
 
-    if (allRevenues.length === 0) {
-      return 1;
-    }
+    if (allRevenues.length === 0) return 1;
 
-    const sequenceNumbers = allRevenues
-      .map(r => {
-        if (!r.order_number) return 0;
-        const parts = r.order_number.split('-');
-        if (parts.length >= 3) {
-          const numPart = parts[parts.length - 1];
-          const num = parseInt(numPart, 10);
-          return isNaN(num) ? 0 : num;
-        }
-        return 0;
-      })
-      .filter(n => n > 0);
+    // جلب أعلى رقم order_seq من كل الطلبات الموجودة
+    const maxSeq = Math.max(...allRevenues.map(r => r.order_seq || 0));
 
-    if (sequenceNumbers.length === 0) {
-      return 1;
-    }
-
-    return Math.max(...sequenceNumbers) + 1;
+    // إرجاع أعلى رقم مضافاً إليه 1
+    return maxSeq + 1;
   }
-
   regenerateBookingRefForEdit(country: string, productId: number, currentOrderNumber: string): string {
     const countryCode = (country || 'UAE').substring(0, 3).toUpperCase();
     const product = this.products().find(p => p.product_id == productId);
@@ -229,122 +202,40 @@ export class DataService {
   }
 
   // =============================================
-  // GENERATE MONTHLY SALARIES
+  // REVENUE / BOOKING ORDER CRUD
   // =============================================
-  async generateMonthlySalaries(year: number, month: number): Promise<{ success: boolean; error?: any; generated: number }> {
-    console.log('=== generateMonthlySalaries START ===');
-    console.log('Year:', year, 'Month:', month);
-
-    try {
-      const allEmployees = this.employees();
-      const activeEmployees = allEmployees.filter(emp => !emp.end_date);
-
-      console.log('Total employees:', allEmployees.length);
-      console.log('Active employees (no end_date):', activeEmployees.length);
-
-      if (activeEmployees.length === 0) {
-        console.log('No active employees found!');
-        return { success: true, generated: 0 };
-      }
-
-      console.log('Checking existing salaries from local signal...');
-      const localSalaries = this.salaries();
-      const existingForThisMonth = localSalaries.filter(s => s.year === year && s.month === month);
-
-      console.log('Total salaries in signal:', localSalaries.length);
-      console.log('Existing salary records for this month:', existingForThisMonth.length);
-
-      const existingEmployeeIds = new Set(existingForThisMonth.map(s => s.employee_id));
-
-      const employeesNeedingSalary = activeEmployees.filter(
-        emp => !existingEmployeeIds.has(emp.employee_id)
-      );
-
-      console.log('Employees needing salary records:', employeesNeedingSalary.length);
-
-      if (employeesNeedingSalary.length === 0) {
-        console.log('All active employees already have salary records for this period.');
-        return { success: true, generated: 0 };
-      }
-
-      const SALARY_MULTIPLIER = 1;
-
-      const newSalaryRecords = employeesNeedingSalary.map(emp => {
-        const calculatedBase = (Number(emp.salary) || 0) * SALARY_MULTIPLIER;
-        const finalSalary = Math.round(calculatedBase * 100) / 100;
-
-        return {
-          employee_id: emp.employee_id,
-          year: year,
-          month: month,
-          base_salary: finalSalary,
-          bonus: 0,
-          deductions: 0,
-          net_salary: finalSalary,
-          status: 'pending' as const
-        };
-      });
-
-      console.log('New salary records to insert:', newSalaryRecords.length);
-
-      const BATCH_SIZE = 50;
-      let totalInserted = 0;
-      const allInsertedData: any[] = [];
-
-      for (let i = 0; i < newSalaryRecords.length; i += BATCH_SIZE) {
-        const batch = newSalaryRecords.slice(i, i + BATCH_SIZE);
-        console.log(`Inserting batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(newSalaryRecords.length / BATCH_SIZE)} (${batch.length} records)...`);
-
-        const { data: insertedData, error: insertError } = await this.supabase
-          .from('fact_salary')
-          .insert(batch)
-          .select();
-
-        if (insertError) {
-          console.error('Error inserting batch:', insertError);
-          continue;
-        }
-
-        if (insertedData) {
-          totalInserted += insertedData.length;
-          allInsertedData.push(...insertedData);
-          console.log(`Batch inserted successfully: ${insertedData.length} records`);
-        }
-      }
-
-      console.log('Total successfully inserted:', totalInserted, 'records');
-
-      if (allInsertedData.length > 0) {
-        this.salaries.update(current => [...allInsertedData, ...current]);
-        console.log('Local salaries signal updated');
-      }
-
-      console.log('=== generateMonthlySalaries END ===');
-      return { success: true, generated: totalInserted };
-
-    } catch (error: any) {
-      console.error('Unexpected error in generateMonthlySalaries:', error);
-      return { success: false, error: error.message, generated: 0 };
-    }
-  }
-
-  // =============================================
-  // CRUD Operations
-  // =============================================
-
-  // --- REVENUE ---
   async addRevenue(item: Partial<FactRevenue>) {
-    const payload = {
+    const payload: any = {
       date: item.date,
-      gross_amount: item.gross_amount,
+      gross_amount: item.gross_amount || 0,
       total_value: item.total_value || 0,
       order_number: item.order_number,
       product_id: item.product_id,
       country: item.country,
-      lead_id: item.lead_id,
-      owner_id: item.owner_id,
+      lead_id: item.lead_id || null,
+      owner_id: item.owner_id || null,
       start_date: item.start_date || null,
-      end_date: item.end_date || null
+      end_date: item.end_date || null,
+      // New fields
+      bo_name: item.bo_name || null,
+      campaign_name: item.campaign_name || null,
+      description: item.description || null,
+      project_type: item.project_type || null,
+      booking_order_type: item.booking_order_type || 'One Time',
+      client_id: item.client_id || null,
+      bo_submission_date: item.bo_submission_date || null,
+      payment_date: item.payment_date || null,
+      estimated_revenue: item.estimated_revenue || 0,
+      direct_cost_labor: item.direct_cost_labor || 0,
+      direct_cost_material: item.direct_cost_material || 0,
+      direct_cost_equipment: item.direct_cost_equipment || 0,
+      direct_cost_tools: item.direct_cost_tools || 0,
+      direct_cost_other: item.direct_cost_other || 0,
+      one_time_marketing: item.one_time_marketing || 0,
+      one_time_consultation: item.one_time_consultation || 0,
+      one_time_misc: item.one_time_misc || 0,
+      comments: item.comments || null,
+      approval_status: item.approval_status || 'Pending'
     };
 
     const { data, error } = await this.supabase.from('fact_revenue').insert([payload]).select();
@@ -360,16 +251,39 @@ export class DataService {
     const { id, ...rest } = item;
 
     const payload: any = {};
+
+    // Basic fields
     if (rest.date !== undefined) payload.date = rest.date;
     if (rest.gross_amount !== undefined) payload.gross_amount = rest.gross_amount;
     if (rest.total_value !== undefined) payload.total_value = rest.total_value;
     if (rest.order_number !== undefined) payload.order_number = rest.order_number;
     if (rest.product_id !== undefined) payload.product_id = rest.product_id;
     if (rest.country !== undefined) payload.country = rest.country;
-    if (rest.lead_id !== undefined) payload.lead_id = rest.lead_id;
-    if (rest.owner_id !== undefined) payload.owner_id = rest.owner_id;
+    if (rest.lead_id !== undefined) payload.lead_id = rest.lead_id || null;
+    if (rest.owner_id !== undefined) payload.owner_id = rest.owner_id || null;
     if (rest.start_date !== undefined) payload.start_date = rest.start_date || null;
     if (rest.end_date !== undefined) payload.end_date = rest.end_date || null;
+
+    // New fields
+    if (rest.bo_name !== undefined) payload.bo_name = rest.bo_name;
+    if (rest.campaign_name !== undefined) payload.campaign_name = rest.campaign_name;
+    if (rest.description !== undefined) payload.description = rest.description;
+    if (rest.project_type !== undefined) payload.project_type = rest.project_type;
+    if (rest.booking_order_type !== undefined) payload.booking_order_type = rest.booking_order_type;
+    if (rest.client_id !== undefined) payload.client_id = rest.client_id || null;
+    if (rest.bo_submission_date !== undefined) payload.bo_submission_date = rest.bo_submission_date;
+    if (rest.payment_date !== undefined) payload.payment_date = rest.payment_date;
+    if (rest.estimated_revenue !== undefined) payload.estimated_revenue = rest.estimated_revenue;
+    if (rest.direct_cost_labor !== undefined) payload.direct_cost_labor = rest.direct_cost_labor;
+    if (rest.direct_cost_material !== undefined) payload.direct_cost_material = rest.direct_cost_material;
+    if (rest.direct_cost_equipment !== undefined) payload.direct_cost_equipment = rest.direct_cost_equipment;
+    if (rest.direct_cost_tools !== undefined) payload.direct_cost_tools = rest.direct_cost_tools;
+    if (rest.direct_cost_other !== undefined) payload.direct_cost_other = rest.direct_cost_other;
+    if (rest.one_time_marketing !== undefined) payload.one_time_marketing = rest.one_time_marketing;
+    if (rest.one_time_consultation !== undefined) payload.one_time_consultation = rest.one_time_consultation;
+    if (rest.one_time_misc !== undefined) payload.one_time_misc = rest.one_time_misc;
+    if (rest.comments !== undefined) payload.comments = rest.comments;
+    if (rest.approval_status !== undefined) payload.approval_status = rest.approval_status;
 
     const { data, error } = await this.supabase.from('fact_revenue').update(payload).eq('id', id).select();
 
@@ -380,17 +294,148 @@ export class DataService {
     return { success: !error, error: error?.message, data };
   }
 
-  // --- EMPLOYEE ---
+  async deleteRevenue(id: number) {
+    // First delete monthly data
+    await this.supabase.from('fact_revenue_monthly').delete().eq('revenue_id', id);
+
+    // Then delete revenue
+    const { error } = await this.supabase.from('fact_revenue').delete().eq('id', id);
+    if (!error) {
+      this.revenues.update(v => v.filter(r => r.id !== id));
+    }
+    return { success: !error, error: error?.message };
+  }
+
+  // =============================================
+  // APPROVAL SYSTEM
+  // =============================================
+  async approveRevenue(revenueId: number, notes?: string) {
+    const currentUser = this.authService.currentUser();
+    const employee = this.employees().find(e => e.email === currentUser?.email);
+
+    const payload = {
+      approval_status: 'Approved',
+      approved_by: employee?.employee_id || null,
+      approved_at: new Date().toISOString(),
+      approval_notes: notes || null
+    };
+
+    const { data, error } = await this.supabase
+      .from('fact_revenue')
+      .update(payload)
+      .eq('id', revenueId)
+      .select();
+
+    if (data) {
+      this.revenues.update(v => v.map(r => r.id === revenueId ? data[0] : r));
+    }
+
+    return { success: !error, error: error?.message, data };
+  }
+
+  async rejectRevenue(revenueId: number, notes?: string) {
+    const currentUser = this.authService.currentUser();
+    const employee = this.employees().find(e => e.email === currentUser?.email);
+
+    const payload = {
+      approval_status: 'Rejected',
+      approved_by: employee?.employee_id || null,
+      approved_at: new Date().toISOString(),
+      approval_notes: notes || null
+    };
+
+    const { data, error } = await this.supabase
+      .from('fact_revenue')
+      .update(payload)
+      .eq('id', revenueId)
+      .select();
+
+    if (data) {
+      this.revenues.update(v => v.map(r => r.id === revenueId ? data[0] : r));
+    }
+
+    return { success: !error, error: error?.message, data };
+  }
+
+  // =============================================
+  // MONTHLY DISTRIBUTION (Multi-Retainer)
+  // =============================================
+  async getRevenueMonthlyData(revenueId: number): Promise<FactRevenueMonthly[]> {
+    const { data, error } = await this.supabase
+      .from('fact_revenue_monthly')
+      .select('*')
+      .eq('revenue_id', revenueId)
+      .order('year', { ascending: true })
+      .order('month', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching monthly data:', error);
+      return [];
+    }
+
+    return data || [];
+  }
+
+  async saveRevenueMonthly(monthly: FactRevenueMonthly): Promise<{ success: boolean; error?: string }> {
+    if (monthly.id) {
+      const { error } = await this.supabase
+        .from('fact_revenue_monthly')
+        .update({
+          estimated_revenue: monthly.estimated_revenue,
+          actual_revenue: monthly.actual_revenue,
+          notes: monthly.notes,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', monthly.id);
+
+      return { success: !error, error: error?.message };
+    } else {
+      const { error } = await this.supabase
+        .from('fact_revenue_monthly')
+        .insert([{
+          revenue_id: monthly.revenue_id,
+          year: monthly.year,
+          month: monthly.month,
+          estimated_revenue: monthly.estimated_revenue,
+          actual_revenue: monthly.actual_revenue,
+          notes: monthly.notes
+        }]);
+
+      return { success: !error, error: error?.message };
+    }
+  }
+
+  async updateRevenueMonthly(monthly: FactRevenueMonthly): Promise<{ success: boolean; error?: string }> {
+    const { error } = await this.supabase
+      .from('fact_revenue_monthly')
+      .update({
+        actual_revenue: monthly.actual_revenue,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', monthly.id);
+
+    return { success: !error, error: error?.message };
+  }
+
+  async deleteRevenueMonthly(revenueId: number): Promise<{ success: boolean; error?: string }> {
+    const { error } = await this.supabase
+      .from('fact_revenue_monthly')
+      .delete()
+      .eq('revenue_id', revenueId);
+
+    return { success: !error, error: error?.message };
+  }
+
+  // =============================================
+  // EMPLOYEE CRUD
+  // =============================================
   async addEmployee(item: Partial<DimEmployee>) {
-    console.log('[DataService] addEmployee called with:', item);
     const { employee_id, created_at, ...payload } = item as any;
 
     const { data, error } = await this.supabase
       .from('dim_employee')
       .insert([payload])
       .select();
-
-    console.log('[DataService] addEmployee result - data:', data, 'error:', error);
 
     if (data && data.length > 0) {
       this.employees.update(v => [...v, data[0]].sort((a, b) => a.name.localeCompare(b.name)));
@@ -400,12 +445,9 @@ export class DataService {
   }
 
   async updateEmployee(item: Partial<DimEmployee>) {
-    console.log('[DataService] updateEmployee called with:', item);
-
     const { employee_id, created_at, ...payload } = item as any;
 
     if (!employee_id) {
-      console.error('[DataService] updateEmployee: No employee_id provided!');
       return { success: false, error: 'No employee_id provided', data: null };
     }
 
@@ -414,8 +456,6 @@ export class DataService {
       .update(payload)
       .eq('employee_id', employee_id)
       .select();
-
-    console.log('[DataService] updateEmployee result - data:', data, 'error:', error);
 
     if (data && data.length > 0) {
       this.employees.update(currentList =>
@@ -432,24 +472,48 @@ export class DataService {
     return { success: !error, error: error?.message };
   }
 
-  // --- CLIENT ---
+  // =============================================
+  // CLIENT CRUD (Updated with all CRM fields)
+  // =============================================
   async addClient(item: Partial<DimClient>) {
-    console.log('[DataService] addClient called with:', item);
-
     const payload: any = {
       client_name: item.client_name,
       country: item.country || 'UAE'
     };
 
-    if (item.product_id) payload.product_id = item.product_id;
+    // Assigned Team fields
     if (item.lead_id) payload.lead_id = item.lead_id;
     if (item.relationship_manager_id) payload.relationship_manager_id = item.relationship_manager_id;
 
-    console.log('[DataService] Clean payload:', payload);
+    // Company Info fields
+    if (item.product_id) payload.product_id = item.product_id;
+    if (item.company_type) payload.company_type = item.company_type;
+    if (item.industry) payload.industry = item.industry;
+
+    // Contact Info fields
+    if (item.poc_name) payload.poc_name = item.poc_name;
+    if (item.contact_email) payload.contact_email = item.contact_email;
+    if (item.contact_phone) payload.contact_phone = item.contact_phone;
+    if (item.contact_person) payload.contact_person = item.contact_person;
+
+    // Sales Pipeline fields
+    if (item.status) payload.status = item.status;
+    if (item.lead_source) payload.lead_source = item.lead_source;
+    if (item.account_manager_id) payload.account_manager_id = item.account_manager_id;
+
+    // Deal Info fields
+    if (item.estimated_deal_value) payload.estimated_deal_value = item.estimated_deal_value;
+    if (item.expected_closing_date) payload.expected_closing_date = item.expected_closing_date;
+
+    // Key Dates fields
+    if (item.first_contact_date) payload.first_contact_date = item.first_contact_date;
+    if (item.last_followup_date) payload.last_followup_date = item.last_followup_date;
+    if (item.next_action_date) payload.next_action_date = item.next_action_date;
+
+    // Notes
+    if (item.notes) payload.notes = item.notes;
 
     const { data, error } = await this.supabase.from('dim_client').insert([payload]).select();
-
-    console.log('[DataService] addClient result - data:', data, 'error:', error);
 
     if (data && data.length > 0) {
       this.clients.update(v => [data[0], ...v]);
@@ -459,8 +523,6 @@ export class DataService {
   }
 
   async updateClient(item: Partial<DimClient>) {
-    console.log('[DataService] updateClient called with:', item);
-
     const { client_id, created_at, ...rest } = item as any;
 
     if (!client_id) {
@@ -468,17 +530,13 @@ export class DataService {
     }
 
     const payload: any = {};
-    if (rest.client_name !== undefined) payload.client_name = rest.client_name;
-    if (rest.country !== undefined) payload.country = rest.country;
-    if (rest.product_id !== undefined) payload.product_id = rest.product_id || null;
-    if (rest.lead_id !== undefined) payload.lead_id = rest.lead_id || null;
-    if (rest.relationship_manager_id !== undefined) payload.relationship_manager_id = rest.relationship_manager_id || null;
-
-    console.log('[DataService] Update payload:', payload);
+    Object.keys(rest).forEach(key => {
+      if (rest[key] !== undefined) {
+        payload[key] = rest[key] || null;
+      }
+    });
 
     const { data, error } = await this.supabase.from('dim_client').update(payload).eq('client_id', client_id).select();
-
-    console.log('[DataService] updateClient result - data:', data, 'error:', error);
 
     if (data && data.length > 0) {
       this.clients.update(v => v.map(c => c.client_id === client_id ? data[0] : c));
@@ -493,7 +551,9 @@ export class DataService {
     return { success: !error, error: error?.message };
   }
 
-  // --- PIPELINE ---
+  // =============================================
+  // PIPELINE CRUD
+  // =============================================
   async addPipeline(item: Partial<FactPipeline>) {
     const { id, created_at, ...payload } = item as any;
     const { data, error } = await this.supabase.from('fact_pipeline').insert([payload]).select();
@@ -503,10 +563,7 @@ export class DataService {
 
   async updatePipeline(item: Partial<FactPipeline>) {
     const { id, created_at, ...payload } = item as any;
-
-    if (!id) {
-      return { success: false, error: 'No pipeline id provided', data: null };
-    }
+    if (!id) return { success: false, error: 'No pipeline id provided', data: null };
 
     const { data, error } = await this.supabase.from('fact_pipeline').update(payload).eq('id', id).select();
     if (data) this.pipelines.update(v => v.map(p => p.id === id ? data[0] : p));
@@ -519,7 +576,9 @@ export class DataService {
     return { success: !error, error: error?.message };
   }
 
-  // --- COST ---
+  // =============================================
+  // COST CRUD
+  // =============================================
   async addCost(item: Partial<FactCost>) {
     const { id, ...payload } = item as any;
     const { data, error } = await this.supabase.from('fact_cost').insert([payload]).select();
@@ -540,9 +599,23 @@ export class DataService {
     return { success: !error, error: error?.message };
   }
 
-  // =============================================
-  // GENERATE ZERO COSTS
-  // =============================================
+  async addCostsBulk(items: Partial<FactCost>[]) {
+    const { data, error } = await this.supabase
+      .from('fact_cost')
+      .insert(items)
+      .select();
+
+    if (data) {
+      this.costs.update(current => [...data, ...current]);
+    }
+
+    return {
+      success: !error,
+      error: error?.message,
+      count: data?.length || 0
+    };
+  }
+
   async generateZeroCostsForMonth(year: number, month: number): Promise<{ success: boolean; generated: number; error?: string }> {
     try {
       const allProducts = this.products();
@@ -588,7 +661,9 @@ export class DataService {
     }
   }
 
-  // --- SALARY ---
+  // =============================================
+  // SALARY CRUD
+  // =============================================
   async updateSalary(item: Partial<FactSalary>) {
     const { id, created_at, ...payload } = item as any;
     const { data, error } = await this.supabase.from('fact_salary').update(payload).eq('id', id).select();
@@ -596,7 +671,80 @@ export class DataService {
     return { success: !error, error: error?.message, data };
   }
 
-  // --- TARGET ---
+  async generateMonthlySalaries(year: number, month: number): Promise<{ success: boolean; error?: any; generated: number }> {
+    try {
+      const allEmployees = this.employees();
+      const activeEmployees = allEmployees.filter(emp => !emp.end_date);
+
+      if (activeEmployees.length === 0) {
+        return { success: true, generated: 0 };
+      }
+
+      const localSalaries = this.salaries();
+      const existingForThisMonth = localSalaries.filter(s => s.year === year && s.month === month);
+      const existingEmployeeIds = new Set(existingForThisMonth.map(s => s.employee_id));
+
+      const employeesNeedingSalary = activeEmployees.filter(
+        emp => !existingEmployeeIds.has(emp.employee_id)
+      );
+
+      if (employeesNeedingSalary.length === 0) {
+        return { success: true, generated: 0 };
+      }
+
+      const newSalaryRecords = employeesNeedingSalary.map(emp => {
+        const finalSalary = Math.round((Number(emp.salary) || 0) * 100) / 100;
+
+        return {
+          employee_id: emp.employee_id,
+          year: year,
+          month: month,
+          base_salary: finalSalary,
+          bonus: 0,
+          deductions: 0,
+          net_salary: finalSalary,
+          status: 'pending' as const
+        };
+      });
+
+      const BATCH_SIZE = 50;
+      let totalInserted = 0;
+      const allInsertedData: any[] = [];
+
+      for (let i = 0; i < newSalaryRecords.length; i += BATCH_SIZE) {
+        const batch = newSalaryRecords.slice(i, i + BATCH_SIZE);
+
+        const { data: insertedData, error: insertError } = await this.supabase
+          .from('fact_salary')
+          .insert(batch)
+          .select();
+
+        if (insertError) {
+          console.error('Error inserting batch:', insertError);
+          continue;
+        }
+
+        if (insertedData) {
+          totalInserted += insertedData.length;
+          allInsertedData.push(...insertedData);
+        }
+      }
+
+      if (allInsertedData.length > 0) {
+        this.salaries.update(current => [...allInsertedData, ...current]);
+      }
+
+      return { success: true, generated: totalInserted };
+
+    } catch (error: any) {
+      console.error('Unexpected error in generateMonthlySalaries:', error);
+      return { success: false, error: error.message, generated: 0 };
+    }
+  }
+
+  // =============================================
+  // TARGET CRUD
+  // =============================================
   async addTarget(item: Partial<FactTarget>) {
     const { id, ...payload } = item as any;
     const { data, error } = await this.supabase.from('fact_target_annual').insert([payload]).select();
@@ -610,4 +758,5 @@ export class DataService {
     if (data) this.targets.update(v => v.map(t => t.id === id ? data[0] : t));
     return { success: !error, error: error?.message, data };
   }
+
 }

@@ -15,7 +15,7 @@ export interface DimClient {
   relationship_manager_id?: number;
   created_at?: string;
 
-  // ✅ CRM Fields
+  // CRM Fields
   company_type?: 'Direct' | 'Agency';
   first_contact_date?: string;
   account_manager_id?: number;
@@ -30,8 +30,6 @@ export interface DimClient {
   notes?: string;
   last_followup_date?: string;
   next_action_date?: string;
-
-  // Legacy fields for compatibility
   contact_person?: string;
 }
 
@@ -50,23 +48,97 @@ export interface DimEmployee {
   created_at?: string;
 }
 
+// ✅ Enhanced Booking Order / Revenue Interface
 export interface FactRevenue {
   id?: number;
-  date: string;
-  year?: number;
-  month?: number;
-  product_id: number;
-  client_id?: number;
+
+  // Project Info
+  order_seq?: number;           // Auto-generated sequential number
+  order_number?: string;        // Project ID (legacy field)
+  bo_name?: string;             // Full BO Name: Country_Client_BizUnit_CampaignName_Date_Sequential#
+  campaign_name?: string;
+  description?: string;
+  project_type?: 'Social Media Management' | 'Production' | 'Distribution' | 'Event' | 'SEO Content' | 'Others';
+  booking_order_type?: 'One Time' | 'Multi Retainer';
+
+  // Relations
+  owner_id?: number;            // Employee (Owner)
+  product_id: number;           // Department
+  client_id?: number;           // Client
+  lead_id?: number;             // Lead (legacy)
+
+  // Location
   country: string;
-  gross_amount: number;
-  total_value?: number;
-  order_number?: string;
-  lead_id?: number;
-  owner_id?: number;
-  booking_order?: string;
-  notes?: string;
+
+  // Dates
+  date: string;                 // Legacy booking date
+  bo_submission_date?: string;
   start_date?: string | null;
   end_date?: string | null;
+  payment_date?: string;
+
+  // Revenue
+  estimated_revenue?: number;
+  gross_amount: number;         // Actual Revenue
+  total_value?: number;         // Legacy total value
+
+  // Direct Costs
+  direct_cost_labor?: number;
+  direct_cost_material?: number;
+  direct_cost_equipment?: number;
+  direct_cost_tools?: number;
+  direct_cost_other?: number;
+
+  // One Time Costs
+  one_time_marketing?: number;
+  one_time_consultation?: number;
+  one_time_misc?: number;
+
+  // Comments
+  comments?: string;
+  notes?: string;               // Legacy notes
+
+  // Approval System
+  approval_status?: 'Pending' | 'Approved' | 'Rejected';
+  approved_by?: number;         // Employee ID who approved
+  approved_at?: string;         // Timestamp of approval
+  approval_notes?: string;
+
+  // Legacy fields
+  year?: number;
+  month?: number;
+  booking_order?: string;
+}
+
+// ✅ Monthly Distribution for Multi-Retainer
+export interface FactRevenueMonthly {
+  id?: number;
+  revenue_id: number;           // FK to fact_revenue
+  year: number;
+  month: number;
+  estimated_revenue: number;
+  actual_revenue: number;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// ✅ Profitability View (Calculated)
+export interface RevenueProfitability {
+  id: number;
+  order_number?: string;
+  bo_name?: string;
+  campaign_name?: string;
+  estimated_revenue: number;
+  actual_revenue: number;
+  total_direct_cost: number;
+  total_one_time_cost: number;
+  total_cost: number;
+  net_profit: number;
+  profit_margin_percent: number;
+  approval_status?: string;
+  approved_by?: number;
+  approved_at?: string;
 }
 
 export interface FactPipeline {
@@ -121,6 +193,6 @@ export interface UserProfile {
   id: string;
   email: string;
   full_name?: string;
-  role: 'admin' | 'manager' | 'viewer'| 'viewer' | 'finance';
+  role: 'admin' | 'manager' | 'viewer' | 'finance'| 'sales';
   created_at?: string;
 }

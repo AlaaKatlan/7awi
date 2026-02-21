@@ -3,9 +3,9 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DataService } from '../../services/data.service';
 import { AuthService } from '../../services/auth.service';
-// ... imports (كما هي)
 import { DashboardComponent } from '../dashboard/dashboard.component';
 import { RevenueManagerComponent } from '../revenue-manager/revenue-manager.component';
+import { BookingOrderManagerComponent } from '../booking-order-manager/booking-order-manager.component';
 import { PipelineManagerComponent } from '../pipeline-manager/pipeline-manager.component';
 import { TargetManagerComponent } from '../target manager/target-manager.component';
 import { CostManagerComponent } from '../cost-manager/cost-manager.component';
@@ -18,8 +18,8 @@ import { SalaryManagerComponent } from '../salary-manager/salary-manager.compone
   standalone: true,
   imports: [
     CommonModule, FormsModule, DashboardComponent, RevenueManagerComponent,
-    PipelineManagerComponent, TargetManagerComponent, CostManagerComponent,
-    ClientManagerComponent, EmployeeManagerComponent, SalaryManagerComponent
+    BookingOrderManagerComponent, PipelineManagerComponent, TargetManagerComponent,
+    CostManagerComponent, ClientManagerComponent, EmployeeManagerComponent, SalaryManagerComponent
   ],
   template: `
     <div class="flex h-screen bg-surface font-sans text-slate-800">
@@ -34,46 +34,55 @@ import { SalaryManagerComponent } from '../salary-manager/salary-manager.compone
 
         <nav class="flex-1 p-4 space-y-1 mt-4 overflow-y-auto">
 
-          <button (click)="activeTab = 'dashboard'"
-                  [class]="activeTab === 'dashboard' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
-                  class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
-            <span class="material-icons" [class.mr-3]="sidebarOpen">dashboard</span>
-            <span *ngIf="sidebarOpen">Dashboard</span>
-          </button>
+          <ng-container *ngIf="!authService.isSales()">
+            <button (click)="activeTab = 'dashboard'"
+                    [class]="activeTab === 'dashboard' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
+                    class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
+              <span class="material-icons" [class.mr-3]="sidebarOpen">dashboard</span>
+              <span *ngIf="sidebarOpen">Dashboard</span>
+            </button>
 
-          <div *ngIf="sidebarOpen" class="pt-4 pb-2">
-            <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">Financial</span>
-          </div>
+            <div *ngIf="sidebarOpen" class="pt-4 pb-2">
+              <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">Financial</span>
+            </div>
 
-          <button (click)="activeTab = 'revenue'"
-                  [class]="activeTab === 'revenue' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
-                  class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
-            <span class="material-icons" [class.mr-3]="sidebarOpen">attach_money</span>
-            <span *ngIf="sidebarOpen">BO / Revenue</span>
-          </button>
+            <button (click)="activeTab = 'booking-orders'"
+                    [class]="activeTab === 'booking-orders' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
+                    class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
+              <span class="material-icons" [class.mr-3]="sidebarOpen">receipt_long</span>
+              <span *ngIf="sidebarOpen">Booking Orders</span>
+            </button>
 
-          <button (click)="activeTab = 'pipeline'"
-                  [class]="activeTab === 'pipeline' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
-                  class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
-            <span class="material-icons" [class.mr-3]="sidebarOpen">insights</span>
-            <span *ngIf="sidebarOpen">Pipeline</span>
-          </button>
+            <button (click)="activeTab = 'revenue'"
+                    [class]="activeTab === 'revenue' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
+                    class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
+              <span class="material-icons" [class.mr-3]="sidebarOpen">attach_money</span>
+              <span *ngIf="sidebarOpen">Revenue (Legacy)</span>
+            </button>
 
-          <button (click)="activeTab = 'target'"
-                  [class]="activeTab === 'target' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
-                  class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
-            <span class="material-icons" [class.mr-3]="sidebarOpen">flag</span>
-            <span *ngIf="sidebarOpen">Targets</span>
-          </button>
+            <button (click)="activeTab = 'pipeline'"
+                    [class]="activeTab === 'pipeline' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
+                    class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
+              <span class="material-icons" [class.mr-3]="sidebarOpen">insights</span>
+              <span *ngIf="sidebarOpen">Pipeline</span>
+            </button>
 
-          <button (click)="activeTab = 'cost'"
-                  [class]="activeTab === 'cost' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
-                  class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
-            <span class="material-icons" [class.mr-3]="sidebarOpen">money_off</span>
-            <span *ngIf="sidebarOpen">Costs</span>
-          </button>
+            <button (click)="activeTab = 'target'"
+                    [class]="activeTab === 'target' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
+                    class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
+              <span class="material-icons" [class.mr-3]="sidebarOpen">flag</span>
+              <span *ngIf="sidebarOpen">Targets</span>
+            </button>
 
-          <ng-container *ngIf="authService.isAdmin() || authService.isFinance()">
+            <button (click)="activeTab = 'cost'"
+                    [class]="activeTab === 'cost' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
+                    class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
+              <span class="material-icons" [class.mr-3]="sidebarOpen">money_off</span>
+              <span *ngIf="sidebarOpen">Costs</span>
+            </button>
+          </ng-container>
+
+          <ng-container *ngIf="authService.isAdmin() || authService.isFinance() || authService.isSales()">
             <div *ngIf="sidebarOpen" class="pt-4 pb-2">
               <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">People</span>
             </div>
@@ -146,14 +155,27 @@ import { SalaryManagerComponent } from '../salary-manager/salary-manager.compone
         </header>
 
         @switch (activeTab) {
-            @case ('dashboard') { <app-dashboard></app-dashboard> }
-            @case ('revenue') { <app-revenue-manager></app-revenue-manager> }
-            @case ('pipeline') { <app-pipeline-manager></app-pipeline-manager> }
-            @case ('target') { <app-target-manager></app-target-manager> }
-            @case ('cost') { <app-cost-manager></app-cost-manager> }
+            @case ('dashboard') {
+              @if (!authService.isSales()) { <app-dashboard></app-dashboard> }
+            }
+            @case ('booking-orders') {
+              @if (!authService.isSales()) { <app-booking-order-manager></app-booking-order-manager> }
+            }
+            @case ('revenue') {
+              @if (!authService.isSales()) { <app-revenue-manager></app-revenue-manager> }
+            }
+            @case ('pipeline') {
+              @if (!authService.isSales()) { <app-pipeline-manager></app-pipeline-manager> }
+            }
+            @case ('target') {
+              @if (!authService.isSales()) { <app-target-manager></app-target-manager> }
+            }
+            @case ('cost') {
+              @if (!authService.isSales()) { <app-cost-manager></app-cost-manager> }
+            }
 
             @case ('clients') {
-              @if (authService.isAdmin() || authService.isFinance()) {
+              @if (authService.isAdmin() || authService.isFinance() || authService.isSales()) {
                 <app-client-manager></app-client-manager>
               } @else {
                 <div class="bg-white rounded-2xl p-12 text-center shadow-sm">
@@ -236,7 +258,7 @@ import { SalaryManagerComponent } from '../salary-manager/salary-manager.compone
   `]
 })
 export class MainLayoutComponent {
-  activeTab: 'dashboard' | 'revenue' | 'pipeline' | 'target' | 'cost' | 'clients' | 'employees' | 'salaries' = 'dashboard';
+  activeTab: 'dashboard' | 'booking-orders' | 'revenue' | 'pipeline' | 'target' | 'cost' | 'clients' | 'employees' | 'salaries' = 'dashboard';
   sidebarOpen = true;
 
   dataService = inject(DataService);
@@ -252,7 +274,14 @@ export class MainLayoutComponent {
 
   constructor() {
     effect(() => {
-      console.log('Layout Profile Updated:', this.userProfile());
+      const profile = this.userProfile();
+      console.log('Layout Profile Updated:', profile);
+
+      // ✅ التوجيه التلقائي للمبيعات:
+      // بمجرد تحميل ملف المستخدم ومعرفة أنه Sales، نغير التاب الافتراضية من Dashboard إلى Clients
+      if (this.authService.isSales() && this.activeTab === 'dashboard') {
+        this.activeTab = 'clients';
+      }
     });
   }
 
@@ -261,7 +290,8 @@ export class MainLayoutComponent {
   getPageTitle(): string {
     const titles: Record<string, string> = {
       'dashboard': 'Insight Dashboard',
-      'revenue': 'Revenue Management',
+      'booking-orders': 'Booking Order Management',
+      'revenue': 'Revenue Management (Legacy)',
       'pipeline': 'Pipeline Management',
       'target': 'Target Management',
       'cost': 'Cost Management',
