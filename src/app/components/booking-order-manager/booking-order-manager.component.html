@@ -167,7 +167,7 @@
             <tr class="hover:bg-slate-50 transition-colors"
                 [class.bg-amber-50]="revenue.approval_status === 'Pending'"
                 [class.bg-red-50]="isProfitMarginLow(revenue) && revenue.approval_status !== 'Approved'">
-              
+
               <!-- Expand Button -->
               <td class="px-3 py-4">
                 <button *ngIf="revenue.booking_order_type === 'Multi Retainer'"
@@ -554,13 +554,13 @@
           </div>
 
           <!-- Custom Percentage Input -->
-          <div *ngIf="currentItem.payment_terms === 'Custom'" 
+          <div *ngIf="currentItem.payment_terms === 'Custom'"
                class="p-4 bg-indigo-50 rounded-xl border border-indigo-200 animate-fade-in">
             <label class="block text-[10px] font-black text-indigo-600 uppercase tracking-wider mb-2">
               Custom Payment Percentage
             </label>
             <div class="flex items-center gap-3">
-              <input type="range" [(ngModel)]="currentItem.payment_custom_percentage" 
+              <input type="range" [(ngModel)]="currentItem.payment_custom_percentage"
                      min="1" max="100" step="1"
                      class="flex-1 h-2 bg-indigo-200 rounded-lg appearance-none cursor-pointer accent-indigo-600">
               <div class="flex items-center gap-1 bg-white px-3 py-2 rounded-lg border border-indigo-200">
@@ -571,13 +571,13 @@
               </div>
             </div>
             <p class="mt-2 text-xs text-indigo-600">
-              <span class="font-bold">{{ currentItem.payment_custom_percentage }}%</span> upfront payment, 
+              <span class="font-bold">{{ currentItem.payment_custom_percentage }}%</span> upfront payment,
               <span class="font-bold">{{ 100 - (currentItem.payment_custom_percentage || 0) }}%</span> upon completion
             </p>
           </div>
 
           <!-- Retainer Dates -->
-          <div *ngIf="currentItem.payment_terms === 'Retainer'" 
+          <div *ngIf="currentItem.payment_terms === 'Retainer'"
                class="p-4 bg-indigo-50 rounded-xl border border-indigo-200 animate-fade-in">
             <label class="block text-[10px] font-black text-indigo-600 uppercase tracking-wider mb-3">
               Retainer Payment Period
@@ -841,7 +841,7 @@
       </div>
 
       <!-- APPROVAL STATUS CARD (Edit Mode Only) -->
-      <div *ngIf="isEditMode && currentItem.approval_status" 
+      <div *ngIf="isEditMode && currentItem.approval_status"
            class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
         <div class="bg-gradient-to-r from-indigo-600 to-indigo-500 px-5 py-3">
           <h3 class="text-white font-bold flex items-center gap-2">
@@ -947,7 +947,7 @@
       <div>
         <p class="font-bold text-amber-800">Low Profit Margin Warning</p>
         <p class="text-sm text-amber-700">
-          This booking order has a profit margin of <strong>{{ calculateProfitMargin(revenueToApprove!) | number:'1.1-1' }}%</strong>, 
+          This booking order has a profit margin of <strong>{{ calculateProfitMargin(revenueToApprove!) | number:'1.1-1' }}%</strong>,
           which is below the recommended 30%.
         </p>
       </div>
@@ -980,4 +980,4 @@
 </div>
 
 <!-- Track By Function -->
-<ng-template #trackByRevenue let-revenue>{{ revenue.id }}</ng-template>
+<!-- <ng-template #trackByRevenue let-revenue>{{ revenue.id }}</ng-template> -->

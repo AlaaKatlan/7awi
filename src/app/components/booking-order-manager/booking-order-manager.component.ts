@@ -20,7 +20,7 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
 
   // View State
   currentView = signal<'list' | 'form'>('list');
-  
+
   // Filters
   searchText = signal('');
   filterYear = signal<number | null>(new Date().getFullYear());
@@ -47,8 +47,7 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
   // Monthly distribution data
   monthlyData = signal<Map<number, FactRevenueMonthly[]>>(new Map());
 
-  // Current item being edited
-  currentItem: FactRevenue = this.getEmptyRevenue();
+
 
   // Profit margin thresholds (editable)
   marginThreshold1 = signal(20);
@@ -167,19 +166,20 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
 
   // Stats
   totalRevenues = computed(() => this.filteredRevenues().length);
-  totalEstimatedRevenue = computed(() => 
+  totalEstimatedRevenue = computed(() =>
     this.filteredRevenues().reduce((sum, r) => sum + (r.estimated_revenue || r.gross_amount || 0), 0)
   );
-  totalActualRevenue = computed(() => 
+  totalActualRevenue = computed(() =>
     this.filteredRevenues().reduce((sum, r) => sum + (r.gross_amount || 0), 0)
   );
-  pendingApprovalCount = computed(() => 
+  pendingApprovalCount = computed(() =>
     this.filteredRevenues().filter(r => r.approval_status === 'Pending').length
   );
-  multiRetainerCount = computed(() => 
+  multiRetainerCount = computed(() =>
     this.filteredRevenues().filter(r => r.booking_order_type === 'Multi Retainer').length
   );
-
+  // Current item being edited
+  currentItem: FactRevenue = this.getEmptyRevenue();
   ngAfterViewInit() {
     this.loadFlatpickrStyles();
     this.loadXLSXLibrary();
@@ -316,16 +316,16 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
 
   calculateTotalDirectCost(item: FactRevenue): number {
     return (item.direct_cost_labor || 0) +
-           (item.direct_cost_material || 0) +
-           (item.direct_cost_equipment || 0) +
-           (item.direct_cost_tools || 0) +
-           (item.direct_cost_other || 0);
+      (item.direct_cost_material || 0) +
+      (item.direct_cost_equipment || 0) +
+      (item.direct_cost_tools || 0) +
+      (item.direct_cost_other || 0);
   }
 
   calculateTotalOneTimeCost(item: FactRevenue): number {
     return (item.one_time_marketing || 0) +
-           (item.one_time_consultation || 0) +
-           (item.one_time_misc || 0);
+      (item.one_time_consultation || 0) +
+      (item.one_time_misc || 0);
   }
 
   calculateTotalCost(item: FactRevenue): number {
@@ -363,7 +363,7 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
     const product = this.sortedProducts().find(p => p.product_id === this.currentItem.product_id);
     const campaign = this.currentItem.campaign_name || 'Project';
     const date = this.currentItem.bo_submission_date || new Date().toISOString().split('T')[0];
-    
+
     const countryCode = country.substring(0, 3).toUpperCase();
     const clientCode = (client?.client_name || 'CLIENT').split(' ')[0].substring(0, 10).toUpperCase();
     const productCode = (product?.product_name || 'DEPT').replace(/\s/g, '').substring(0, 15).toUpperCase();
@@ -372,7 +372,7 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
     const seqCode = (this.currentItem.order_seq || this.dataService.revenues().length + 1).toString().padStart(3, '0');
 
     this.currentItem.bo_name = `${countryCode}_${clientCode}_${productCode}_${campaignCode}_${dateCode}_${seqCode}`;
-    
+
     // Also update order_number for legacy compatibility
     this.currentItem.order_number = this.dataService.generateBookingRef(country, this.currentItem.product_id);
   }
@@ -387,12 +387,12 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
 
     const startDate = new Date(this.currentItem.start_date);
     const endDate = new Date(this.currentItem.end_date);
-    
+
     if (startDate >= endDate) return;
 
     const months: { year: number; month: number }[] = [];
     const current = new Date(startDate);
-    
+
     while (current <= endDate) {
       months.push({
         year: current.getFullYear(),
@@ -420,12 +420,12 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
 
   getMonthsCount(): number {
     if (!this.currentItem.start_date || !this.currentItem.end_date) return 0;
-    
+
     const start = new Date(this.currentItem.start_date);
     const end = new Date(this.currentItem.end_date);
-    
-    return (end.getFullYear() - start.getFullYear()) * 12 + 
-           (end.getMonth() - start.getMonth()) + 1;
+
+    return (end.getFullYear() - start.getFullYear()) * 12 +
+      (end.getMonth() - start.getMonth()) + 1;
   }
 
   // =============================================
@@ -526,7 +526,7 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
 
     try {
       const data = this.filteredRevenues();
-      
+
       // Prepare data for Excel
       const excelData = data.map(r => ({
         'BO Name': r.bo_name || '-',
@@ -593,7 +593,7 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
 
   getPaymentTermsDisplay(item: FactRevenue): string {
     if (!item.payment_terms) return '-';
-    
+
     switch (item.payment_terms) {
       case 'Custom':
         return `Custom (${item.payment_custom_percentage || 0}%)`;
@@ -703,22 +703,24 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
   // =============================================
   // HELPERS
   // =============================================
-
+  trackByRevenue(index: number, revenue: FactRevenue): any {
+    return revenue.id;
+  }
   getApprovalStatusClass(status: string | undefined): string {
     if (!status) return 'bg-slate-100 text-slate-600';
-    
+
     const classes: Record<string, string> = {
       'Pending': 'bg-amber-100 text-amber-700',
       'Approved': 'bg-emerald-100 text-emerald-700',
       'Rejected': 'bg-red-100 text-red-700'
     };
-    
+
     return classes[status] || 'bg-slate-100 text-slate-600';
   }
 
   getProjectTypeClass(type: string | undefined): string {
     if (!type) return 'bg-slate-100 text-slate-600';
-    
+
     const classes: Record<string, string> = {
       'Social Media Management': 'bg-blue-50 text-blue-700',
       'Production': 'bg-purple-50 text-purple-700',
@@ -727,7 +729,7 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
       'SEO Content': 'bg-indigo-50 text-indigo-700',
       'Others': 'bg-slate-100 text-slate-600'
     };
-    
+
     return classes[type] || 'bg-slate-100 text-slate-600';
   }
 

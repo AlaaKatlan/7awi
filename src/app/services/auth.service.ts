@@ -21,8 +21,7 @@ export class AuthService {
   isAdmin = computed(() => this.userProfile()?.role === 'admin');
   isManager = computed(() => ['admin', 'manager'].includes(this.userProfile()?.role || ''));
   isFinance = computed(() => ['finance'].includes(this.userProfile()?.role || ''));
-  isSales = computed(() => ['sales'].includes(this.userProfile()?.role || ''));
-
+isSales = computed(() => ['sales'].includes(this.userProfile()?.role || ''));
   constructor() {
     this.supabase = createClient(environment.supabaseUrl, environment.supabaseKey, {
       auth: {
