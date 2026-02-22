@@ -157,34 +157,36 @@ export class DataService {
   // =============================================
   // Booking Order Number Generation
   // =============================================
-generateBookingRef(country: string, productId: number): string {
+  generateBookingRef(country: string, productId: number): string {
     const countryCode = (country || 'UAE').substring(0, 3).toUpperCase();
     const product = this.products().find(p => p.product_id == productId);
     const prodCode = product?.product_code || 'GEN';
-
-    // جلب الرقم التالي مباشرة
     const nextSeq = this.getNextSequentialNumber();
     const increment = nextSeq.toString().padStart(4, '0');
-
     return `${countryCode}-${prodCode}-${increment}`;
   }
-// =============================================
-  // حساب الرقم التسلسلي القادم (يخص 2026 وما بعد)
-  // =============================================
-  // =============================================
-  // حساب الرقم التسلسلي القادم (أعلى رقم + 1)
-  // =============================================
-  getNextSequentialNumber(): number {
-    const allRevenues = this.revenues();
 
+  private getNextSequentialNumber(): number {
+    const allRevenues = this.revenues();
     if (allRevenues.length === 0) return 1;
 
-    // جلب أعلى رقم order_seq من كل الطلبات الموجودة
-    const maxSeq = Math.max(...allRevenues.map(r => r.order_seq || 0));
+    const sequenceNumbers = allRevenues
+      .map(r => {
+        if (!r.order_number) return 0;
+        const parts = r.order_number.split('-');
+        if (parts.length >= 3) {
+          const numPart = parts[parts.length - 1];
+          const num = parseInt(numPart, 10);
+          return isNaN(num) ? 0 : num;
+        }
+        return 0;
+      })
+      .filter(n => n > 0);
 
-    // إرجاع أعلى رقم مضافاً إليه 1
-    return maxSeq + 1;
+    if (sequenceNumbers.length === 0) return 1;
+    return Math.max(...sequenceNumbers) + 1;
   }
+
   regenerateBookingRefForEdit(country: string, productId: number, currentOrderNumber: string): string {
     const countryCode = (country || 'UAE').substring(0, 3).toUpperCase();
     const product = this.products().find(p => p.product_id == productId);
@@ -235,7 +237,12 @@ generateBookingRef(country: string, productId: number): string {
       one_time_consultation: item.one_time_consultation || 0,
       one_time_misc: item.one_time_misc || 0,
       comments: item.comments || null,
-      approval_status: item.approval_status || 'Pending'
+      approval_status: item.approval_status || 'Pending',
+      // Payment Terms fields
+      payment_terms: item.payment_terms || 'Upfront',
+      payment_custom_percentage: item.payment_custom_percentage || 50,
+      payment_retainer_start: item.payment_retainer_start || null,
+      payment_retainer_end: item.payment_retainer_end || null
     };
 
     const { data, error } = await this.supabase.from('fact_revenue').insert([payload]).select();
@@ -284,6 +291,11 @@ generateBookingRef(country: string, productId: number): string {
     if (rest.one_time_misc !== undefined) payload.one_time_misc = rest.one_time_misc;
     if (rest.comments !== undefined) payload.comments = rest.comments;
     if (rest.approval_status !== undefined) payload.approval_status = rest.approval_status;
+    // Payment Terms fields
+    if (rest.payment_terms !== undefined) payload.payment_terms = rest.payment_terms;
+    if (rest.payment_custom_percentage !== undefined) payload.payment_custom_percentage = rest.payment_custom_percentage;
+    if (rest.payment_retainer_start !== undefined) payload.payment_retainer_start = rest.payment_retainer_start || null;
+    if (rest.payment_retainer_end !== undefined) payload.payment_retainer_end = rest.payment_retainer_end || null;
 
     const { data, error } = await this.supabase.from('fact_revenue').update(payload).eq('id', id).select();
 
@@ -484,32 +496,32 @@ generateBookingRef(country: string, productId: number): string {
     // Assigned Team fields
     if (item.lead_id) payload.lead_id = item.lead_id;
     if (item.relationship_manager_id) payload.relationship_manager_id = item.relationship_manager_id;
-
+    
     // Company Info fields
     if (item.product_id) payload.product_id = item.product_id;
     if (item.company_type) payload.company_type = item.company_type;
     if (item.industry) payload.industry = item.industry;
-
+    
     // Contact Info fields
     if (item.poc_name) payload.poc_name = item.poc_name;
     if (item.contact_email) payload.contact_email = item.contact_email;
     if (item.contact_phone) payload.contact_phone = item.contact_phone;
     if (item.contact_person) payload.contact_person = item.contact_person;
-
+    
     // Sales Pipeline fields
     if (item.status) payload.status = item.status;
     if (item.lead_source) payload.lead_source = item.lead_source;
     if (item.account_manager_id) payload.account_manager_id = item.account_manager_id;
-
+    
     // Deal Info fields
     if (item.estimated_deal_value) payload.estimated_deal_value = item.estimated_deal_value;
     if (item.expected_closing_date) payload.expected_closing_date = item.expected_closing_date;
-
+    
     // Key Dates fields
     if (item.first_contact_date) payload.first_contact_date = item.first_contact_date;
     if (item.last_followup_date) payload.last_followup_date = item.last_followup_date;
     if (item.next_action_date) payload.next_action_date = item.next_action_date;
-
+    
     // Notes
     if (item.notes) payload.notes = item.notes;
 

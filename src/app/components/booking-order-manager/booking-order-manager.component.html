@@ -1,841 +1,983 @@
-@if (currentView() === 'list') {
-<div class="p-6 bg-[#f8fafc] min-h-screen">
+<!-- ============================================= -->
+<!-- BOOKING ORDER MANAGER - RESPONSIVE + PAYMENT TERMS + EXCEL EXPORT -->
+<!-- ============================================= -->
 
-  <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
-    <div class="bg-white p-5 rounded-2xl shadow-sm border-l-4 border-[#1e3a8a]">
-      <h3 class="text-gray-400 text-xs font-bold uppercase">Total Orders</h3>
-      <p class="text-2xl font-black text-gray-800 mt-1">{{ totalRevenues() }}</p>
+<!-- ==================== LIST VIEW ==================== -->
+<div *ngIf="currentView() === 'list'" class="space-y-6">
+
+  <!-- HEADER WITH ACTIONS -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div>
+      <h2 class="text-2xl font-black text-slate-800">Booking Orders</h2>
+      <p class="text-slate-500 text-sm mt-1">Manage all booking orders and track profitability</p>
     </div>
-    <div class="bg-white p-5 rounded-2xl shadow-sm border-l-4 border-emerald-500">
-      <h3 class="text-gray-400 text-xs font-bold uppercase">Estimated Revenue</h3>
-      <p class="text-2xl font-black text-emerald-600 mt-1">{{ formatCurrency(totalEstimatedRevenue()) }}</p>
-    </div>
-    <div class="bg-white p-5 rounded-2xl shadow-sm border-l-4 border-blue-500">
-      <h3 class="text-gray-400 text-xs font-bold uppercase">Actual Revenue</h3>
-      <p class="text-2xl font-black text-blue-600 mt-1">{{ formatCurrency(totalActualRevenue()) }}</p>
-    </div>
-    <div class="bg-white p-5 rounded-2xl shadow-sm border-l-4 border-amber-500">
-      <h3 class="text-gray-400 text-xs font-bold uppercase">Pending Approval</h3>
-      <p class="text-2xl font-black text-amber-600 mt-1">{{ pendingApprovalCount() }}</p>
-    </div>
-    <div class="bg-white p-5 rounded-2xl shadow-sm border-l-4 border-purple-500">
-      <h3 class="text-gray-400 text-xs font-bold uppercase">Multi-Retainer</h3>
-      <p class="text-2xl font-black text-purple-600 mt-1">{{ multiRetainerCount() }}</p>
-    </div>
-  </div>
-
-  <div class="bg-white p-4 rounded-xl shadow-sm mb-6 border border-gray-100">
-    <div class="flex flex-wrap gap-4 items-end">
-      <div class="flex-1 min-w-[200px]">
-        <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Search</label>
-        <div class="relative">
-          <span class="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">search</span>
-          <input type="text" [ngModel]="searchText()" (ngModelChange)="searchText.set($event)"
-                 placeholder="Search by BO name, campaign, client..."
-                 class="w-full bg-slate-50 border-0 rounded-lg pl-10 pr-4 py-2.5 focus:ring-2 focus:ring-[#1e3a8a] outline-none text-sm">
-        </div>
-      </div>
-
-      <div class="w-28">
-        <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Year</label>
-        <select [ngModel]="filterYear()" (ngModelChange)="filterYear.set($event)"
-                class="w-full bg-slate-50 border-0 rounded-lg px-3 py-2.5 outline-none cursor-pointer text-sm">
-          <option [ngValue]="null">All</option>
-          @for (year of yearsList(); track year) {
-            <option [ngValue]="year">{{ year }}</option>
-          }
-        </select>
-      </div>
-
-      <div class="w-32">
-        <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Month</label>
-        <select [ngModel]="filterMonth()" (ngModelChange)="filterMonth.set($event)"
-                class="w-full bg-slate-50 border-0 rounded-lg px-3 py-2.5 outline-none cursor-pointer text-sm">
-          <option [ngValue]="null">All</option>
-          @for (m of months; track m.value) {
-            <option [ngValue]="m.value">{{ m.name }}</option>
-          }
-        </select>
-      </div>
-
-      <div class="w-36">
-        <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Approval</label>
-        <select [ngModel]="filterApproval()" (ngModelChange)="filterApproval.set($event)"
-                class="w-full bg-slate-50 border-0 rounded-lg px-3 py-2.5 outline-none cursor-pointer text-sm">
-          <option value="ALL">All Status</option>
-          @for (status of approvalStatuses; track status) {
-            <option [value]="status">{{ status }}</option>
-          }
-        </select>
-      </div>
-
-      <div class="w-36">
-        <label class="text-[10px] font-black text-gray-400 uppercase mb-1 block">Type</label>
-        <select [ngModel]="filterType()" (ngModelChange)="filterType.set($event)"
-                class="w-full bg-slate-50 border-0 rounded-lg px-3 py-2.5 outline-none cursor-pointer text-sm">
-          <option value="ALL">All Types</option>
-          @for (type of bookingOrderTypes; track type) {
-            <option [value]="type">{{ type }}</option>
-          }
-        </select>
-      </div>
-
+    <div class="flex flex-wrap gap-3">
+      <!-- Excel Export Button -->
+      <button (click)="exportToExcel()"
+              [disabled]="exporting() || filteredRevenues().length === 0"
+              class="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">
+        <span class="material-icons text-lg" [class.animate-spin]="exporting()">
+          {{ exporting() ? 'sync' : 'download' }}
+        </span>
+        <span class="hidden sm:inline">{{ exporting() ? 'Exporting...' : 'Export Excel' }}</span>
+        <span class="sm:hidden">Excel</span>
+      </button>
+      <!-- Add New Button -->
       <button (click)="openAddForm()"
-              class="bg-[#1e3a8a] text-white px-6 py-2.5 rounded-lg font-bold shadow-md hover:bg-blue-900 transition flex items-center gap-2">
-        <span class="material-icons text-sm">add</span> New Booking Order
+              class="flex items-center gap-2 px-5 py-2.5 bg-hawy-blue text-white rounded-xl font-bold text-sm hover:bg-hawy-dark transition-all shadow-lg">
+        <span class="material-icons text-lg">add</span>
+        <span class="hidden sm:inline">Add Booking Order</span>
+        <span class="sm:hidden">Add</span>
       </button>
     </div>
   </div>
 
-  <div class="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100">
+  <!-- STATS CARDS - Responsive Grid -->
+  <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+    <!-- Total Orders -->
+    <div class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-100">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 sm:w-12 sm:h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+          <span class="material-icons text-blue-600 text-lg sm:text-xl">receipt_long</span>
+        </div>
+        <div class="min-w-0 flex-1">
+          <p class="text-xs font-bold text-slate-400 uppercase tracking-wide truncate">Total</p>
+          <p class="text-xl sm:text-2xl font-black text-slate-800">{{ totalRevenues() }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Estimated Revenue -->
+    <div class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-100">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 sm:w-12 sm:h-12 bg-emerald-100 rounded-xl flex items-center justify-center">
+          <span class="material-icons text-emerald-600 text-lg sm:text-xl">trending_up</span>
+        </div>
+        <div class="min-w-0 flex-1">
+          <p class="text-xs font-bold text-slate-400 uppercase tracking-wide truncate">Estimated</p>
+          <p class="text-lg sm:text-xl font-black text-emerald-600 truncate">{{ formatCurrency(totalEstimatedRevenue()) }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actual Revenue -->
+    <div class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-100">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 sm:w-12 sm:h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+          <span class="material-icons text-blue-600 text-lg sm:text-xl">payments</span>
+        </div>
+        <div class="min-w-0 flex-1">
+          <p class="text-xs font-bold text-slate-400 uppercase tracking-wide truncate">Actual</p>
+          <p class="text-lg sm:text-xl font-black text-blue-600 truncate">{{ formatCurrency(totalActualRevenue()) }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pending Approval -->
+    <div class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-100">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 sm:w-12 sm:h-12 bg-amber-100 rounded-xl flex items-center justify-center">
+          <span class="material-icons text-amber-600 text-lg sm:text-xl">pending_actions</span>
+        </div>
+        <div class="min-w-0 flex-1">
+          <p class="text-xs font-bold text-slate-400 uppercase tracking-wide truncate">Pending</p>
+          <p class="text-xl sm:text-2xl font-black text-amber-600">{{ pendingApprovalCount() }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Multi-Retainer -->
+    <div class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-100 col-span-2 md:col-span-1">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 sm:w-12 sm:h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+          <span class="material-icons text-purple-600 text-lg sm:text-xl">autorenew</span>
+        </div>
+        <div class="min-w-0 flex-1">
+          <p class="text-xs font-bold text-slate-400 uppercase tracking-wide truncate">Retainer</p>
+          <p class="text-xl sm:text-2xl font-black text-purple-600">{{ multiRetainerCount() }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FILTERS - Responsive -->
+  <div class="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100">
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+      <!-- Search -->
+      <div class="col-span-2 sm:col-span-3 lg:col-span-2">
+        <div class="relative">
+          <span class="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+          <input type="text" [ngModel]="searchText()" (ngModelChange)="searchText.set($event)"
+                 placeholder="Search BO, campaign, client..."
+                 class="w-full pl-10 pr-4 py-2.5 bg-slate-50 rounded-xl border-0 text-sm font-medium focus:ring-2 focus:ring-hawy-blue outline-none">
+        </div>
+      </div>
+
+      <!-- Year -->
+      <select [ngModel]="filterYear()" (ngModelChange)="filterYear.set($event)"
+              class="w-full px-4 py-2.5 bg-slate-50 rounded-xl border-0 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-hawy-blue outline-none">
+        <option [ngValue]="null">All Years</option>
+        <option *ngFor="let year of yearsList()" [ngValue]="year">{{ year }}</option>
+      </select>
+
+      <!-- Month -->
+      <select [ngModel]="filterMonth()" (ngModelChange)="filterMonth.set($event)"
+              class="w-full px-4 py-2.5 bg-slate-50 rounded-xl border-0 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-hawy-blue outline-none">
+        <option [ngValue]="null">All Months</option>
+        <option *ngFor="let month of months" [ngValue]="month.value">{{ month.name }}</option>
+      </select>
+
+      <!-- Approval Status -->
+      <select [ngModel]="filterApproval()" (ngModelChange)="filterApproval.set($event)"
+              class="w-full px-4 py-2.5 bg-slate-50 rounded-xl border-0 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-hawy-blue outline-none">
+        <option value="ALL">All Status</option>
+        <option *ngFor="let status of approvalStatuses" [value]="status">{{ status }}</option>
+      </select>
+
+      <!-- Booking Type -->
+      <select [ngModel]="filterType()" (ngModelChange)="filterType.set($event)"
+              class="w-full px-4 py-2.5 bg-slate-50 rounded-xl border-0 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-hawy-blue outline-none">
+        <option value="ALL">All Types</option>
+        <option *ngFor="let type of bookingOrderTypes" [value]="type">{{ type }}</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- DATA TABLE - Responsive with horizontal scroll on mobile -->
+  <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
     <div class="overflow-x-auto">
-      <table class="w-full text-left border-collapse">
-        <thead class="bg-slate-50 text-[10px] text-gray-400 font-black uppercase tracking-widest border-b border-slate-100">
+      <table class="w-full min-w-[900px]">
+        <thead class="bg-gradient-to-r from-slate-800 to-slate-700">
           <tr>
-            <th class="p-4 w-8"></th>
-            <th class="p-4">BO Name / Campaign</th>
-            <th class="p-4">Client</th>
-            <th class="p-4">Department</th>
-            <th class="p-4 text-center">Type</th>
-            <th class="p-4 text-right">Est. Revenue</th>
-            <th class="p-4 text-right">Total Cost</th>
-            <th class="p-4 text-center">Margin</th>
-            <th class="p-4 text-center">Status</th>
-            <th class="p-4 text-center">Actions</th>
+            <th class="w-10 px-3 py-4 text-left text-[10px] font-black text-white uppercase tracking-wider"></th>
+            <th class="px-4 py-4 text-left text-[10px] font-black text-white uppercase tracking-wider">BO / Campaign</th>
+            <th class="px-4 py-4 text-left text-[10px] font-black text-white uppercase tracking-wider">Client</th>
+            <th class="px-4 py-4 text-left text-[10px] font-black text-white uppercase tracking-wider hidden lg:table-cell">Dept</th>
+            <th class="px-4 py-4 text-left text-[10px] font-black text-white uppercase tracking-wider">Type</th>
+            <th class="px-4 py-4 text-right text-[10px] font-black text-white uppercase tracking-wider">Est. Revenue</th>
+            <th class="px-4 py-4 text-right text-[10px] font-black text-white uppercase tracking-wider hidden md:table-cell">Total Cost</th>
+            <th class="px-4 py-4 text-center text-[10px] font-black text-white uppercase tracking-wider">Margin</th>
+            <th class="px-4 py-4 text-center text-[10px] font-black text-white uppercase tracking-wider">Status</th>
+            <th class="px-4 py-4 text-center text-[10px] font-black text-white uppercase tracking-wider">Actions</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-gray-50 text-sm">
-          @for (revenue of filteredRevenues(); track revenue.id) {
-            <tr class="hover:bg-blue-50/50 transition duration-150"
-                [class.bg-amber-50/30]="revenue.approval_status === 'Pending'"
-                [class.bg-red-50/20]="isProfitMarginLow(revenue)">
-
-              <td class="p-4">
-                @if (revenue.booking_order_type === 'Multi Retainer') {
-                  <button (click)="toggleRowExpansion(revenue.id!)"
-                          class="text-slate-400 hover:text-[#1e3a8a] transition p-1">
-                    <span class="material-icons text-lg">
-                      {{ isRowExpanded(revenue.id!) ? 'expand_less' : 'expand_more' }}
-                    </span>
-                  </button>
-                }
+        <tbody class="divide-y divide-slate-100">
+          <ng-container *ngFor="let revenue of filteredRevenues(); trackBy: trackByRevenue">
+            <!-- Main Row -->
+            <tr class="hover:bg-slate-50 transition-colors"
+                [class.bg-amber-50]="revenue.approval_status === 'Pending'"
+                [class.bg-red-50]="isProfitMarginLow(revenue) && revenue.approval_status !== 'Approved'">
+              
+              <!-- Expand Button -->
+              <td class="px-3 py-4">
+                <button *ngIf="revenue.booking_order_type === 'Multi Retainer'"
+                        (click)="toggleRowExpansion(revenue.id!)"
+                        class="w-7 h-7 rounded-lg bg-purple-100 hover:bg-purple-200 flex items-center justify-center transition-all">
+                  <span class="material-icons text-purple-600 text-sm transition-transform"
+                        [class.rotate-90]="isRowExpanded(revenue.id!)">chevron_right</span>
+                </button>
               </td>
 
-              <td class="p-4 cursor-pointer" (click)="editRevenue(revenue)">
-                <div class="flex items-center gap-3">
-                  <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-sm">
-                    {{ (revenue.campaign_name || revenue.order_number || 'BO').charAt(0).toUpperCase() }}
-                  </div>
-                  <div>
-                    <span class="font-bold text-slate-800 block">{{ revenue.campaign_name || revenue.order_number || '-' }}</span>
-                    <span class="text-[10px] text-slate-400 font-mono">{{ revenue.bo_name || revenue.order_number }}</span>
-                  </div>
+              <!-- BO / Campaign -->
+              <td class="px-4 py-4">
+                <div class="max-w-[200px]">
+                  <p class="font-bold text-slate-800 text-sm truncate" [title]="revenue.bo_name">{{ revenue.bo_name || revenue.order_number || '-' }}</p>
+                  <p class="text-xs text-slate-500 truncate" [title]="revenue.campaign_name">{{ revenue.campaign_name || '-' }}</p>
                 </div>
               </td>
 
-              <td class="p-4">
-                <span class="text-slate-700 font-medium">{{ dataService.getClientName(revenue.client_id) }}</span>
-                <span class="text-[10px] text-slate-400 block">{{ revenue.country }}</span>
+              <!-- Client -->
+              <td class="px-4 py-4">
+                <span class="font-medium text-slate-700 text-sm">{{ dataService.getClientName(revenue.client_id) }}</span>
               </td>
 
-              <td class="p-4">
-                <span class="bg-blue-50 text-[#1e3a8a] px-2.5 py-1 rounded-full text-[10px] font-black uppercase">
-                  {{ dataService.getProductName(revenue.product_id) }}
+              <!-- Department -->
+              <td class="px-4 py-4 hidden lg:table-cell">
+                <span class="text-sm text-slate-600">{{ dataService.getProductName(revenue.product_id) }}</span>
+              </td>
+
+              <!-- Type -->
+              <td class="px-4 py-4">
+                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold"
+                      [class.bg-blue-100]="revenue.booking_order_type === 'One Time'"
+                      [class.text-blue-700]="revenue.booking_order_type === 'One Time'"
+                      [class.bg-purple-100]="revenue.booking_order_type === 'Multi Retainer'"
+                      [class.text-purple-700]="revenue.booking_order_type === 'Multi Retainer'">
+                  <span class="material-icons text-xs">{{ revenue.booking_order_type === 'Multi Retainer' ? 'autorenew' : 'schedule' }}</span>
+                  <span class="hidden sm:inline">{{ revenue.booking_order_type }}</span>
                 </span>
               </td>
 
-              <td class="p-4 text-center">
-                <span [class]="revenue.booking_order_type === 'Multi Retainer' ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-600'"
-                      class="px-2.5 py-1 rounded-full text-[10px] font-black uppercase whitespace-nowrap">
-                  {{ revenue.booking_order_type || 'One Time' }}
-                </span>
-              </td>
-
-              <td class="p-4 text-right">
+              <!-- Est. Revenue -->
+              <td class="px-4 py-4 text-right">
                 <span class="font-bold text-emerald-600">{{ formatCurrency(revenue.estimated_revenue || revenue.gross_amount) }}</span>
               </td>
 
-              <td class="p-4 text-right">
-                <span class="font-medium text-slate-600">{{ formatCurrency(calculateTotalCost(revenue)) }}</span>
+              <!-- Total Cost -->
+              <td class="px-4 py-4 text-right hidden md:table-cell">
+                <span class="font-medium text-rose-600">{{ formatCurrency(calculateTotalCost(revenue)) }}</span>
               </td>
 
-              <td class="p-4 text-center">
-                <span [class]="calculateProfitMargin(revenue) < 30 ? 'text-red-600 bg-red-50' : 'text-emerald-600 bg-emerald-50'"
-                      class="px-2.5 py-1 rounded-full text-xs font-black">
+              <!-- Margin -->
+              <td class="px-4 py-4 text-center">
+                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-black"
+                      [class.bg-emerald-100]="calculateProfitMargin(revenue) >= 30"
+                      [class.text-emerald-700]="calculateProfitMargin(revenue) >= 30"
+                      [class.bg-red-100]="calculateProfitMargin(revenue) < 30"
+                      [class.text-red-700]="calculateProfitMargin(revenue) < 30">
+                  <span class="material-icons text-xs" *ngIf="calculateProfitMargin(revenue) < 30">warning</span>
                   {{ calculateProfitMargin(revenue) | number:'1.1-1' }}%
                 </span>
               </td>
 
-              <td class="p-4 text-center">
-                <span [class]="getApprovalStatusClass(revenue.approval_status)"
-                      class="px-2.5 py-1 rounded-full text-[10px] font-black uppercase">
-                  {{ revenue.approval_status || 'Pending' }}
+              <!-- Status -->
+              <td class="px-4 py-4 text-center">
+                <span class="px-2 py-1 rounded-lg text-xs font-bold" [ngClass]="getApprovalStatusClass(revenue.approval_status)">
+                  {{ revenue.approval_status || 'N/A' }}
                 </span>
               </td>
 
-              <td class="p-4 text-center" (click)="$event.stopPropagation()">
+              <!-- Actions -->
+              <td class="px-4 py-4">
                 <div class="flex items-center justify-center gap-1">
                   <button (click)="editRevenue(revenue)"
-                          class="text-slate-400 hover:text-[#1e3a8a] transition p-1.5 rounded-lg hover:bg-blue-50"
+                          class="w-8 h-8 rounded-lg bg-blue-50 hover:bg-blue-100 flex items-center justify-center transition-all"
                           title="Edit">
-                    <span class="material-icons text-base">edit</span>
+                    <span class="material-icons text-blue-600 text-sm">edit</span>
                   </button>
-                  @if (canApprove() && revenue.approval_status === 'Pending') {
-                    <button (click)="openApprovalModal(revenue)"
-                            class="text-slate-400 hover:text-emerald-500 transition p-1.5 rounded-lg hover:bg-emerald-50"
-                            title="Approve/Reject">
-                      <span class="material-icons text-base">fact_check</span>
-                    </button>
-                  }
+                  <button *ngIf="canApprove() && revenue.approval_status === 'Pending'"
+                          (click)="openApprovalModal(revenue)"
+                          class="w-8 h-8 rounded-lg bg-emerald-50 hover:bg-emerald-100 flex items-center justify-center transition-all"
+                          title="Approve">
+                    <span class="material-icons text-emerald-600 text-sm">check_circle</span>
+                  </button>
                   <button (click)="confirmDelete(revenue)"
-                          class="text-slate-400 hover:text-red-500 transition p-1.5 rounded-lg hover:bg-red-50"
+                          class="w-8 h-8 rounded-lg bg-rose-50 hover:bg-rose-100 flex items-center justify-center transition-all"
                           title="Delete">
-                    <span class="material-icons text-base">delete</span>
+                    <span class="material-icons text-rose-600 text-sm">delete</span>
                   </button>
                 </div>
               </td>
             </tr>
 
-            @if (revenue.booking_order_type === 'Multi Retainer' && isRowExpanded(revenue.id!)) {
-              <tr class="bg-slate-50/50">
-                <td colspan="10" class="p-0">
-                  <div class="p-4 border-t border-slate-100">
-                    <div class="flex items-center gap-2 mb-4">
-                      <span class="material-icons text-purple-500 text-lg">calendar_month</span>
-                      <h4 class="font-bold text-slate-700 text-sm">Monthly Revenue Distribution</h4>
-                    </div>
-
-                    <div class="overflow-x-auto">
-                      <table class="w-full text-sm">
-                        <thead>
-                          <tr class="bg-slate-100 text-[10px] text-slate-500 uppercase font-bold">
-                            <th class="p-3 text-left">Month</th>
-                            <th class="p-3 text-right">Estimated</th>
-                            <th class="p-3 text-right">Actual</th>
-                            <th class="p-3 text-right">Variance</th>
-                          </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100">
-                          @for (monthly of getMonthlyDataForRevenue(revenue.id!); track monthly.id) {
-                            <tr class="hover:bg-white transition">
-                              <td class="p-3 font-medium text-slate-700">
-                                {{ getMonthName(monthly.month) }} {{ monthly.year }}
-                              </td>
-                              <td class="p-3 text-right text-slate-600">
-                                {{ formatCurrency(monthly.estimated_revenue) }}
-                              </td>
-                              <td class="p-3 text-right">
-                                <input type="number"
-                                       [ngModel]="monthly.actual_revenue"
-                                       (ngModelChange)="updateMonthlyActual(monthly, $event)"
-                                       class="w-28 p-1.5 bg-white border border-slate-200 rounded-lg text-right text-sm font-medium focus:ring-2 focus:ring-purple-500 outline-none">
-                              </td>
-                              <td class="p-3 text-right font-bold"
-                                  [class.text-emerald-600]="monthly.actual_revenue >= monthly.estimated_revenue"
-                                  [class.text-red-500]="monthly.actual_revenue < monthly.estimated_revenue">
-                                {{ formatCurrency(monthly.actual_revenue - monthly.estimated_revenue) }}
-                              </td>
-                            </tr>
-                          } @empty {
-                            <tr>
-                              <td colspan="4" class="p-4 text-center text-slate-400 italic">
-                                No monthly data available
-                              </td>
-                            </tr>
-                          }
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </td>
-              </tr>
-            }
-          } @empty {
-            <tr>
-              <td colspan="10" class="p-12 text-center">
-                <div class="flex flex-col items-center">
-                  <span class="material-icons text-6xl text-slate-200 mb-4">receipt_long</span>
-                  <p class="text-slate-400 italic">No booking orders found matching your criteria.</p>
-                  <button (click)="openAddForm()" class="mt-4 text-[#1e3a8a] font-bold hover:underline flex items-center gap-1">
-                    <span class="material-icons text-sm">add</span> Create your first booking order
-                  </button>
+            <!-- Expanded Row for Monthly Distribution -->
+            <tr *ngIf="isRowExpanded(revenue.id!) && revenue.booking_order_type === 'Multi Retainer'"
+                class="bg-purple-50/50">
+              <td colspan="10" class="px-6 py-4">
+                <div class="bg-white rounded-xl border border-purple-100 p-4 overflow-x-auto">
+                  <h4 class="font-bold text-purple-800 text-sm mb-3 flex items-center gap-2">
+                    <span class="material-icons text-sm">calendar_month</span>
+                    Monthly Distribution
+                  </h4>
+                  <table class="w-full min-w-[500px]">
+                    <thead>
+                      <tr class="bg-purple-100/50">
+                        <th class="px-3 py-2 text-left text-xs font-bold text-purple-800">Month</th>
+                        <th class="px-3 py-2 text-right text-xs font-bold text-purple-800">Estimated</th>
+                        <th class="px-3 py-2 text-right text-xs font-bold text-purple-800">Actual</th>
+                        <th class="px-3 py-2 text-center text-xs font-bold text-purple-800">Variance</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-purple-100">
+                      <tr *ngFor="let monthly of getMonthlyDataForRevenue(revenue.id!)" class="hover:bg-purple-50">
+                        <td class="px-3 py-2 text-sm font-medium text-slate-700">
+                          {{ getMonthName(monthly.month) }} {{ monthly.year }}
+                        </td>
+                        <td class="px-3 py-2 text-right text-sm font-bold text-emerald-600">
+                          {{ formatCurrency(monthly.estimated_revenue) }}
+                        </td>
+                        <td class="px-3 py-2 text-right">
+                          <input type="number" [value]="monthly.actual_revenue"
+                                 (blur)="updateMonthlyActual(monthly, $any($event.target).valueAsNumber)"
+                                 class="w-24 px-2 py-1 bg-white border border-purple-200 rounded-lg text-sm text-right font-bold text-blue-600 focus:ring-2 focus:ring-purple-400 outline-none">
+                        </td>
+                        <td class="px-3 py-2 text-center">
+                          <span class="text-xs font-bold"
+                                [class.text-emerald-600]="monthly.actual_revenue >= monthly.estimated_revenue"
+                                [class.text-red-600]="monthly.actual_revenue < monthly.estimated_revenue">
+                            {{ monthly.actual_revenue - monthly.estimated_revenue >= 0 ? '+' : '' }}{{ formatCurrency(monthly.actual_revenue - monthly.estimated_revenue) }}
+                          </span>
+                        </td>
+                      </tr>
+                      <tr *ngIf="getMonthlyDataForRevenue(revenue.id!).length === 0">
+                        <td colspan="4" class="px-3 py-4 text-center text-slate-400 text-sm">
+                          No monthly data available
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
               </td>
             </tr>
-          }
+          </ng-container>
+
+          <!-- Empty State -->
+          <tr *ngIf="filteredRevenues().length === 0">
+            <td colspan="10" class="px-6 py-12 text-center">
+              <span class="material-icons text-5xl text-slate-200 mb-3">inbox</span>
+              <p class="text-slate-400 font-medium">No booking orders found</p>
+              <p class="text-slate-300 text-sm">Try adjusting your filters or add a new order</p>
+            </td>
+          </tr>
         </tbody>
       </table>
     </div>
   </div>
 </div>
-}
 
-@if (currentView() === 'form') {
-<div class="min-h-screen bg-[#f8fafc]">
+<!-- ==================== FORM VIEW ==================== -->
+<div *ngIf="currentView() === 'form'" class="space-y-6">
 
-  <div class="bg-white border-b border-slate-200 sticky top-0 z-10">
-    <div class="max-w-7xl mx-auto px-6 py-4">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-4">
-          <button (click)="goBackToList()"
-                  class="p-2 rounded-xl hover:bg-slate-100 transition text-slate-500 hover:text-slate-700">
-            <span class="material-icons">arrow_back</span>
-          </button>
-          <div>
-            <h1 class="text-xl font-black text-slate-800">
-              {{ isEditMode ? 'Edit Booking Order' : 'New Booking Order' }}
-            </h1>
-            <p class="text-sm text-slate-400">{{ isEditMode ? 'Update booking order details' : 'Create a new booking order' }}</p>
-          </div>
-        </div>
-
-        <div class="flex items-center gap-3">
-          <button (click)="goBackToList()"
-                  class="px-5 py-2.5 text-slate-500 font-bold text-sm hover:bg-slate-100 rounded-xl transition">
-            Cancel
-          </button>
-          <button (click)="save()"
-                  [disabled]="!currentItem.campaign_name || saving()"
-                  class="px-6 py-2.5 bg-[#1e3a8a] text-white font-bold text-sm rounded-xl shadow-lg hover:bg-blue-900 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
-            @if (saving()) {
-              <span class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
-            }
-            <span>{{ isEditMode ? 'Update' : 'Save' }}</span>
-          </button>
-        </div>
+  <!-- FORM HEADER -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div class="flex items-center gap-3">
+      <button (click)="goBackToList()"
+              class="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-all">
+        <span class="material-icons text-slate-600">arrow_back</span>
+      </button>
+      <div>
+        <h2 class="text-xl sm:text-2xl font-black text-slate-800">
+          {{ isEditMode ? 'Edit Booking Order' : 'New Booking Order' }}
+        </h2>
+        <p class="text-slate-500 text-sm mt-0.5">Fill in the details below</p>
       </div>
     </div>
+    <button (click)="save()" [disabled]="saving()"
+            class="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-hawy-blue text-white rounded-xl font-bold text-sm hover:bg-hawy-dark transition-all shadow-lg disabled:opacity-50">
+      <span class="material-icons text-lg" [class.animate-spin]="saving()">{{ saving() ? 'sync' : 'save' }}</span>
+      {{ saving() ? 'Saving...' : 'Save Booking Order' }}
+    </button>
   </div>
 
-  <div class="max-w-7xl mx-auto px-6 py-8">
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+  <!-- FORM GRID - Responsive -->
+  <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
 
-      <div class="lg:col-span-2 space-y-6">
+    <!-- ==================== MAIN COLUMN (2/3) ==================== -->
+    <div class="xl:col-span-2 space-y-6">
 
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-          <div class="bg-gradient-to-r from-slate-800 to-slate-700 px-6 py-4">
-            <h2 class="text-white font-bold flex items-center gap-2">
-              <span class="material-icons text-lg">folder_open</span>
-              Project Information
-            </h2>
-          </div>
-          <div class="p-6 space-y-5">
-
-            <div>
-              <label class="block text-[11px] font-black text-slate-500 uppercase mb-2">
-                Campaign / Project Name <span class="text-red-500">*</span>
-              </label>
-              <input type="text" [(ngModel)]="currentItem.campaign_name" (ngModelChange)="generateBoName()"
-                     class="w-full p-3.5 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-[#1e3a8a] text-slate-800 font-medium transition"
-                     placeholder="e.g., Ramadan Campaign 2026">
+      <!-- PROJECT INFO SECTION -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="bg-gradient-to-r from-slate-700 to-slate-600 px-5 py-3">
+          <h3 class="text-white font-bold flex items-center gap-2">
+            <span class="material-icons text-lg">info</span>
+            Project Information
+          </h3>
+        </div>
+        <div class="p-4 sm:p-6 space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <!-- Campaign Name -->
+            <div class="sm:col-span-2">
+              <label class="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5">Campaign Name *</label>
+              <input type="text" [(ngModel)]="currentItem.campaign_name" required
+                     placeholder="e.g., Ramadan Event Campaign"
+                     class="w-full px-4 py-3 bg-slate-50 rounded-xl border-0 font-medium text-slate-700 focus:ring-2 focus:ring-hawy-blue outline-none">
             </div>
 
-            <div>
-              <label class="block text-[11px] font-black text-slate-500 uppercase mb-2">
-                BO Name <span class="text-emerald-500 text-[10px]">(Auto-generated)</span>
-              </label>
-              <div class="flex items-center gap-2">
-                <input type="text" [ngModel]="currentItem.bo_name" readonly
-                       class="flex-1 p-3.5 bg-slate-100 rounded-xl border border-slate-200 text-slate-600 font-mono text-sm">
-                <button (click)="generateBoName()"
-                        class="p-3.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition"
-                        title="Regenerate">
-                  <span class="material-icons text-sm">refresh</span>
+            <!-- BO Name (Auto-generated) -->
+            <div class="sm:col-span-2">
+              <label class="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5">BO Name (Auto-generated)</label>
+              <div class="flex gap-2">
+                <input type="text" [(ngModel)]="currentItem.bo_name" readonly
+                       class="flex-1 px-4 py-3 bg-slate-100 rounded-xl border-0 font-mono text-sm text-slate-600">
+                <button (click)="generateBoName()" type="button"
+                        class="px-4 py-3 bg-hawy-blue text-white rounded-xl hover:bg-hawy-dark transition-all"
+                        title="Regenerate BO Name">
+                  <span class="material-icons">refresh</span>
                 </button>
               </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label class="block text-[11px] font-black text-slate-500 uppercase mb-2">Booking Order Type</label>
-                <select [(ngModel)]="currentItem.booking_order_type"
-                        class="w-full p-3.5 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-[#1e3a8a] cursor-pointer transition">
-                  @for (type of bookingOrderTypes; track type) {
-                    <option [value]="type">{{ type }}</option>
-                  }
-                </select>
-              </div>
-              <div>
-                <label class="block text-[11px] font-black text-slate-500 uppercase mb-2">Project Type</label>
-                <select [(ngModel)]="currentItem.project_type"
-                        class="w-full p-3.5 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-[#1e3a8a] cursor-pointer transition">
-                  @for (type of projectTypes; track type) {
-                    <option [value]="type">{{ type }}</option>
-                  }
-                </select>
-              </div>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label class="block text-[11px] font-black text-slate-500 uppercase mb-2">Client</label>
-                <select [(ngModel)]="currentItem.client_id" (ngModelChange)="generateBoName()"
-                        class="w-full p-3.5 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-[#1e3a8a] cursor-pointer transition">
-                  <option [ngValue]="undefined">— Select Client —</option>
-                  @for (client of sortedClients(); track client.client_id) {
-                    <option [ngValue]="client.client_id">{{ client.client_name }}</option>
-                  }
-                </select>
-              </div>
-              <div>
-                <label class="block text-[11px] font-black text-slate-500 uppercase mb-2">Department</label>
-                <select [(ngModel)]="currentItem.product_id" (ngModelChange)="generateBoName()"
-                        class="w-full p-3.5 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-[#1e3a8a] cursor-pointer transition">
-                  @for (prod of sortedProducts(); track prod.product_id) {
-                    <option [ngValue]="prod.product_id">{{ prod.product_name }}</option>
-                  }
-                </select>
-              </div>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label class="block text-[11px] font-black text-slate-500 uppercase mb-2">Owner (Employee)</label>
-                <select [(ngModel)]="currentItem.owner_id"
-                        class="w-full p-3.5 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-[#1e3a8a] cursor-pointer transition">
-                  <option [ngValue]="undefined">— Select Owner —</option>
-                  @for (emp of sortedEmployees(); track emp.employee_id) {
-                    <option [ngValue]="emp.employee_id">{{ emp.name }}</option>
-                  }
-                </select>
-              </div>
-              <div>
-                <label class="block text-[11px] font-black text-slate-500 uppercase mb-2">Country</label>
-                <select [(ngModel)]="currentItem.country" (ngModelChange)="generateBoName()"
-                        class="w-full p-3.5 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-[#1e3a8a] cursor-pointer transition">
-                  @for (country of countries; track country) {
-                    <option [value]="country">{{ country }}</option>
-                  }
-                </select>
-              </div>
-            </div>
-
+            <!-- Booking Order Type -->
             <div>
-              <label class="block text-[11px] font-black text-slate-500 uppercase mb-2">Description</label>
-              <textarea [(ngModel)]="currentItem.description" rows="3"
-                        class="w-full p-3.5 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-[#1e3a8a] resize-none transition"
-                        placeholder="Brief description of the project..."></textarea>
-            </div>
-          </div>
-        </div>
-
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-          <div class="bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-4">
-            <h2 class="text-white font-bold flex items-center gap-2">
-              <span class="material-icons text-lg">calendar_month</span>
-              Project Dates
-            </h2>
-          </div>
-          <div class="p-6">
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div>
-                <label class="block text-[11px] font-black text-slate-500 uppercase mb-2">BO Submission Date</label>
-                <div class="relative">
-                  <span class="material-icons absolute left-3.5 top-1/2 -translate-y-1/2 text-amber-500 text-lg pointer-events-none">event</span>
-                  <input type="text" id="bo_submission_date"
-                         class="w-full p-3.5 pl-11 bg-amber-50 rounded-xl border border-amber-200 outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer font-medium"
-                         placeholder="Select date" readonly>
-                </div>
-              </div>
-              <div>
-                <label class="block text-[11px] font-black text-slate-500 uppercase mb-2">Start Date</label>
-                <div class="relative">
-                  <span class="material-icons absolute left-3.5 top-1/2 -translate-y-1/2 text-emerald-500 text-lg pointer-events-none">play_circle</span>
-                  <input type="text" id="start_date"
-                         class="w-full p-3.5 pl-11 bg-emerald-50 rounded-xl border border-emerald-200 outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer font-medium"
-                         placeholder="Select date" readonly>
-                </div>
-              </div>
-              <div>
-                <label class="block text-[11px] font-black text-slate-500 uppercase mb-2">End Date</label>
-                <div class="relative">
-                  <span class="material-icons absolute left-3.5 top-1/2 -translate-y-1/2 text-red-500 text-lg pointer-events-none">stop_circle</span>
-                  <input type="text" id="end_date"
-                         class="w-full p-3.5 pl-11 bg-red-50 rounded-xl border border-red-200 outline-none focus:ring-2 focus:ring-red-500 cursor-pointer font-medium"
-                         placeholder="Select date" readonly>
-                </div>
-              </div>
-              <div>
-                <label class="block text-[11px] font-black text-slate-500 uppercase mb-2">Payment Date</label>
-                <div class="relative">
-                  <span class="material-icons absolute left-3.5 top-1/2 -translate-y-1/2 text-blue-500 text-lg pointer-events-none">payments</span>
-                  <input type="text" id="payment_date"
-                         class="w-full p-3.5 pl-11 bg-blue-50 rounded-xl border border-blue-200 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer font-medium"
-                         placeholder="Select date" readonly>
-                </div>
-              </div>
+              <label class="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5">Booking Order Type</label>
+              <select [(ngModel)]="currentItem.booking_order_type"
+                      class="w-full px-4 py-3 bg-slate-50 rounded-xl border-0 font-medium text-slate-700 focus:ring-2 focus:ring-hawy-blue outline-none">
+                <option *ngFor="let type of bookingOrderTypes" [value]="type">{{ type }}</option>
+              </select>
             </div>
 
-            @if (currentItem.booking_order_type === 'Multi Retainer' && getMonthsCount() > 0) {
-              <div class="mt-4 p-4 bg-purple-50 rounded-xl border border-purple-200">
-                <div class="flex items-center gap-2 text-purple-700">
-                  <span class="material-icons">info</span>
-                  <span class="font-bold">Multi-Retainer: {{ getMonthsCount() }} months</span>
-                </div>
-                <p class="text-sm text-purple-600 mt-1">
-                  Revenue will be distributed across {{ getMonthsCount() }} months:
-                  {{ formatCurrency((currentItem.estimated_revenue || currentItem.gross_amount || 0) / getMonthsCount()) }} per month
-                </p>
-              </div>
-            }
-          </div>
-        </div>
+            <!-- Project Type -->
+            <div>
+              <label class="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5">Project Type</label>
+              <select [(ngModel)]="currentItem.project_type"
+                      class="w-full px-4 py-3 bg-slate-50 rounded-xl border-0 font-medium text-slate-700 focus:ring-2 focus:ring-hawy-blue outline-none">
+                <option *ngFor="let type of projectTypes" [value]="type">{{ type }}</option>
+              </select>
+            </div>
 
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-          <div class="bg-gradient-to-r from-emerald-600 to-emerald-500 px-6 py-4">
-            <h2 class="text-white font-bold flex items-center gap-2">
-              <span class="material-icons text-lg">attach_money</span>
-              Revenue
-            </h2>
-          </div>
-          <div class="p-6">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label class="block text-[11px] font-black text-slate-500 uppercase mb-2">Estimated Revenue (USD)</label>
-                <div class="relative">
-                  <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-emerald-500 font-bold text-lg">$</span>
-                  <input type="number" [(ngModel)]="currentItem.estimated_revenue" (ngModelChange)="onAmountChange()"
-                         class="w-full p-3.5 pl-10 bg-emerald-50 rounded-xl border border-emerald-200 outline-none focus:ring-2 focus:ring-emerald-500 font-black text-lg text-emerald-700 transition"
-                         placeholder="0">
-                </div>
-              </div>
-              <div>
-                <label class="block text-[11px] font-black text-slate-500 uppercase mb-2">Actual Revenue (USD)</label>
-                <div class="relative">
-                  <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-blue-500 font-bold text-lg">$</span>
-                  <input type="number" [(ngModel)]="currentItem.gross_amount" (ngModelChange)="onAmountChange()"
-                         class="w-full p-3.5 pl-10 bg-blue-50 rounded-xl border border-blue-200 outline-none focus:ring-2 focus:ring-blue-500 font-black text-lg text-blue-700 transition"
-                         placeholder="0">
-                </div>
-              </div>
+            <!-- Client -->
+            <div>
+              <label class="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5">Client</label>
+              <select [(ngModel)]="currentItem.client_id"
+                      class="w-full px-4 py-3 bg-slate-50 rounded-xl border-0 font-medium text-slate-700 focus:ring-2 focus:ring-hawy-blue outline-none">
+                <option [ngValue]="undefined">Select Client</option>
+                <option *ngFor="let client of sortedClients()" [ngValue]="client.client_id">{{ client.client_name }}</option>
+              </select>
             </div>
-          </div>
-        </div>
 
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-          <div class="bg-gradient-to-r from-rose-600 to-rose-500 px-6 py-4">
-            <h2 class="text-white font-bold flex items-center gap-2">
-              <span class="material-icons text-lg">receipt_long</span>
-              Expected Direct Costs
-            </h2>
-          </div>
-          <div class="p-6">
-            <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <div>
-                <label class="block text-[11px] font-black text-slate-500 uppercase mb-2">Labor</label>
-                <input type="number" [(ngModel)]="currentItem.direct_cost_labor"
-                       class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-rose-500 text-sm font-medium"
-                       placeholder="0">
-              </div>
-              <div>
-                <label class="block text-[11px] font-black text-slate-500 uppercase mb-2">Material</label>
-                <input type="number" [(ngModel)]="currentItem.direct_cost_material"
-                       class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-rose-500 text-sm font-medium"
-                       placeholder="0">
-              </div>
-              <div>
-                <label class="block text-[11px] font-black text-slate-500 uppercase mb-2">Equipment</label>
-                <input type="number" [(ngModel)]="currentItem.direct_cost_equipment"
-                       class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-rose-500 text-sm font-medium"
-                       placeholder="0">
-              </div>
-              <div>
-                <label class="block text-[11px] font-black text-slate-500 uppercase mb-2">Tools</label>
-                <input type="number" [(ngModel)]="currentItem.direct_cost_tools"
-                       class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-rose-500 text-sm font-medium"
-                       placeholder="0">
-              </div>
-              <div>
-                <label class="block text-[11px] font-black text-slate-500 uppercase mb-2">Others</label>
-                <input type="number" [(ngModel)]="currentItem.direct_cost_other"
-                       class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-rose-500 text-sm font-medium"
-                       placeholder="0">
-              </div>
+            <!-- Department -->
+            <div>
+              <label class="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5">Department</label>
+              <select [(ngModel)]="currentItem.product_id"
+                      class="w-full px-4 py-3 bg-slate-50 rounded-xl border-0 font-medium text-slate-700 focus:ring-2 focus:ring-hawy-blue outline-none">
+                <option *ngFor="let prod of sortedProducts()" [ngValue]="prod.product_id">{{ prod.product_name }}</option>
+              </select>
             </div>
-            <div class="mt-4 p-3 bg-rose-50 rounded-xl flex justify-between items-center">
-              <span class="text-sm font-bold text-rose-700">Total Direct Costs:</span>
-              <span class="text-lg font-black text-rose-700">{{ formatCurrency(calculateTotalDirectCost(currentItem)) }}</span>
-            </div>
-          </div>
-        </div>
 
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-          <div class="bg-gradient-to-r from-purple-600 to-purple-500 px-6 py-4">
-            <h2 class="text-white font-bold flex items-center gap-2">
-              <span class="material-icons text-lg">sell</span>
-              One Time Costs
-            </h2>
-          </div>
-          <div class="p-6">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label class="block text-[11px] font-black text-slate-500 uppercase mb-2">Marketing</label>
-                <input type="number" [(ngModel)]="currentItem.one_time_marketing"
-                       class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-purple-500 text-sm font-medium"
-                       placeholder="0">
-              </div>
-              <div>
-                <label class="block text-[11px] font-black text-slate-500 uppercase mb-2">Consultation</label>
-                <input type="number" [(ngModel)]="currentItem.one_time_consultation"
-                       class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-purple-500 text-sm font-medium"
-                       placeholder="0">
-              </div>
-              <div>
-                <label class="block text-[11px] font-black text-slate-500 uppercase mb-2">Miscellaneous</label>
-                <input type="number" [(ngModel)]="currentItem.one_time_misc"
-                       class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-purple-500 text-sm font-medium"
-                       placeholder="0">
-              </div>
+            <!-- Owner -->
+            <div>
+              <label class="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5">Owner</label>
+              <select [(ngModel)]="currentItem.owner_id"
+                      class="w-full px-4 py-3 bg-slate-50 rounded-xl border-0 font-medium text-slate-700 focus:ring-2 focus:ring-hawy-blue outline-none">
+                <option [ngValue]="undefined">Select Owner</option>
+                <option *ngFor="let emp of sortedEmployees()" [ngValue]="emp.employee_id">{{ emp.name }}</option>
+              </select>
             </div>
-            <div class="mt-4 p-3 bg-purple-50 rounded-xl flex justify-between items-center">
-              <span class="text-sm font-bold text-purple-700">Total One Time Costs:</span>
-              <span class="text-lg font-black text-purple-700">{{ formatCurrency(calculateTotalOneTimeCost(currentItem)) }}</span>
-            </div>
-          </div>
-        </div>
 
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-          <div class="bg-gradient-to-r from-slate-600 to-slate-500 px-6 py-4">
-            <h2 class="text-white font-bold flex items-center gap-2">
-              <span class="material-icons text-lg">comment</span>
-              Comments
-            </h2>
-          </div>
-          <div class="p-6">
-            <textarea [(ngModel)]="currentItem.comments" rows="4"
-                      class="w-full p-3.5 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-slate-500 resize-none transition"
-                      placeholder="Additional comments or notes..."></textarea>
+            <!-- Country -->
+            <div>
+              <label class="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5">Country</label>
+              <select [(ngModel)]="currentItem.country"
+                      class="w-full px-4 py-3 bg-slate-50 rounded-xl border-0 font-medium text-slate-700 focus:ring-2 focus:ring-hawy-blue outline-none">
+                <option *ngFor="let country of countries" [value]="country">{{ country }}</option>
+              </select>
+            </div>
+
+            <!-- Description -->
+            <div class="sm:col-span-2">
+              <label class="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5">Description</label>
+              <textarea [(ngModel)]="currentItem.description" rows="2"
+                        placeholder="Brief project description..."
+                        class="w-full px-4 py-3 bg-slate-50 rounded-xl border-0 font-medium text-slate-700 focus:ring-2 focus:ring-hawy-blue outline-none resize-none"></textarea>
+            </div>
           </div>
         </div>
       </div>
 
-      <div class="space-y-6">
-
-        <div class="bg-white rounded-2xl shadow-lg border-2 overflow-hidden"
-             [class.border-red-300]="isProfitMarginLow(currentItem)"
-             [class.border-emerald-300]="!isProfitMarginLow(currentItem)">
-          <div class="px-6 py-4"
-               [class.bg-gradient-to-r]="true"
-               [class.from-red-600]="isProfitMarginLow(currentItem)"
-               [class.to-red-500]="isProfitMarginLow(currentItem)"
-               [class.from-emerald-600]="!isProfitMarginLow(currentItem)"
-               [class.to-emerald-500]="!isProfitMarginLow(currentItem)">
-            <h2 class="text-white font-bold flex items-center gap-2">
-              <span class="material-icons text-lg">analytics</span>
-              Profitability Analysis
-            </h2>
-          </div>
-          <div class="p-6 space-y-4">
-
-            <div class="text-center p-6 rounded-xl"
-                 [class.bg-red-50]="isProfitMarginLow(currentItem)"
-                 [class.bg-emerald-50]="!isProfitMarginLow(currentItem)">
-              <p class="text-[11px] font-black uppercase text-slate-500 mb-1">Actual Profit Margin</p>
-              <p class="text-4xl font-black"
-                 [class.text-red-600]="isProfitMarginLow(currentItem)"
-                 [class.text-emerald-600]="!isProfitMarginLow(currentItem)">
-                {{ calculateProfitMargin(currentItem) | number:'1.2-2' }}%
-              </p>
-              @if (isProfitMarginLow(currentItem)) {
-                <p class="text-xs text-red-500 mt-2 font-bold flex items-center justify-center gap-1">
-                  <span class="material-icons text-sm">warning</span>
-                  Below 30% - Requires Approval
-                </p>
-              }
-            </div>
-
-            <div class="space-y-2">
-              <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
-                <span class="text-xs font-bold text-slate-500">Total Revenue</span>
-                <span class="font-black text-emerald-600">{{ formatCurrency(currentItem.estimated_revenue || currentItem.gross_amount) }}</span>
-              </div>
-              <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
-                <span class="text-xs font-bold text-slate-500">Total Cost</span>
-                <span class="font-black text-rose-600">{{ formatCurrency(calculateTotalCost(currentItem)) }}</span>
-              </div>
-              <div class="flex justify-between items-center p-3 rounded-lg"
-                   [class.bg-emerald-100]="calculateNetProfit(currentItem) >= 0"
-                   [class.bg-red-100]="calculateNetProfit(currentItem) < 0">
-                <span class="text-xs font-bold text-slate-600">Net Profit</span>
-                <span class="font-black"
-                      [class.text-emerald-700]="calculateNetProfit(currentItem) >= 0"
-                      [class.text-red-700]="calculateNetProfit(currentItem) < 0">
-                  {{ formatCurrency(calculateNetProfit(currentItem)) }}
-                </span>
-              </div>
-            </div>
-
-            <div class="border-t border-slate-100 pt-4">
-              <p class="text-[11px] font-black uppercase text-slate-400 mb-3">Required Revenue for Target Margins</p>
-              <div class="overflow-hidden rounded-xl border border-slate-200">
-                <table class="w-full text-sm">
-                  <thead>
-                    <tr class="bg-slate-100">
-                      <th class="p-2 text-center">
-                        <input type="number" [(ngModel)]="marginThreshold1"
-                               class="w-12 p-1 bg-white border border-slate-200 rounded text-center text-xs font-bold">
-                        <span class="text-[10px] text-slate-500">%</span>
-                      </th>
-                      <th class="p-2 text-center">
-                        <input type="number" [(ngModel)]="marginThreshold2"
-                               class="w-12 p-1 bg-white border border-slate-200 rounded text-center text-xs font-bold">
-                        <span class="text-[10px] text-slate-500">%</span>
-                      </th>
-                      <th class="p-2 text-center">
-                        <input type="number" [(ngModel)]="marginThreshold3"
-                               class="w-12 p-1 bg-white border border-slate-200 rounded text-center text-xs font-bold">
-                        <span class="text-[10px] text-slate-500">%</span>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr class="bg-white">
-                      <td class="p-2 text-center font-bold text-slate-700 text-xs">
-                        {{ formatCurrency(calculateRequiredRevenue(calculateTotalCost(currentItem), marginThreshold1())) }}
-                      </td>
-                      <td class="p-2 text-center font-bold text-slate-700 text-xs">
-                        {{ formatCurrency(calculateRequiredRevenue(calculateTotalCost(currentItem), marginThreshold2())) }}
-                      </td>
-                      <td class="p-2 text-center font-bold text-emerald-600 text-xs">
-                        {{ formatCurrency(calculateRequiredRevenue(calculateTotalCost(currentItem), marginThreshold3())) }}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <p class="text-[10px] text-slate-400 mt-2 italic">
-                Formula: Total Cost ÷ (1 - Margin%)
-              </p>
-            </div>
-          </div>
+      <!-- DATES SECTION -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="bg-gradient-to-r from-amber-600 to-amber-500 px-5 py-3">
+          <h3 class="text-white font-bold flex items-center gap-2">
+            <span class="material-icons text-lg">event</span>
+            Project Dates
+          </h3>
         </div>
-
-        @if (isEditMode && currentItem.approval_status) {
-          <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-            <div class="bg-gradient-to-r from-indigo-600 to-indigo-500 px-6 py-4">
-              <h2 class="text-white font-bold flex items-center gap-2">
-                <span class="material-icons text-lg">verified</span>
-                Approval Status
-              </h2>
+        <div class="p-4 sm:p-6">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- BO Submission Date -->
+            <div>
+              <label class="block text-[10px] font-black text-amber-600 uppercase tracking-wider mb-1.5">
+                <span class="material-icons text-xs align-middle mr-1">send</span>Submission Date
+              </label>
+              <input type="text" id="bo_submission_date" [(ngModel)]="currentItem.bo_submission_date"
+                     placeholder="Select date"
+                     class="w-full px-4 py-3 bg-amber-50 rounded-xl border border-amber-200 font-medium text-slate-700 focus:ring-2 focus:ring-amber-400 outline-none">
             </div>
-            <div class="p-6">
-              <div class="text-center mb-4">
-                <span [class]="getApprovalStatusClass(currentItem.approval_status)"
-                      class="px-4 py-2 rounded-full text-sm font-black uppercase">
-                  {{ currentItem.approval_status }}
-                </span>
-              </div>
-              @if (currentItem.approved_by) {
-                <div class="space-y-2 text-sm">
-                  <div class="flex justify-between">
-                    <span class="text-slate-500">Approved By:</span>
-                    <span class="font-bold">{{ dataService.getEmployeeName(currentItem.approved_by) }}</span>
-                  </div>
-                  @if (currentItem.approved_at) {
-                    <div class="flex justify-between">
-                      <span class="text-slate-500">Approved At:</span>
-                      <span class="font-medium">{{ formatDate(currentItem.approved_at) }}</span>
-                    </div>
-                  }
-                  @if (currentItem.approval_notes) {
-                    <div class="mt-3 p-3 bg-slate-50 rounded-lg">
-                      <p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Notes:</p>
-                      <p class="text-sm text-slate-600">{{ currentItem.approval_notes }}</p>
-                    </div>
-                  }
-                </div>
-              }
+
+            <!-- Start Date -->
+            <div>
+              <label class="block text-[10px] font-black text-emerald-600 uppercase tracking-wider mb-1.5">
+                <span class="material-icons text-xs align-middle mr-1">play_arrow</span>Start Date
+              </label>
+              <input type="text" id="start_date" [(ngModel)]="currentItem.start_date"
+                     placeholder="Select date"
+                     class="w-full px-4 py-3 bg-emerald-50 rounded-xl border border-emerald-200 font-medium text-slate-700 focus:ring-2 focus:ring-emerald-400 outline-none">
+            </div>
+
+            <!-- End Date -->
+            <div>
+              <label class="block text-[10px] font-black text-red-600 uppercase tracking-wider mb-1.5">
+                <span class="material-icons text-xs align-middle mr-1">stop</span>End Date
+              </label>
+              <input type="text" id="end_date" [(ngModel)]="currentItem.end_date"
+                     placeholder="Select date"
+                     class="w-full px-4 py-3 bg-red-50 rounded-xl border border-red-200 font-medium text-slate-700 focus:ring-2 focus:ring-red-400 outline-none">
+            </div>
+
+            <!-- Payment Date -->
+            <div>
+              <label class="block text-[10px] font-black text-blue-600 uppercase tracking-wider mb-1.5">
+                <span class="material-icons text-xs align-middle mr-1">payments</span>Payment Date
+              </label>
+              <input type="text" id="payment_date" [(ngModel)]="currentItem.payment_date"
+                     placeholder="Select date"
+                     class="w-full px-4 py-3 bg-blue-50 rounded-xl border border-blue-200 font-medium text-slate-700 focus:ring-2 focus:ring-blue-400 outline-none">
             </div>
           </div>
-        }
 
-        <div class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-5 border border-slate-200">
-          <div class="flex items-start gap-3">
-            <div class="p-2 bg-white rounded-xl shadow-sm">
-              <span class="material-icons text-[#1e3a8a]">lightbulb</span>
-            </div>
-            <div>
-              <h4 class="font-bold text-slate-700 text-sm mb-1">Quick Tips</h4>
-              <ul class="text-xs text-slate-500 space-y-1">
-                <li>• Projects with margin &#60; 30% require admin approval</li>
-                <li>• Multi-Retainer distributes revenue across months</li>
-                <li>• BO Name is auto-generated from project details</li>
-              </ul>
+          <!-- Multi-Retainer Info Banner -->
+          <div *ngIf="currentItem.booking_order_type === 'Multi Retainer' && currentItem.start_date && currentItem.end_date"
+               class="mt-4 p-4 bg-purple-50 border border-purple-200 rounded-xl">
+            <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+              <div class="flex items-center gap-2">
+                <span class="material-icons text-purple-600">autorenew</span>
+                <span class="font-bold text-purple-800">Multi-Retainer:</span>
+              </div>
+              <div class="flex flex-wrap items-center gap-4 text-sm">
+                <span class="text-purple-700"><strong>{{ getMonthsCount() }}</strong> months</span>
+                <span class="text-purple-700">{{ formatCurrency((currentItem.estimated_revenue || 0) / getMonthsCount()) }}/month</span>
+              </div>
             </div>
           </div>
         </div>
       </div>
+
+      <!-- ✅ NEW: PAYMENT TERMS SECTION -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="bg-gradient-to-r from-indigo-600 to-indigo-500 px-5 py-3">
+          <h3 class="text-white font-bold flex items-center gap-2">
+            <span class="material-icons text-lg">account_balance_wallet</span>
+            Payment Terms
+          </h3>
+        </div>
+        <div class="p-4 sm:p-6">
+          <!-- Payment Type Selection - Card Style -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+            <button *ngFor="let option of paymentTermsOptions"
+                    type="button"
+                    (click)="currentItem.payment_terms = option.value"
+                    [class.ring-2]="currentItem.payment_terms === option.value"
+                    [class.ring-indigo-500]="currentItem.payment_terms === option.value"
+                    [class.bg-indigo-50]="currentItem.payment_terms === option.value"
+                    class="flex flex-col items-center gap-2 p-4 bg-slate-50 rounded-xl border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/50 transition-all cursor-pointer">
+              <span class="material-icons text-2xl"
+                    [class.text-indigo-600]="currentItem.payment_terms === option.value"
+                    [class.text-slate-400]="currentItem.payment_terms !== option.value">
+                {{ option.icon }}
+              </span>
+              <span class="text-xs font-bold"
+                    [class.text-indigo-700]="currentItem.payment_terms === option.value"
+                    [class.text-slate-600]="currentItem.payment_terms !== option.value">
+                {{ option.label }}
+              </span>
+            </button>
+          </div>
+
+          <!-- Custom Percentage Input -->
+          <div *ngIf="currentItem.payment_terms === 'Custom'" 
+               class="p-4 bg-indigo-50 rounded-xl border border-indigo-200 animate-fade-in">
+            <label class="block text-[10px] font-black text-indigo-600 uppercase tracking-wider mb-2">
+              Custom Payment Percentage
+            </label>
+            <div class="flex items-center gap-3">
+              <input type="range" [(ngModel)]="currentItem.payment_custom_percentage" 
+                     min="1" max="100" step="1"
+                     class="flex-1 h-2 bg-indigo-200 rounded-lg appearance-none cursor-pointer accent-indigo-600">
+              <div class="flex items-center gap-1 bg-white px-3 py-2 rounded-lg border border-indigo-200">
+                <input type="number" [(ngModel)]="currentItem.payment_custom_percentage"
+                       min="1" max="100"
+                       class="w-14 bg-transparent font-black text-indigo-700 text-center outline-none">
+                <span class="text-indigo-600 font-bold">%</span>
+              </div>
+            </div>
+            <p class="mt-2 text-xs text-indigo-600">
+              <span class="font-bold">{{ currentItem.payment_custom_percentage }}%</span> upfront payment, 
+              <span class="font-bold">{{ 100 - (currentItem.payment_custom_percentage || 0) }}%</span> upon completion
+            </p>
+          </div>
+
+          <!-- Retainer Dates -->
+          <div *ngIf="currentItem.payment_terms === 'Retainer'" 
+               class="p-4 bg-indigo-50 rounded-xl border border-indigo-200 animate-fade-in">
+            <label class="block text-[10px] font-black text-indigo-600 uppercase tracking-wider mb-3">
+              Retainer Payment Period
+            </label>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-bold text-indigo-700 mb-1.5">Start Date</label>
+                <input type="text" id="payment_retainer_start" [(ngModel)]="currentItem.payment_retainer_start"
+                       placeholder="Select start date"
+                       class="w-full px-4 py-3 bg-white rounded-xl border border-indigo-200 font-medium text-slate-700 focus:ring-2 focus:ring-indigo-400 outline-none">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-indigo-700 mb-1.5">End Date</label>
+                <input type="text" id="payment_retainer_end" [(ngModel)]="currentItem.payment_retainer_end"
+                       placeholder="Select end date"
+                       class="w-full px-4 py-3 bg-white rounded-xl border border-indigo-200 font-medium text-slate-700 focus:ring-2 focus:ring-indigo-400 outline-none">
+              </div>
+            </div>
+          </div>
+
+          <!-- Payment Terms Summary -->
+          <div class="mt-4 p-3 bg-slate-50 rounded-xl flex items-center gap-3">
+            <span class="material-icons text-slate-400">info</span>
+            <p class="text-sm text-slate-600">
+              <strong>Selected:</strong> {{ getPaymentTermsDisplay(currentItem) }}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- REVENUE SECTION -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="bg-gradient-to-r from-emerald-600 to-emerald-500 px-5 py-3">
+          <h3 class="text-white font-bold flex items-center gap-2">
+            <span class="material-icons text-lg">monetization_on</span>
+            Revenue
+          </h3>
+        </div>
+        <div class="p-4 sm:p-6">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <!-- Estimated Revenue -->
+            <div>
+              <label class="block text-[10px] font-black text-emerald-600 uppercase tracking-wider mb-1.5">Estimated Revenue ($)</label>
+              <input type="number" [(ngModel)]="currentItem.estimated_revenue" min="0" step="100"
+                     class="w-full px-4 py-3 bg-emerald-50 rounded-xl border border-emerald-200 font-bold text-emerald-700 text-lg focus:ring-2 focus:ring-emerald-400 outline-none">
+            </div>
+
+            <!-- Actual Revenue -->
+            <div>
+              <label class="block text-[10px] font-black text-blue-600 uppercase tracking-wider mb-1.5">Actual Revenue ($)</label>
+              <input type="number" [(ngModel)]="currentItem.gross_amount" min="0" step="100"
+                     class="w-full px-4 py-3 bg-blue-50 rounded-xl border border-blue-200 font-bold text-blue-700 text-lg focus:ring-2 focus:ring-blue-400 outline-none">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DIRECT COSTS SECTION -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="bg-gradient-to-r from-rose-600 to-rose-500 px-5 py-3">
+          <h3 class="text-white font-bold flex items-center gap-2">
+            <span class="material-icons text-lg">receipt</span>
+            Direct Costs
+          </h3>
+        </div>
+        <div class="p-4 sm:p-6">
+          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+            <div>
+              <label class="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5">Labor ($)</label>
+              <input type="number" [(ngModel)]="currentItem.direct_cost_labor" min="0"
+                     class="w-full px-3 py-2.5 bg-slate-50 rounded-xl border-0 font-medium text-slate-700 focus:ring-2 focus:ring-rose-400 outline-none">
+            </div>
+            <div>
+              <label class="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5">Material ($)</label>
+              <input type="number" [(ngModel)]="currentItem.direct_cost_material" min="0"
+                     class="w-full px-3 py-2.5 bg-slate-50 rounded-xl border-0 font-medium text-slate-700 focus:ring-2 focus:ring-rose-400 outline-none">
+            </div>
+            <div>
+              <label class="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5">Equipment ($)</label>
+              <input type="number" [(ngModel)]="currentItem.direct_cost_equipment" min="0"
+                     class="w-full px-3 py-2.5 bg-slate-50 rounded-xl border-0 font-medium text-slate-700 focus:ring-2 focus:ring-rose-400 outline-none">
+            </div>
+            <div>
+              <label class="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5">Tools ($)</label>
+              <input type="number" [(ngModel)]="currentItem.direct_cost_tools" min="0"
+                     class="w-full px-3 py-2.5 bg-slate-50 rounded-xl border-0 font-medium text-slate-700 focus:ring-2 focus:ring-rose-400 outline-none">
+            </div>
+            <div>
+              <label class="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5">Others ($)</label>
+              <input type="number" [(ngModel)]="currentItem.direct_cost_other" min="0"
+                     class="w-full px-3 py-2.5 bg-slate-50 rounded-xl border-0 font-medium text-slate-700 focus:ring-2 focus:ring-rose-400 outline-none">
+            </div>
+          </div>
+          <div class="mt-4 pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <span class="text-sm font-bold text-slate-600">Total Direct Cost:</span>
+            <span class="text-xl font-black text-rose-600">{{ formatCurrency(calculateTotalDirectCost(currentItem)) }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ONE TIME COSTS SECTION -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="bg-gradient-to-r from-purple-600 to-purple-500 px-5 py-3">
+          <h3 class="text-white font-bold flex items-center gap-2">
+            <span class="material-icons text-lg">shopping_bag</span>
+            One Time Costs
+          </h3>
+        </div>
+        <div class="p-4 sm:p-6">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label class="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5">Marketing ($)</label>
+              <input type="number" [(ngModel)]="currentItem.one_time_marketing" min="0"
+                     class="w-full px-4 py-3 bg-slate-50 rounded-xl border-0 font-medium text-slate-700 focus:ring-2 focus:ring-purple-400 outline-none">
+            </div>
+            <div>
+              <label class="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5">Consultation ($)</label>
+              <input type="number" [(ngModel)]="currentItem.one_time_consultation" min="0"
+                     class="w-full px-4 py-3 bg-slate-50 rounded-xl border-0 font-medium text-slate-700 focus:ring-2 focus:ring-purple-400 outline-none">
+            </div>
+            <div>
+              <label class="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5">Miscellaneous ($)</label>
+              <input type="number" [(ngModel)]="currentItem.one_time_misc" min="0"
+                     class="w-full px-4 py-3 bg-slate-50 rounded-xl border-0 font-medium text-slate-700 focus:ring-2 focus:ring-purple-400 outline-none">
+            </div>
+          </div>
+          <div class="mt-4 pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <span class="text-sm font-bold text-slate-600">Total One Time Cost:</span>
+            <span class="text-xl font-black text-purple-600">{{ formatCurrency(calculateTotalOneTimeCost(currentItem)) }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- COMMENTS SECTION -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="bg-gradient-to-r from-slate-600 to-slate-500 px-5 py-3">
+          <h3 class="text-white font-bold flex items-center gap-2">
+            <span class="material-icons text-lg">comment</span>
+            Comments
+          </h3>
+        </div>
+        <div class="p-4 sm:p-6">
+          <textarea [(ngModel)]="currentItem.comments" rows="4"
+                    placeholder="Add any additional notes or comments..."
+                    class="w-full px-4 py-3 bg-slate-50 rounded-xl border-0 font-medium text-slate-700 focus:ring-2 focus:ring-slate-400 outline-none resize-none"></textarea>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ==================== SIDEBAR (1/3) ==================== -->
+    <div class="space-y-6">
+
+      <!-- PROFITABILITY ANALYSIS CARD -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden sticky top-6">
+        <div class="px-5 py-4"
+             [class.bg-gradient-to-r]="true"
+             [class.from-emerald-600]="calculateProfitMargin(currentItem) >= 30"
+             [class.to-emerald-500]="calculateProfitMargin(currentItem) >= 30"
+             [class.from-red-600]="calculateProfitMargin(currentItem) < 30"
+             [class.to-red-500]="calculateProfitMargin(currentItem) < 30">
+          <h3 class="text-white font-bold flex items-center gap-2">
+            <span class="material-icons text-lg">analytics</span>
+            Profitability Analysis
+          </h3>
+        </div>
+        <div class="p-5">
+          <!-- Profit Margin Display -->
+          <div class="text-center mb-6">
+            <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Actual Profit Margin</p>
+            <div class="flex items-center justify-center gap-2">
+              <span *ngIf="calculateProfitMargin(currentItem) < 30" class="material-icons text-3xl text-red-500 animate-pulse">warning</span>
+              <span class="text-4xl sm:text-5xl font-black"
+                    [class.text-emerald-600]="calculateProfitMargin(currentItem) >= 30"
+                    [class.text-red-600]="calculateProfitMargin(currentItem) < 30">
+                {{ calculateProfitMargin(currentItem) | number:'1.1-1' }}%
+              </span>
+            </div>
+            <p *ngIf="calculateProfitMargin(currentItem) < 30" class="mt-2 text-xs font-bold text-red-500 bg-red-50 rounded-lg py-1.5 px-3 inline-block">
+              Below 30% - Requires Approval
+            </p>
+          </div>
+
+          <!-- Summary -->
+          <div class="space-y-3 mb-6 p-4 bg-slate-50 rounded-xl">
+            <div class="flex justify-between items-center">
+              <span class="text-sm text-slate-600">Total Revenue</span>
+              <span class="font-bold text-emerald-600">{{ formatCurrency(currentItem.estimated_revenue || currentItem.gross_amount) }}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-sm text-slate-600">Total Cost</span>
+              <span class="font-bold text-rose-600">-{{ formatCurrency(calculateTotalCost(currentItem)) }}</span>
+            </div>
+            <div class="pt-3 border-t border-slate-200 flex justify-between items-center">
+              <span class="text-sm font-bold text-slate-700">Net Profit</span>
+              <span class="text-lg font-black"
+                    [class.text-emerald-600]="calculateNetProfit(currentItem) >= 0"
+                    [class.text-red-600]="calculateNetProfit(currentItem) < 0">
+                {{ formatCurrency(calculateNetProfit(currentItem)) }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Margin Thresholds Table -->
+          <div>
+            <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Required Revenue for Target Margins</p>
+            <div class="overflow-hidden rounded-xl border border-slate-200">
+              <table class="w-full text-sm">
+                <thead class="bg-slate-100">
+                  <tr>
+                    <th class="px-3 py-2 text-left font-bold text-slate-600">Margin %</th>
+                    <th class="px-3 py-2 text-right font-bold text-slate-600">Required</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                  <tr>
+                    <td class="px-3 py-2">
+                      <div class="flex items-center gap-1">
+                        <input type="number" [(ngModel)]="marginThreshold1" (ngModelChange)="marginThreshold1.set($event)"
+                               min="1" max="99" class="w-12 px-1 py-0.5 bg-slate-50 rounded border border-slate-200 text-center font-bold text-slate-700 text-xs">
+                        <span class="text-slate-500">%</span>
+                      </div>
+                    </td>
+                    <td class="px-3 py-2 text-right font-bold text-slate-700">
+                      {{ formatCurrency(calculateRequiredRevenue(calculateTotalCost(currentItem), marginThreshold1())) }}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="px-3 py-2">
+                      <div class="flex items-center gap-1">
+                        <input type="number" [(ngModel)]="marginThreshold2" (ngModelChange)="marginThreshold2.set($event)"
+                               min="1" max="99" class="w-12 px-1 py-0.5 bg-slate-50 rounded border border-slate-200 text-center font-bold text-slate-700 text-xs">
+                        <span class="text-slate-500">%</span>
+                      </div>
+                    </td>
+                    <td class="px-3 py-2 text-right font-bold text-slate-700">
+                      {{ formatCurrency(calculateRequiredRevenue(calculateTotalCost(currentItem), marginThreshold2())) }}
+                    </td>
+                  </tr>
+                  <tr class="bg-emerald-50">
+                    <td class="px-3 py-2">
+                      <div class="flex items-center gap-1">
+                        <input type="number" [(ngModel)]="marginThreshold3" (ngModelChange)="marginThreshold3.set($event)"
+                               min="1" max="99" class="w-12 px-1 py-0.5 bg-white rounded border border-emerald-300 text-center font-bold text-emerald-700 text-xs">
+                        <span class="text-emerald-600 font-bold">%</span>
+                        <span class="material-icons text-emerald-600 text-xs">check_circle</span>
+                      </div>
+                    </td>
+                    <td class="px-3 py-2 text-right font-bold text-emerald-700">
+                      {{ formatCurrency(calculateRequiredRevenue(calculateTotalCost(currentItem), marginThreshold3())) }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="mt-3 text-[10px] text-slate-400 text-center">
+              Formula: Total Cost ÷ (1 - Margin%)
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- APPROVAL STATUS CARD (Edit Mode Only) -->
+      <div *ngIf="isEditMode && currentItem.approval_status" 
+           class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="bg-gradient-to-r from-indigo-600 to-indigo-500 px-5 py-3">
+          <h3 class="text-white font-bold flex items-center gap-2">
+            <span class="material-icons text-lg">verified</span>
+            Approval Status
+          </h3>
+        </div>
+        <div class="p-5 space-y-4">
+          <div class="flex items-center justify-between">
+            <span class="text-sm text-slate-600">Status</span>
+            <span class="px-3 py-1 rounded-lg text-sm font-bold" [ngClass]="getApprovalStatusClass(currentItem.approval_status)">
+              {{ currentItem.approval_status }}
+            </span>
+          </div>
+          <div *ngIf="currentItem.approved_by">
+            <span class="text-sm text-slate-600">Approved By</span>
+            <p class="font-bold text-slate-800">{{ dataService.getEmployeeName(currentItem.approved_by) }}</p>
+          </div>
+          <div *ngIf="currentItem.approved_at">
+            <span class="text-sm text-slate-600">Approved At</span>
+            <p class="font-bold text-slate-800">{{ formatDate(currentItem.approved_at) }}</p>
+          </div>
+          <div *ngIf="currentItem.approval_notes">
+            <span class="text-sm text-slate-600">Notes</span>
+            <p class="font-medium text-slate-700 bg-slate-50 rounded-lg p-3 mt-1">{{ currentItem.approval_notes }}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- QUICK TIPS -->
+      <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-5 border border-blue-100">
+        <h4 class="font-bold text-blue-800 flex items-center gap-2 mb-3">
+          <span class="material-icons text-lg">tips_and_updates</span>
+          Quick Tips
+        </h4>
+        <ul class="space-y-2 text-sm text-blue-700">
+          <li class="flex items-start gap-2">
+            <span class="material-icons text-xs mt-1 text-blue-400">check_circle</span>
+            Keep profit margin above 30% for auto-approval
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="material-icons text-xs mt-1 text-blue-400">check_circle</span>
+            BO Name is auto-generated from project details
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="material-icons text-xs mt-1 text-blue-400">check_circle</span>
+            Multi-Retainer distributes revenue across months
+          </li>
+        </ul>
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
+<!-- ==================== DELETE MODAL ==================== -->
+<div *ngIf="showDeleteModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  <div class="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl animate-fade-in">
+    <div class="flex items-center gap-4 mb-6">
+      <div class="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center">
+        <span class="material-icons text-red-600 text-2xl">delete_forever</span>
+      </div>
+      <div>
+        <h3 class="text-xl font-black text-slate-800">Delete Booking Order</h3>
+        <p class="text-slate-500 text-sm">This action cannot be undone</p>
+      </div>
+    </div>
+    <p class="text-slate-600 mb-6">
+      Are you sure you want to delete <strong class="text-slate-800">{{ revenueToDelete?.campaign_name || revenueToDelete?.bo_name }}</strong>?
+    </p>
+    <div class="flex flex-col-reverse sm:flex-row gap-3">
+      <button (click)="showDeleteModal = false"
+              class="flex-1 px-4 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-all">
+        Cancel
+      </button>
+      <button (click)="deleteRevenue()"
+              class="flex-1 px-4 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all">
+        Delete
+      </button>
     </div>
   </div>
 </div>
-}
 
-@if (showApprovalModal) {
-  <div class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-    <div class="bg-white p-8 rounded-[2rem] w-full max-w-md shadow-2xl">
-      <div class="flex justify-between items-center mb-6">
-        <h3 class="font-black text-xl text-slate-800 uppercase tracking-tight">Review Booking Order</h3>
-        <button (click)="showApprovalModal = false" class="text-slate-400 hover:text-rose-500 transition">
-          <span class="material-icons">close</span>
-        </button>
+<!-- ==================== APPROVAL MODAL ==================== -->
+<div *ngIf="showApprovalModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  <div class="bg-white w-full max-w-lg rounded-2xl p-6 shadow-2xl animate-fade-in">
+    <div class="flex items-center gap-4 mb-6">
+      <div class="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center">
+        <span class="material-icons text-emerald-600 text-2xl">check_circle</span>
       </div>
-
-      <div class="bg-slate-50 p-4 rounded-xl mb-6">
-        <p class="text-sm text-slate-600 mb-2">
-          <strong>Campaign:</strong> {{ revenueToApprove?.campaign_name }}
-        </p>
-        <p class="text-sm text-slate-600 mb-2">
-          <strong>Profit Margin:</strong>
-          <span [class.text-red-600]="isProfitMarginLow(revenueToApprove!)"
-                [class.text-emerald-600]="!isProfitMarginLow(revenueToApprove!)"
-                class="font-bold">
-            {{ calculateProfitMargin(revenueToApprove!) | number:'1.2-2' }}%
-          </span>
-        </p>
-      </div>
-
-      <div class="mb-6">
-        <label class="block text-[10px] font-black text-slate-400 uppercase mb-2">Approval Notes</label>
-        <textarea [(ngModel)]="approvalNotes" rows="3"
-                  class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a]"
-                  placeholder="Optional notes for this decision..."></textarea>
-      </div>
-
-      <div class="flex gap-3">
-        <button (click)="rejectRevenue()"
-                class="flex-1 py-3 bg-red-500 text-white rounded-xl font-black shadow-lg uppercase text-[10px] tracking-widest hover:bg-red-600 transition flex items-center justify-center gap-2">
-          <span class="material-icons text-sm">close</span> Reject
-        </button>
-        <button (click)="approveRevenue()"
-                class="flex-1 py-3 bg-emerald-500 text-white rounded-xl font-black shadow-lg uppercase text-[10px] tracking-widest hover:bg-emerald-600 transition flex items-center justify-center gap-2">
-          <span class="material-icons text-sm">check</span> Approve
-        </button>
+      <div>
+        <h3 class="text-xl font-black text-slate-800">Review Booking Order</h3>
+        <p class="text-slate-500 text-sm">{{ revenueToApprove?.campaign_name }}</p>
       </div>
     </div>
-  </div>
-}
 
-@if (showDeleteModal) {
-  <div class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-    <div class="bg-white p-8 rounded-[2rem] w-full max-w-md shadow-2xl text-center">
-      <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-        <span class="material-icons text-red-500 text-3xl">warning</span>
-      </div>
-      <h3 class="font-black text-xl text-slate-800 mb-2">Delete Booking Order?</h3>
-      <p class="text-slate-500 mb-6">
-        Are you sure you want to delete <strong>{{ revenueToDelete?.campaign_name || revenueToDelete?.order_number }}</strong>?
-        This action cannot be undone.
-      </p>
-      <div class="flex gap-3">
-        <button (click)="showDeleteModal = false"
-                class="flex-1 py-3 text-slate-400 font-bold uppercase text-[10px] tracking-widest hover:bg-slate-50 rounded-xl transition">
-          Cancel
-        </button>
-        <button (click)="deleteRevenue()"
-                class="flex-1 py-3 bg-red-500 text-white rounded-xl font-black shadow-lg uppercase text-[10px] tracking-widest hover:bg-red-600 transition">
-          Delete
-        </button>
+    <!-- Profit Margin Warning -->
+    <div *ngIf="revenueToApprove && isProfitMarginLow(revenueToApprove)"
+         class="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
+      <span class="material-icons text-amber-600 text-xl">warning</span>
+      <div>
+        <p class="font-bold text-amber-800">Low Profit Margin Warning</p>
+        <p class="text-sm text-amber-700">
+          This booking order has a profit margin of <strong>{{ calculateProfitMargin(revenueToApprove!) | number:'1.1-1' }}%</strong>, 
+          which is below the recommended 30%.
+        </p>
       </div>
     </div>
+
+    <div class="mb-6">
+      <label class="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">Approval Notes (Optional)</label>
+      <textarea [(ngModel)]="approvalNotes" rows="3"
+                placeholder="Add any notes for this decision..."
+                class="w-full px-4 py-3 bg-slate-50 rounded-xl border-0 font-medium text-slate-700 focus:ring-2 focus:ring-emerald-400 outline-none resize-none"></textarea>
+    </div>
+
+    <div class="flex flex-col-reverse sm:flex-row gap-3">
+      <button (click)="showApprovalModal = false"
+              class="flex-1 px-4 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-all">
+        Cancel
+      </button>
+      <button (click)="rejectRevenue()"
+              class="flex-1 px-4 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all flex items-center justify-center gap-2">
+        <span class="material-icons text-lg">cancel</span>
+        Reject
+      </button>
+      <button (click)="approveRevenue()"
+              class="flex-1 px-4 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2">
+        <span class="material-icons text-lg">check</span>
+        Approve
+      </button>
+    </div>
   </div>
-}
+</div>
+
+<!-- Track By Function -->
+<ng-template #trackByRevenue let-revenue>{{ revenue.id }}</ng-template>

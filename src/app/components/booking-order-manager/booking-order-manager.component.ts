@@ -6,6 +6,7 @@ import { AuthService } from '../../services/auth.service';
 import { FactRevenue, FactRevenueMonthly } from '../../models/data.models';
 
 declare var flatpickr: any;
+declare var XLSX: any;
 
 @Component({
   selector: 'app-booking-order-manager',
@@ -19,7 +20,7 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
 
   // View State
   currentView = signal<'list' | 'form'>('list');
-
+  
   // Filters
   searchText = signal('');
   filterYear = signal<number | null>(new Date().getFullYear());
@@ -32,6 +33,7 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
 
   // UI State
   saving = signal(false);
+  exporting = signal(false);
   showDeleteModal = false;
   showApprovalModal = false;
   isEditMode = false;
@@ -45,7 +47,8 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
   // Monthly distribution data
   monthlyData = signal<Map<number, FactRevenueMonthly[]>>(new Map());
 
-
+  // Current item being edited
+  currentItem: FactRevenue = this.getEmptyRevenue();
 
   // Profit margin thresholds (editable)
   marginThreshold1 = signal(20);
@@ -66,6 +69,14 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
   ];
 
   bookingOrderTypes = ['One Time', 'Multi Retainer'];
+
+  // ✅ NEW: Payment Terms Options
+  paymentTermsOptions = [
+    { value: 'Upfront', label: 'Upfront', icon: 'bolt' },
+    { value: 'Upon Completion', label: 'Upon Completion', icon: 'check_circle' },
+    { value: 'Custom', label: 'Custom (%)', icon: 'tune' },
+    { value: 'Retainer', label: 'Retainer', icon: 'autorenew' }
+  ];
 
   approvalStatuses = ['Pending', 'Approved', 'Rejected'];
 
@@ -156,21 +167,22 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
 
   // Stats
   totalRevenues = computed(() => this.filteredRevenues().length);
-  totalEstimatedRevenue = computed(() =>
+  totalEstimatedRevenue = computed(() => 
     this.filteredRevenues().reduce((sum, r) => sum + (r.estimated_revenue || r.gross_amount || 0), 0)
   );
-  totalActualRevenue = computed(() =>
+  totalActualRevenue = computed(() => 
     this.filteredRevenues().reduce((sum, r) => sum + (r.gross_amount || 0), 0)
   );
-  pendingApprovalCount = computed(() =>
+  pendingApprovalCount = computed(() => 
     this.filteredRevenues().filter(r => r.approval_status === 'Pending').length
   );
-  multiRetainerCount = computed(() =>
+  multiRetainerCount = computed(() => 
     this.filteredRevenues().filter(r => r.booking_order_type === 'Multi Retainer').length
   );
-currentItem: FactRevenue = this.getEmptyRevenue();
+
   ngAfterViewInit() {
     this.loadFlatpickrStyles();
+    this.loadXLSXLibrary();
   }
 
   ngOnDestroy() {
@@ -199,6 +211,16 @@ currentItem: FactRevenue = this.getEmptyRevenue();
     }
   }
 
+  // ✅ NEW: Load XLSX library for Excel export
+  private loadXLSXLibrary() {
+    if (!document.getElementById('xlsx-js')) {
+      const script = document.createElement('script');
+      script.id = 'xlsx-js';
+      script.src = 'https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js';
+      document.head.appendChild(script);
+    }
+  }
+
   private initializeFlatpickr() {
     this.destroyFlatpickrInstances();
 
@@ -217,7 +239,9 @@ currentItem: FactRevenue = this.getEmptyRevenue();
         { id: 'bo_submission_date', field: 'bo_submission_date' },
         { id: 'start_date', field: 'start_date' },
         { id: 'end_date', field: 'end_date' },
-        { id: 'payment_date', field: 'payment_date' }
+        { id: 'payment_date', field: 'payment_date' },
+        { id: 'payment_retainer_start', field: 'payment_retainer_start' },
+        { id: 'payment_retainer_end', field: 'payment_retainer_end' }
       ];
 
       dateInputs.forEach(input => {
@@ -268,6 +292,11 @@ currentItem: FactRevenue = this.getEmptyRevenue();
       start_date: null,
       end_date: null,
       payment_date: undefined,
+      // ✅ NEW: Payment Terms defaults
+      payment_terms: 'Upfront',
+      payment_custom_percentage: 50,
+      payment_retainer_start: null,
+      payment_retainer_end: null,
       direct_cost_labor: 0,
       direct_cost_material: 0,
       direct_cost_equipment: 0,
@@ -333,30 +362,22 @@ currentItem: FactRevenue = this.getEmptyRevenue();
     const client = this.sortedClients().find(c => c.client_id === this.currentItem.client_id);
     const product = this.sortedProducts().find(p => p.product_id === this.currentItem.product_id);
     const campaign = this.currentItem.campaign_name || 'Project';
-
-    const dateStr = this.currentItem.bo_submission_date || this.currentItem.date || new Date().toISOString().split('T')[0];
-
+    const date = this.currentItem.bo_submission_date || new Date().toISOString().split('T')[0];
+    
     const countryCode = country.substring(0, 3).toUpperCase();
     const clientCode = (client?.client_name || 'CLIENT').split(' ')[0].substring(0, 10).toUpperCase();
     const productCode = (product?.product_name || 'DEPT').replace(/\s/g, '').substring(0, 15).toUpperCase();
     const campaignCode = campaign.replace(/\s/g, '').substring(0, 20).toUpperCase();
-    const dateCode = dateStr.substring(5, 7) + dateStr.substring(0, 4); // MMYYYY
-
-    // ✅ جلب التسلسل: إذا كان طلب موجود نأخذ رقمه، وإذا كان جديد نجلب الماكس + 1
-    const nextSeq = this.currentItem.order_seq || this.dataService.getNextSequentialNumber();
-    const seqCode = nextSeq.toString().padStart(3, '0');
+    const dateCode = date.substring(5, 7) + date.substring(0, 4); // MMYYYY
+    const seqCode = (this.currentItem.order_seq || this.dataService.revenues().length + 1).toString().padStart(3, '0');
 
     this.currentItem.bo_name = `${countryCode}_${clientCode}_${productCode}_${campaignCode}_${dateCode}_${seqCode}`;
-
-    // تحديث order_number أيضاً
+    
+    // Also update order_number for legacy compatibility
     this.currentItem.order_number = this.dataService.generateBookingRef(country, this.currentItem.product_id);
   }
 
   // =============================================
-  // MULTI-RETAINER MONTHLY DISTRIBUTION
-  // =============================================
-
- // =============================================
   // MULTI-RETAINER MONTHLY DISTRIBUTION
   // =============================================
 
@@ -366,35 +387,29 @@ currentItem: FactRevenue = this.getEmptyRevenue();
 
     const startDate = new Date(this.currentItem.start_date);
     const endDate = new Date(this.currentItem.end_date);
-
-    // استخدام دالة getMonthsCount الموثوقة لحساب عدد الأشهر بدلاً من loop التواريخ
-    const totalMonths = this.getMonthsCount();
-    if (totalMonths <= 0) return;
+    
+    if (startDate >= endDate) return;
 
     const months: { year: number; month: number }[] = [];
-    let curYear = startDate.getFullYear();
-    let curMonth = startDate.getMonth() + 1;
-
-    // توليد الأشهر بشكل آمن لتجنب مشكلة (31 يناير -> 3 مارس)
-    for (let i = 0; i < totalMonths; i++) {
-      months.push({ year: curYear, month: curMonth });
-      curMonth++;
-      if (curMonth > 12) {
-        curMonth = 1;
-        curYear++;
-      }
+    const current = new Date(startDate);
+    
+    while (current <= endDate) {
+      months.push({
+        year: current.getFullYear(),
+        month: current.getMonth() + 1
+      });
+      current.setMonth(current.getMonth() + 1);
     }
 
-    // ✅ التعديل الأهم: الاعتماد على gross_amount أو estimated_revenue أيهما متوفر
-    const totalRevenue = this.currentItem.estimated_revenue || this.currentItem.gross_amount || 0;
-    const monthlyRevenue = totalMonths > 0 ? totalRevenue / totalMonths : 0;
+    const totalRevenue = this.currentItem.estimated_revenue || 0;
+    const monthlyRevenue = months.length > 0 ? totalRevenue / months.length : 0;
 
     // Update local monthly data signal
     const distribution: FactRevenueMonthly[] = months.map(m => ({
       revenue_id: this.currentItem.id || 0,
       year: m.year,
       month: m.month,
-      estimated_revenue: Math.round(monthlyRevenue * 100) / 100, // تقريب لخانين
+      estimated_revenue: Math.round(monthlyRevenue * 100) / 100,
       actual_revenue: 0
     }));
 
@@ -403,19 +418,13 @@ currentItem: FactRevenue = this.getEmptyRevenue();
     this.monthlyData.set(currentMap);
   }
 
-  // ✅ دالة جديدة تُستدعى عند تغيير أي مبلغ في واجهة المستخدم
-  onAmountChange(): void {
-    if (this.currentItem.booking_order_type === 'Multi Retainer') {
-      this.generateMonthlyDistribution();
-    }
-  }
   getMonthsCount(): number {
     if (!this.currentItem.start_date || !this.currentItem.end_date) return 0;
-
+    
     const start = new Date(this.currentItem.start_date);
     const end = new Date(this.currentItem.end_date);
-
-    return (end.getFullYear() - start.getFullYear()) * 12 +
+    
+    return (end.getFullYear() - start.getFullYear()) * 12 + 
            (end.getMonth() - start.getMonth()) + 1;
   }
 
@@ -504,6 +513,105 @@ currentItem: FactRevenue = this.getEmptyRevenue();
   }
 
   // =============================================
+  // ✅ NEW: EXCEL EXPORT
+  // =============================================
+
+  async exportToExcel(): Promise<void> {
+    if (typeof XLSX === 'undefined') {
+      alert('Excel library is still loading. Please try again in a moment.');
+      return;
+    }
+
+    this.exporting.set(true);
+
+    try {
+      const data = this.filteredRevenues();
+      
+      // Prepare data for Excel
+      const excelData = data.map(r => ({
+        'BO Name': r.bo_name || '-',
+        'Campaign': r.campaign_name || '-',
+        'Client': this.dataService.getClientName(r.client_id),
+        'Department': this.dataService.getProductName(r.product_id),
+        'Country': r.country,
+        'Project Type': r.project_type || '-',
+        'Booking Type': r.booking_order_type || '-',
+        'Owner': this.dataService.getEmployeeName(r.owner_id),
+        'BO Submission Date': r.bo_submission_date || '-',
+        'Start Date': r.start_date || '-',
+        'End Date': r.end_date || '-',
+        'Payment Date': r.payment_date || '-',
+        'Payment Terms': this.getPaymentTermsDisplay(r),
+        'Estimated Revenue': r.estimated_revenue || 0,
+        'Actual Revenue': r.gross_amount || 0,
+        'Direct Cost (Labor)': r.direct_cost_labor || 0,
+        'Direct Cost (Material)': r.direct_cost_material || 0,
+        'Direct Cost (Equipment)': r.direct_cost_equipment || 0,
+        'Direct Cost (Tools)': r.direct_cost_tools || 0,
+        'Direct Cost (Other)': r.direct_cost_other || 0,
+        'Total Direct Cost': this.calculateTotalDirectCost(r),
+        'One Time (Marketing)': r.one_time_marketing || 0,
+        'One Time (Consultation)': r.one_time_consultation || 0,
+        'One Time (Misc)': r.one_time_misc || 0,
+        'Total One Time Cost': this.calculateTotalOneTimeCost(r),
+        'Total Cost': this.calculateTotalCost(r),
+        'Net Profit': this.calculateNetProfit(r),
+        'Profit Margin %': Math.round(this.calculateProfitMargin(r) * 100) / 100,
+        'Approval Status': r.approval_status || '-',
+        'Comments': r.comments || '-'
+      }));
+
+      // Create workbook
+      const ws = XLSX.utils.json_to_sheet(excelData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Booking Orders');
+
+      // Auto-size columns
+      const colWidths = Object.keys(excelData[0] || {}).map(key => ({
+        wch: Math.max(key.length, 15)
+      }));
+      ws['!cols'] = colWidths;
+
+      // Generate filename with date
+      const today = new Date().toISOString().split('T')[0];
+      const filename = `Booking_Orders_${today}.xlsx`;
+
+      // Download file
+      XLSX.writeFile(wb, filename);
+
+    } catch (error: any) {
+      console.error('Export error:', error);
+      alert('Error exporting: ' + error.message);
+    } finally {
+      this.exporting.set(false);
+    }
+  }
+
+  // =============================================
+  // ✅ NEW: PAYMENT TERMS HELPER
+  // =============================================
+
+  getPaymentTermsDisplay(item: FactRevenue): string {
+    if (!item.payment_terms) return '-';
+    
+    switch (item.payment_terms) {
+      case 'Custom':
+        return `Custom (${item.payment_custom_percentage || 0}%)`;
+      case 'Retainer':
+        const start = item.payment_retainer_start ? this.formatDate(item.payment_retainer_start) : '?';
+        const end = item.payment_retainer_end ? this.formatDate(item.payment_retainer_end) : '?';
+        return `Retainer (${start} - ${end})`;
+      default:
+        return item.payment_terms;
+    }
+  }
+
+  getPaymentTermsIcon(terms: string): string {
+    const option = this.paymentTermsOptions.find(o => o.value === terms);
+    return option?.icon || 'payments';
+  }
+
+  // =============================================
   // NAVIGATION & CRUD
   // =============================================
 
@@ -532,7 +640,7 @@ currentItem: FactRevenue = this.getEmptyRevenue();
     this.showDeleteModal = true;
   }
 
-async save(): Promise<void> {
+  async save(): Promise<void> {
     if (!this.currentItem.campaign_name?.trim()) {
       alert('Campaign Name is required');
       return;
@@ -543,12 +651,10 @@ async save(): Promise<void> {
       this.generateBoName();
     }
 
-    // ✅ التعديل هنا: فحص هامش الربح وتحديد الحالة تلقائياً
+    // Check profit margin for approval status
     const margin = this.calculateProfitMargin(this.currentItem);
     if (margin < 30) {
       this.currentItem.approval_status = 'Pending';
-    } else {
-      this.currentItem.approval_status = 'Approved'; // موافقة تلقائية إذا كان 30% أو أكثر
     }
 
     this.saving.set(true);
@@ -600,19 +706,19 @@ async save(): Promise<void> {
 
   getApprovalStatusClass(status: string | undefined): string {
     if (!status) return 'bg-slate-100 text-slate-600';
-
+    
     const classes: Record<string, string> = {
       'Pending': 'bg-amber-100 text-amber-700',
       'Approved': 'bg-emerald-100 text-emerald-700',
       'Rejected': 'bg-red-100 text-red-700'
     };
-
+    
     return classes[status] || 'bg-slate-100 text-slate-600';
   }
 
   getProjectTypeClass(type: string | undefined): string {
     if (!type) return 'bg-slate-100 text-slate-600';
-
+    
     const classes: Record<string, string> = {
       'Social Media Management': 'bg-blue-50 text-blue-700',
       'Production': 'bg-purple-50 text-purple-700',
@@ -621,7 +727,7 @@ async save(): Promise<void> {
       'SEO Content': 'bg-indigo-50 text-indigo-700',
       'Others': 'bg-slate-100 text-slate-600'
     };
-
+    
     return classes[type] || 'bg-slate-100 text-slate-600';
   }
 

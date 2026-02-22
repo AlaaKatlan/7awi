@@ -51,59 +51,65 @@ export interface DimEmployee {
 // ✅ Enhanced Booking Order / Revenue Interface
 export interface FactRevenue {
   id?: number;
-
+  
   // Project Info
   order_seq?: number;           // Auto-generated sequential number
   order_number?: string;        // Project ID (legacy field)
   bo_name?: string;             // Full BO Name: Country_Client_BizUnit_CampaignName_Date_Sequential#
   campaign_name?: string;
   description?: string;
-  project_type?: 'Social Media Management' | 'Production' | 'Distribution' | 'Event' | 'SEO Content' | 'Others';
-  booking_order_type?: 'One Time' | 'Multi Retainer';
-
+  project_type?: string;        // Flexible string type
+  booking_order_type?: string;  // Flexible string type
+  
   // Relations
   owner_id?: number;            // Employee (Owner)
   product_id: number;           // Department
   client_id?: number;           // Client
   lead_id?: number;             // Lead (legacy)
-
+  
   // Location
   country: string;
-
+  
   // Dates
   date: string;                 // Legacy booking date
   bo_submission_date?: string;
   start_date?: string | null;
   end_date?: string | null;
   payment_date?: string;
-
+  
+  // ✅ Payment Terms - Using flexible string type to avoid TypeScript assignment errors
+  payment_terms?: string;                   // 'Upfront' | 'Upon Completion' | 'Custom' | 'Retainer'
+  payment_custom_percentage?: number;       // For Custom payment type (1-100)
+  payment_retainer_start?: string | null;   // For Retainer payment type
+  payment_retainer_end?: string | null;     // For Retainer payment type
+  
   // Revenue
   estimated_revenue?: number;
   gross_amount: number;         // Actual Revenue
   total_value?: number;         // Legacy total value
-
+  
   // Direct Costs
   direct_cost_labor?: number;
   direct_cost_material?: number;
   direct_cost_equipment?: number;
   direct_cost_tools?: number;
   direct_cost_other?: number;
-
+  
   // One Time Costs
   one_time_marketing?: number;
   one_time_consultation?: number;
   one_time_misc?: number;
-
+  
   // Comments
   comments?: string;
   notes?: string;               // Legacy notes
-
+  
   // Approval System
-  approval_status?: 'Pending' | 'Approved' | 'Rejected';
+  approval_status?: string;     // 'Pending' | 'Approved' | 'Rejected'
   approved_by?: number;         // Employee ID who approved
   approved_at?: string;         // Timestamp of approval
   approval_notes?: string;
-
+  
   // Legacy fields
   year?: number;
   month?: number;
@@ -193,6 +199,6 @@ export interface UserProfile {
   id: string;
   email: string;
   full_name?: string;
-  role: 'admin' | 'manager' | 'viewer' | 'finance'| 'sales';
+  role: 'admin' | 'manager' | 'viewer' | 'finance';
   created_at?: string;
 }
