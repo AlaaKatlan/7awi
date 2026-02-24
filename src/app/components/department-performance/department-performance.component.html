@@ -1,0 +1,407 @@
+<!-- ============================================= -->
+<!-- DEPARTMENT PERFORMANCE DASHBOARD - ADMIN ONLY -->
+<!-- ============================================= -->
+
+<div class="space-y-6">
+
+  <!-- HEADER -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div>
+      <h2 class="text-2xl font-black text-slate-800">
+        <!-- Department Performance Dashboard -->
+      </h2>
+      <p class="text-slate-500 text-sm mt-1">
+        <!-- Client spend analysis with MoM, QoQ, and YoY comparisons -->
+      </p>
+    </div>
+    <div class="flex flex-wrap gap-3">
+      <button (click)="refreshCharts()"
+              class="flex items-center gap-2 px-4 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-bold text-sm hover:bg-slate-200 transition-all">
+        <span class="material-icons text-lg">refresh</span>
+        <span class="hidden sm:inline">Refresh</span>
+      </button>
+      <button (click)="exportToExcel()"
+              class="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700 transition-all shadow-lg">
+        <span class="material-icons text-lg">download</span>
+        <span class="hidden sm:inline">Export CSV</span>
+        <span class="sm:hidden">CSV</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- SUMMARY STATS CARDS -->
+  <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+    <!-- Total Clients -->
+    <div class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-100">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 sm:w-12 sm:h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+          <span class="material-icons text-blue-600 text-lg sm:text-xl">business</span>
+        </div>
+        <div class="min-w-0 flex-1">
+          <p class="text-xs font-bold text-slate-400 uppercase tracking-wide truncate">Clients</p>
+          <p class="text-xl sm:text-2xl font-black text-slate-800">{{ totalClients() }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- YTD Spend -->
+    <div class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-100">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 sm:w-12 sm:h-12 bg-emerald-100 rounded-xl flex items-center justify-center">
+          <span class="material-icons text-emerald-600 text-lg sm:text-xl">payments</span>
+        </div>
+        <div class="min-w-0 flex-1">
+          <p class="text-xs font-bold text-slate-400 uppercase tracking-wide truncate">YTD Spend</p>
+          <p class="text-lg sm:text-xl font-black text-emerald-600 truncate">{{ formatCurrency(totalYtdSpend()) }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Previous Year -->
+    <div class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-100">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 sm:w-12 sm:h-12 bg-slate-100 rounded-xl flex items-center justify-center">
+          <span class="material-icons text-slate-600 text-lg sm:text-xl">history</span>
+        </div>
+        <div class="min-w-0 flex-1">
+          <p class="text-xs font-bold text-slate-400 uppercase tracking-wide truncate">Prev Year</p>
+          <p class="text-lg sm:text-xl font-black text-slate-600 truncate">{{ formatCurrency(totalPreviousYearSpend()) }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Avg MoM -->
+    <div class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-100">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center"
+             [class.bg-emerald-100]="avgMomChange() >= 0"
+             [class.bg-red-100]="avgMomChange() < 0">
+          <span class="material-icons text-lg sm:text-xl"
+                [class.text-emerald-600]="avgMomChange() >= 0"
+                [class.text-red-600]="avgMomChange() < 0">
+            {{ getChangeIcon(avgMomChange()) }}
+          </span>
+        </div>
+        <div class="min-w-0 flex-1">
+          <p class="text-xs font-bold text-slate-400 uppercase tracking-wide truncate">Avg MoM</p>
+          <p class="text-lg sm:text-xl font-black truncate"
+             [class.text-emerald-600]="avgMomChange() >= 0"
+             [class.text-red-600]="avgMomChange() < 0">
+            {{ formatPercent(avgMomChange()) }}
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Avg YoY -->
+    <div class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-100 col-span-2 md:col-span-1">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center"
+             [class.bg-emerald-100]="avgYoyChange() >= 0"
+             [class.bg-red-100]="avgYoyChange() < 0">
+          <span class="material-icons text-lg sm:text-xl"
+                [class.text-emerald-600]="avgYoyChange() >= 0"
+                [class.text-red-600]="avgYoyChange() < 0">
+            {{ getChangeIcon(avgYoyChange()) }}
+          </span>
+        </div>
+        <div class="min-w-0 flex-1">
+          <p class="text-xs font-bold text-slate-400 uppercase tracking-wide truncate">Avg YoY</p>
+          <p class="text-lg sm:text-xl font-black truncate"
+             [class.text-emerald-600]="avgYoyChange() >= 0"
+             [class.text-red-600]="avgYoyChange() < 0">
+            {{ formatPercent(avgYoyChange()) }}
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ✅ FILTERS SECTION - ABOVE CHARTS -->
+  <div class="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-100">
+    <div class="flex items-center gap-2 mb-4">
+      <span class="material-icons text-blue-600">filter_list</span>
+      <h3 class="font-bold text-slate-700">Filters</h3>
+      <span class="text-xs text-slate-400">(Charts & Table update automatically)</span>
+    </div>
+    <div class="flex flex-col lg:flex-row gap-4">
+      <!-- Search -->
+      <div class="flex-1">
+        <div class="relative">
+          <span class="material-icons absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+          <input type="text"
+                 [value]="searchText()"
+                 (input)="searchText.set($any($event.target).value); refreshCharts()"
+                 placeholder="Search clients, managers..."
+                 class="w-full pl-12 pr-4 py-3 bg-slate-50 rounded-xl border-0 outline-none font-medium focus:ring-2 focus:ring-blue-500">
+        </div>
+      </div>
+
+      <!-- Department Filter -->
+      <div class="w-full lg:w-52">
+        <select [value]="selectedDepartment() || ''"
+                (change)="selectedDepartment.set($any($event.target).value ? +$any($event.target).value : null); refreshCharts()"
+                class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none font-medium focus:ring-2 focus:ring-blue-500 cursor-pointer">
+          <option value="">All Departments</option>
+          @for (dept of departments(); track dept.product_id) {
+            <option [value]="dept.product_id">{{ dept.product_name }}</option>
+          }
+        </select>
+      </div>
+
+      <!-- Country Filter -->
+      <div class="w-full lg:w-44">
+        <select [value]="selectedCountry()"
+                (change)="selectedCountry.set($any($event.target).value); refreshCharts()"
+                class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none font-medium focus:ring-2 focus:ring-blue-500 cursor-pointer">
+          <option value="ALL">All Countries</option>
+          @for (country of countries(); track country) {
+            <option [value]="country">{{ country }}</option>
+          }
+        </select>
+      </div>
+
+      <!-- Clear Filters -->
+      @if (selectedDepartment() || selectedCountry() !== 'ALL' || searchText()) {
+        <button (click)="selectedDepartment.set(null); selectedCountry.set('ALL'); searchText.set(''); refreshCharts()"
+                class="px-4 py-3 bg-rose-50 text-rose-600 rounded-xl font-bold text-sm hover:bg-rose-100 transition flex items-center gap-2">
+          <span class="material-icons text-sm">clear</span>
+          Clear All
+        </button>
+      }
+    </div>
+
+    <!-- Active Filters Display -->
+    @if (selectedDepartment() || selectedCountry() !== 'ALL') {
+      <div class="flex flex-wrap gap-2 mt-4 pt-4 border-t border-slate-100">
+        <span class="text-xs text-slate-400 font-bold uppercase">Active:</span>
+        @if (selectedDepartment()) {
+          <span class="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center gap-1">
+            <span class="material-icons text-xs">folder</span>
+            {{ getSelectedDepartmentName() }}
+            <button (click)="selectedDepartment.set(null); refreshCharts()" class="ml-1 hover:text-blue-900">×</button>
+          </span>
+        }
+        @if (selectedCountry() !== 'ALL') {
+          <span class="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold flex items-center gap-1">
+            <span class="material-icons text-xs">public</span>
+            {{ selectedCountry() }}
+            <button (click)="selectedCountry.set('ALL'); refreshCharts()" class="ml-1 hover:text-emerald-900">×</button>
+          </span>
+        }
+      </div>
+    }
+  </div>
+
+  <!-- CHARTS SECTION - NOW BELOW FILTERS -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Department Comparison Chart -->
+    <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+      <div class="h-72">
+        <canvas id="deptComparisonChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Monthly Trend Chart -->
+    <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+      <div class="h-72">
+        <canvas id="monthlyTrendChart"></canvas>
+      </div>
+    </div>
+
+    <!-- YoY Distribution Chart -->
+    <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+      <div class="h-72">
+        <canvas id="yoyChangeChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Top Clients Chart -->
+    <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+      <div class="h-72">
+        <canvas id="topClientsChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- DEPARTMENT SUMMARY CARDS -->
+  <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+    <div class="bg-gradient-to-r from-indigo-600 to-indigo-500 px-6 py-4">
+      <h3 class="text-white font-bold flex items-center gap-2">
+        <span class="material-icons">analytics</span>
+        Department Summary
+        @if (selectedCountry() !== 'ALL') {
+          <span class="text-indigo-200 text-sm">({{ selectedCountry() }})</span>
+        }
+      </h3>
+    </div>
+    <div class="p-6">
+      @if (departmentSummaries().length > 0) {
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          @for (dept of departmentSummaries(); track dept.product_id) {
+            <div class="bg-slate-50 rounded-xl p-4 border border-slate-100 hover:shadow-md transition cursor-pointer"
+                 [class.ring-2]="selectedDepartment() === dept.product_id"
+                 [class.ring-blue-500]="selectedDepartment() === dept.product_id"
+                 (click)="selectedDepartment.set(selectedDepartment() === dept.product_id ? null : dept.product_id); refreshCharts()">
+              <div class="flex items-center justify-between mb-3">
+                <h4 class="font-bold text-slate-700 truncate">{{ dept.product_name }}</h4>
+                <span class="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-bold">
+                  {{ dept.total_clients }} clients
+                </span>
+              </div>
+              <div class="space-y-2">
+                <div class="flex justify-between text-sm">
+                  <span class="text-slate-500">YTD:</span>
+                  <span class="font-bold text-slate-700">{{ formatCurrency(dept.total_ytd_spend) }}</span>
+                </div>
+                <div class="flex justify-between text-sm">
+                  <span class="text-slate-500">Prev Year:</span>
+                  <span class="font-medium text-slate-500">{{ formatCurrency(dept.total_previous_year_spend) }}</span>
+                </div>
+                <div class="flex gap-2 mt-3">
+                  <span class="px-2 py-1 rounded text-xs font-bold" [class]="getChangeClass(dept.avg_yoy_change)">
+                    YoY {{ formatPercent(dept.avg_yoy_change) }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          }
+        </div>
+      } @else {
+        <div class="text-center py-8">
+          <span class="material-icons text-4xl text-slate-200">folder_off</span>
+          <p class="text-slate-400 mt-2">No departments match current filters</p>
+        </div>
+      }
+    </div>
+  </div>
+
+  <!-- DATA TABLE -->
+  <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+    <div class="bg-gradient-to-r from-slate-700 to-slate-600 px-6 py-4">
+      <h3 class="text-white font-bold flex items-center gap-2">
+        <span class="material-icons">table_chart</span>
+        Client Performance Data
+        <span class="text-slate-300 text-sm font-normal">({{ filteredPerformance().length }} records)</span>
+      </h3>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead class="bg-slate-50 border-b border-slate-100">
+          <tr>
+            <th class="text-left p-4 font-bold text-slate-600 text-xs uppercase tracking-wider">
+              <button (click)="sort('client_name')" class="flex items-center gap-1 hover:text-blue-600 transition">
+                Client
+                <span class="material-icons text-sm">{{ getSortIcon('client_name') }}</span>
+              </button>
+            </th>
+            <th class="text-left p-4 font-bold text-slate-600 text-xs uppercase tracking-wider hidden md:table-cell">
+              <button (click)="sort('country')" class="flex items-center gap-1 hover:text-blue-600 transition">
+                Country
+                <span class="material-icons text-sm">{{ getSortIcon('country') }}</span>
+              </button>
+            </th>
+            <th class="text-left p-4 font-bold text-slate-600 text-xs uppercase tracking-wider hidden lg:table-cell">
+              <button (click)="sort('account_manager_name')" class="flex items-center gap-1 hover:text-blue-600 transition">
+                Acct. Manager
+                <span class="material-icons text-sm">{{ getSortIcon('account_manager_name') }}</span>
+              </button>
+            </th>
+            <th class="text-right p-4 font-bold text-slate-600 text-xs uppercase tracking-wider hidden sm:table-cell">
+              <button (click)="sort('previous_year_spend')" class="flex items-center gap-1 justify-end hover:text-blue-600 transition">
+                Prev Year
+                <span class="material-icons text-sm">{{ getSortIcon('previous_year_spend') }}</span>
+              </button>
+            </th>
+            <th class="text-right p-4 font-bold text-slate-600 text-xs uppercase tracking-wider">
+              <button (click)="sort('ytd_spend')" class="flex items-center gap-1 justify-end hover:text-blue-600 transition">
+                YTD Spend
+                <span class="material-icons text-sm">{{ getSortIcon('ytd_spend') }}</span>
+              </button>
+            </th>
+            <th class="text-center p-4 font-bold text-slate-600 text-xs uppercase tracking-wider">
+              <button (click)="sort('mom_change')" class="flex items-center gap-1 justify-center hover:text-blue-600 transition">
+                MoM %
+                <span class="material-icons text-sm">{{ getSortIcon('mom_change') }}</span>
+              </button>
+            </th>
+            <th class="text-center p-4 font-bold text-slate-600 text-xs uppercase tracking-wider hidden sm:table-cell">
+              <button (click)="sort('qoq_change')" class="flex items-center gap-1 justify-center hover:text-blue-600 transition">
+                QoQ %
+                <span class="material-icons text-sm">{{ getSortIcon('qoq_change') }}</span>
+              </button>
+            </th>
+            <th class="text-center p-4 font-bold text-slate-600 text-xs uppercase tracking-wider">
+              <button (click)="sort('yoy_change')" class="flex items-center gap-1 justify-center hover:text-blue-600 transition">
+                YoY %
+                <span class="material-icons text-sm">{{ getSortIcon('yoy_change') }}</span>
+              </button>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (item of filteredPerformance(); track item.client_id) {
+            <tr class="border-b border-slate-50 hover:bg-slate-50/50 transition">
+              <td class="p-4">
+                <div class="font-bold text-slate-800">{{ item.client_name }}</div>
+                <div class="text-xs text-slate-400 md:hidden">{{ item.country }}</div>
+              </td>
+              <td class="p-4 text-slate-600 hidden md:table-cell">{{ item.country }}</td>
+              <td class="p-4 text-slate-600 hidden lg:table-cell">{{ item.account_manager_name }}</td>
+              <td class="p-4 text-right font-medium text-slate-500 hidden sm:table-cell">
+                {{ formatCurrency(item.previous_year_spend) }}
+              </td>
+              <td class="p-4 text-right font-bold text-slate-800">
+                {{ formatCurrency(item.ytd_spend) }}
+              </td>
+              <td class="p-4 text-center">
+                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold"
+                      [class]="getChangeClass(item.mom_change)">
+                  <span class="material-icons text-xs">{{ getChangeIcon(item.mom_change) }}</span>
+                  {{ formatPercent(item.mom_change) }}
+                </span>
+              </td>
+              <td class="p-4 text-center hidden sm:table-cell">
+                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold"
+                      [class]="getChangeClass(item.qoq_change)">
+                  <span class="material-icons text-xs">{{ getChangeIcon(item.qoq_change) }}</span>
+                  {{ formatPercent(item.qoq_change) }}
+                </span>
+              </td>
+              <td class="p-4 text-center">
+                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold"
+                      [class]="getChangeClass(item.yoy_change)">
+                  <span class="material-icons text-xs">{{ getChangeIcon(item.yoy_change) }}</span>
+                  {{ formatPercent(item.yoy_change) }}
+                </span>
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="8" class="p-12 text-center">
+                <div class="flex flex-col items-center gap-3">
+                  <span class="material-icons text-5xl text-slate-200">analytics</span>
+                  <p class="text-slate-400 font-medium">No client data found</p>
+                  <p class="text-slate-300 text-sm">Try adjusting your filters</p>
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Table Footer -->
+    @if (filteredPerformance().length > 0) {
+      <div class="bg-slate-50 px-4 py-3 border-t border-slate-100 flex justify-between items-center">
+        <p class="text-sm text-slate-500">
+          Showing <span class="font-bold text-slate-700">{{ filteredPerformance().length }}</span> clients
+        </p>
+        <p class="text-xs text-slate-400">
+          Data based on <span class="font-medium">fact_revenue.gross_amount</span>
+        </p>
+      </div>
+    }
+  </div>
+
+</div>

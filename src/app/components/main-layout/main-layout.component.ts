@@ -12,14 +12,16 @@ import { CostManagerComponent } from '../cost-manager/cost-manager.component';
 import { ClientManagerComponent } from '../client-manager/client-manager.component';
 import { EmployeeManagerComponent } from '../employee-manager/employee-manager.component';
 import { SalaryManagerComponent } from '../salary-manager/salary-manager.component';
+import { DepartmentPerformanceComponent } from '../department-performance/department-performance.component';
 
 @Component({
   selector: 'app-main-layout',
   standalone: true,
   imports: [
     CommonModule, FormsModule, DashboardComponent, RevenueManagerComponent,
-    BookingOrderManagerComponent, PipelineManagerComponent, TargetManagerComponent,
-    CostManagerComponent, ClientManagerComponent, EmployeeManagerComponent, SalaryManagerComponent
+    BookingOrderManagerComponent, PipelineManagerComponent, TargetManagerComponent, 
+    CostManagerComponent, ClientManagerComponent, EmployeeManagerComponent, SalaryManagerComponent,
+    DepartmentPerformanceComponent
   ],
   template: `
     <div class="flex h-screen bg-surface font-sans text-slate-800">
@@ -34,55 +36,63 @@ import { SalaryManagerComponent } from '../salary-manager/salary-manager.compone
 
         <nav class="flex-1 p-4 space-y-1 mt-4 overflow-y-auto">
 
-          <ng-container *ngIf="!authService.isSales()">
-            <button (click)="activeTab = 'dashboard'"
-                    [class]="activeTab === 'dashboard' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
-                    class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
-              <span class="material-icons" [class.mr-3]="sidebarOpen">dashboard</span>
-              <span *ngIf="sidebarOpen">Dashboard</span>
-            </button>
+          <button (click)="activeTab = 'dashboard'"
+                  [class]="activeTab === 'dashboard' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
+                  class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
+            <span class="material-icons" [class.mr-3]="sidebarOpen">dashboard</span>
+            <span *ngIf="sidebarOpen">Dashboard</span>
+          </button>
 
-            <div *ngIf="sidebarOpen" class="pt-4 pb-2">
-              <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">Financial</span>
-            </div>
+          <!-- ✅ NEW: Department Performance - Admin Only -->
+          <button *ngIf="authService.isAdmin()"
+                  (click)="activeTab = 'dept-performance'"
+                  [class]="activeTab === 'dept-performance' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
+                  class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
+            <span class="material-icons" [class.mr-3]="sidebarOpen">leaderboard</span>
+            <span *ngIf="sidebarOpen">Dept. Performance</span>
+          </button>
 
-            <button (click)="activeTab = 'booking-orders'"
-                    [class]="activeTab === 'booking-orders' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
-                    class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
-              <span class="material-icons" [class.mr-3]="sidebarOpen">receipt_long</span>
-              <span *ngIf="sidebarOpen">Booking Orders</span>
-            </button>
+          <div *ngIf="sidebarOpen" class="pt-4 pb-2">
+            <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">Financial</span>
+          </div>
 
-            <button (click)="activeTab = 'revenue'"
-                    [class]="activeTab === 'revenue' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
-                    class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
-              <span class="material-icons" [class.mr-3]="sidebarOpen">attach_money</span>
-              <span *ngIf="sidebarOpen">Revenue (Legacy)</span>
-            </button>
+          <!-- ✅ Booking Orders Button -->
+          <button (click)="activeTab = 'booking-orders'"
+                  [class]="activeTab === 'booking-orders' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
+                  class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
+            <span class="material-icons" [class.mr-3]="sidebarOpen">receipt_long</span>
+            <span *ngIf="sidebarOpen">Booking Orders</span>
+          </button>
 
-            <button (click)="activeTab = 'pipeline'"
-                    [class]="activeTab === 'pipeline' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
-                    class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
-              <span class="material-icons" [class.mr-3]="sidebarOpen">insights</span>
-              <span *ngIf="sidebarOpen">Pipeline</span>
-            </button>
+          <button (click)="activeTab = 'revenue'"
+                  [class]="activeTab === 'revenue' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
+                  class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
+            <span class="material-icons" [class.mr-3]="sidebarOpen">attach_money</span>
+            <span *ngIf="sidebarOpen">Revenue (Legacy)</span>
+          </button>
 
-            <button (click)="activeTab = 'target'"
-                    [class]="activeTab === 'target' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
-                    class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
-              <span class="material-icons" [class.mr-3]="sidebarOpen">flag</span>
-              <span *ngIf="sidebarOpen">Targets</span>
-            </button>
+          <button (click)="activeTab = 'pipeline'"
+                  [class]="activeTab === 'pipeline' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
+                  class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
+            <span class="material-icons" [class.mr-3]="sidebarOpen">insights</span>
+            <span *ngIf="sidebarOpen">Pipeline</span>
+          </button>
 
-            <button (click)="activeTab = 'cost'"
-                    [class]="activeTab === 'cost' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
-                    class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
-              <span class="material-icons" [class.mr-3]="sidebarOpen">money_off</span>
-              <span *ngIf="sidebarOpen">Costs</span>
-            </button>
-          </ng-container>
+          <button (click)="activeTab = 'target'"
+                  [class]="activeTab === 'target' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
+                  class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
+            <span class="material-icons" [class.mr-3]="sidebarOpen">flag</span>
+            <span *ngIf="sidebarOpen">Targets</span>
+          </button>
 
-          <ng-container *ngIf="authService.isAdmin() || authService.isFinance() || authService.isSales()">
+          <button (click)="activeTab = 'cost'"
+                  [class]="activeTab === 'cost' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
+                  class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
+            <span class="material-icons" [class.mr-3]="sidebarOpen">money_off</span>
+            <span *ngIf="sidebarOpen">Costs</span>
+          </button>
+
+          <ng-container *ngIf="authService.isAdmin() || authService.isFinance()">
             <div *ngIf="sidebarOpen" class="pt-4 pb-2">
               <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">People</span>
             </div>
@@ -155,27 +165,28 @@ import { SalaryManagerComponent } from '../salary-manager/salary-manager.compone
         </header>
 
         @switch (activeTab) {
-            @case ('dashboard') {
-              @if (!authService.isSales()) { <app-dashboard></app-dashboard> }
+            @case ('dashboard') { <app-dashboard></app-dashboard> }
+            
+            @case ('dept-performance') {
+              @if (authService.isAdmin()) {
+                <app-department-performance></app-department-performance>
+              } @else {
+                <div class="bg-white rounded-2xl p-12 text-center shadow-sm">
+                  <span class="material-icons text-6xl text-red-200">lock</span>
+                  <h2 class="text-xl font-bold text-slate-700 mt-4">Access Denied</h2>
+                  <p class="text-slate-400 mt-2">You don't have permission to view this page.</p>
+                </div>
+              }
             }
-            @case ('booking-orders') {
-              @if (!authService.isSales()) { <app-booking-order-manager></app-booking-order-manager> }
-            }
-            @case ('revenue') {
-              @if (!authService.isSales()) { <app-revenue-manager></app-revenue-manager> }
-            }
-            @case ('pipeline') {
-              @if (!authService.isSales()) { <app-pipeline-manager></app-pipeline-manager> }
-            }
-            @case ('target') {
-              @if (!authService.isSales()) { <app-target-manager></app-target-manager> }
-            }
-            @case ('cost') {
-              @if (!authService.isSales()) { <app-cost-manager></app-cost-manager> }
-            }
+            
+            @case ('booking-orders') { <app-booking-order-manager></app-booking-order-manager> }
+            @case ('revenue') { <app-revenue-manager></app-revenue-manager> }
+            @case ('pipeline') { <app-pipeline-manager></app-pipeline-manager> }
+            @case ('target') { <app-target-manager></app-target-manager> }
+            @case ('cost') { <app-cost-manager></app-cost-manager> }
 
             @case ('clients') {
-              @if (authService.isAdmin() || authService.isFinance() || authService.isSales()) {
+              @if (authService.isAdmin() || authService.isFinance()) {
                 <app-client-manager></app-client-manager>
               } @else {
                 <div class="bg-white rounded-2xl p-12 text-center shadow-sm">
@@ -258,7 +269,7 @@ import { SalaryManagerComponent } from '../salary-manager/salary-manager.compone
   `]
 })
 export class MainLayoutComponent {
-  activeTab: 'dashboard' | 'booking-orders' | 'revenue' | 'pipeline' | 'target' | 'cost' | 'clients' | 'employees' | 'salaries' = 'dashboard';
+  activeTab: 'dashboard' | 'dept-performance' | 'booking-orders' | 'revenue' | 'pipeline' | 'target' | 'cost' | 'clients' | 'employees' | 'salaries' = 'dashboard';
   sidebarOpen = true;
 
   dataService = inject(DataService);
@@ -274,14 +285,7 @@ export class MainLayoutComponent {
 
   constructor() {
     effect(() => {
-      const profile = this.userProfile();
-      console.log('Layout Profile Updated:', profile);
-
-      // ✅ التوجيه التلقائي للمبيعات:
-      // بمجرد تحميل ملف المستخدم ومعرفة أنه Sales، نغير التاب الافتراضية من Dashboard إلى Clients
-      if (this.authService.isSales() && this.activeTab === 'dashboard') {
-        this.activeTab = 'clients';
-      }
+      console.log('Layout Profile Updated:', this.userProfile());
     });
   }
 
@@ -290,6 +294,7 @@ export class MainLayoutComponent {
   getPageTitle(): string {
     const titles: Record<string, string> = {
       'dashboard': 'Insight Dashboard',
+      'dept-performance': 'Department Performance',
       'booking-orders': 'Booking Order Management',
       'revenue': 'Revenue Management (Legacy)',
       'pipeline': 'Pipeline Management',
