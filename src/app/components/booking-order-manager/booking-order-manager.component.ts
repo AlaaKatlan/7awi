@@ -356,6 +356,9 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
   // =============================================
   // BO NAME GENERATION
   // =============================================
+// =============================================
+  // BO NAME GENERATION
+  // =============================================
 
   generateBoName(): void {
     const country = this.currentItem.country || 'UAE';
@@ -369,14 +372,22 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
     const productCode = (product?.product_name || 'DEPT').replace(/\s/g, '').substring(0, 15).toUpperCase();
     const campaignCode = campaign.replace(/\s/g, '').substring(0, 20).toUpperCase();
     const dateCode = date.substring(5, 7) + date.substring(0, 4); // MMYYYY
-    const seqCode = (this.currentItem.order_seq || this.dataService.revenues().length + 1).toString().padStart(3, '0');
+
+    // ✅ التعديل هنا: جلب أعلى رقم order_seq من كل الطلبات، وإضافة 1 للطلب الجديد
+    const allRevenues = this.dataService.revenues();
+    const maxSeq = allRevenues.length > 0 ? Math.max(...allRevenues.map(r => r.order_seq || 0)) : 0;
+
+    // إذا كان الطلب موجود مسبقاً (تعديل) نأخذ رقمه الحالي، وإذا كان جديد نأخذ (الماكس + 1)
+    const nextSeq = this.currentItem.order_seq || (maxSeq + 1);
+    const seqCode = nextSeq.toString().padStart(3, '0');
 
     this.currentItem.bo_name = `${countryCode}_${clientCode}_${productCode}_${campaignCode}_${dateCode}_${seqCode}`;
 
     // Also update order_number for legacy compatibility
-    this.currentItem.order_number = this.dataService.generateBookingRef(country, this.currentItem.product_id);
+    if(this.dataService.generateBookingRef) {
+        this.currentItem.order_number = this.dataService.generateBookingRef(country, this.currentItem.product_id);
+    }
   }
-
   // =============================================
   // MULTI-RETAINER MONTHLY DISTRIBUTION
   // =============================================
