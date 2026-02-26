@@ -1,0 +1,287 @@
+// ╔══════════════════════════════════════════════════════════════════════════════╗
+// ║                   7AWI SYSTEM - EMPLOYEE MANAGER STYLES                      ║
+// ╚══════════════════════════════════════════════════════════════════════════════╝
+
+// Variables
+$primary-color: #3B82F6;
+$success-color: #22C55E;
+$warning-color: #F59E0B;
+$danger-color: #EF4444;
+$info-color: #06B6D4;
+$secondary-color: #64748B;
+
+$border-radius: 8px;
+$spacing-sm: 0.5rem;
+$spacing-md: 1rem;
+$spacing-lg: 1.5rem;
+$spacing-xl: 2rem;
+
+// Main Container
+.employee-manager-container {
+  padding: $spacing-lg;
+  background-color: #f8fafc;
+  min-height: 100vh;
+}
+
+// Header Section
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: $spacing-lg;
+  
+  .header-left {
+    h1 {
+      display: flex;
+      align-items: center;
+      gap: $spacing-sm;
+      margin: 0;
+      font-size: 1.75rem;
+      font-weight: 600;
+      color: #1e293b;
+      
+      i { color: $primary-color; }
+    }
+    
+    .subtitle {
+      display: flex;
+      align-items: center;
+      gap: $spacing-sm;
+      margin-top: $spacing-sm;
+      color: $secondary-color;
+      font-size: 0.9rem;
+    }
+    
+    .admin-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      background: linear-gradient(135deg, $warning-color, #D97706);
+      color: white;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+  }
+  
+  .header-right {
+    display: flex;
+    gap: $spacing-sm;
+  }
+}
+
+// Summary Cards
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: $spacing-md;
+  margin-bottom: $spacing-lg;
+  
+  ::ng-deep .summary-card .p-card-body { padding: $spacing-md; }
+  
+  .summary-content {
+    display: flex;
+    align-items: center;
+    gap: $spacing-md;
+  }
+  
+  .summary-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: $border-radius;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    
+    i { font-size: 1.5rem; color: white; }
+    
+    &.active { background: linear-gradient(135deg, $success-color, #16A34A); }
+    &.salary { background: linear-gradient(135deg, $primary-color, #2563EB); }
+    &.dept { background: linear-gradient(135deg, $info-color, #0891B2); }
+  }
+  
+  .summary-details {
+    display: flex;
+    flex-direction: column;
+    
+    .summary-value { font-size: 1.5rem; font-weight: 700; color: #1e293b; }
+    .summary-label { font-size: 0.85rem; color: $secondary-color; }
+  }
+}
+
+// Filter Section
+.filter-section {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-md;
+  padding: $spacing-md;
+  background: white;
+  border-radius: $border-radius;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  margin-bottom: $spacing-lg;
+  
+  .filter-item {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-sm;
+    
+    label { font-size: 0.85rem; font-weight: 500; color: $secondary-color; }
+    &.filter-actions { align-self: flex-end; }
+  }
+}
+
+// Table Styles
+::ng-deep .p-datatable {
+  .p-datatable-thead > tr > th { background: #f1f5f9; color: #475569; font-weight: 600; }
+  .inactive-row { opacity: 0.6; background-color: #fef2f2 !important; }
+}
+
+.employee-id { font-weight: 600; color: $secondary-color; }
+
+.employee-info {
+  display: flex;
+  flex-direction: column;
+  .employee-name { font-weight: 600; color: #1e293b; }
+  .employee-email { font-size: 0.8rem; color: $secondary-color; }
+}
+
+.department-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  background: #e0f2fe;
+  color: #0369a1;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.amount-cell { font-weight: 600; color: #1e293b; }
+.actions-cell { display: flex; justify-content: center; gap: $spacing-sm; }
+
+.empty-state {
+  text-align: center;
+  padding: $spacing-xl !important;
+  color: $secondary-color;
+  i { font-size: 3rem; display: block; margin-bottom: $spacing-md; opacity: 0.5; }
+}
+
+// Dialog Styles
+.dialog-content {
+  .field {
+    margin-bottom: $spacing-md;
+    label { display: block; margin-bottom: $spacing-sm; font-weight: 500; color: #374151; }
+    .w-full { width: 100%; }
+  }
+  
+  .change-note {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: $spacing-sm;
+    color: $info-color;
+    font-size: 0.8rem;
+  }
+  
+  .field-hint { display: block; margin-top: $spacing-sm; color: $secondary-color; font-size: 0.8rem; }
+}
+
+// History Dialog
+.history-dialog-content { max-height: 60vh; overflow-y: auto; padding: $spacing-sm; }
+
+.history-loading, .history-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: $spacing-xl;
+  color: $secondary-color;
+  i { font-size: 3rem; margin-bottom: $spacing-md; opacity: 0.5; }
+}
+
+::ng-deep .change-timeline .p-timeline-event-opposite { display: none; }
+
+.timeline-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: white;
+  
+  &.marker-success { background: $success-color; }
+  &.marker-warning { background: $warning-color; }
+  &.marker-danger { background: $danger-color; }
+  &.marker-info { background: $info-color; }
+  &.marker-secondary { background: $secondary-color; }
+}
+
+.history-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: $spacing-sm;
+  .history-date { font-size: 0.8rem; color: $secondary-color; }
+}
+
+.history-card-content { padding: $spacing-sm; }
+
+.history-special {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  font-weight: 500;
+  i.pi-check-circle { color: $success-color; font-size: 1.25rem; }
+  i.pi-times-circle { color: $danger-color; font-size: 1.25rem; }
+}
+
+.history-change .history-values {
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+  padding: $spacing-sm;
+  background: #f8fafc;
+  border-radius: $border-radius;
+  
+  .old-value, .new-value {
+    flex: 1;
+    .value-label { display: block; font-size: 0.75rem; color: $secondary-color; text-transform: uppercase; }
+    .value-text { font-weight: 600; }
+  }
+  .old-value .value-text { text-decoration: line-through; color: $danger-color; }
+  .new-value .value-text { color: $success-color; }
+  > i { color: $secondary-color; }
+}
+
+.history-meta {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  margin-top: $spacing-sm;
+  font-size: 0.85rem;
+  color: $secondary-color;
+}
+
+.history-reason {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  margin-top: $spacing-sm;
+  padding: $spacing-sm;
+  background: #fef9c3;
+  border-radius: $border-radius;
+  font-size: 0.85rem;
+  color: #854d0e;
+}
+
+// Responsive
+@media (max-width: 768px) {
+  .page-header {
+    flex-direction: column;
+    gap: $spacing-md;
+    .header-right { width: 100%; button { flex: 1; } }
+  }
+  .filter-section .filter-item { flex: 1; min-width: 200px; }
+  .summary-cards { grid-template-columns: 1fr; }
+}

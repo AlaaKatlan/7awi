@@ -496,32 +496,32 @@ export class DataService {
     // Assigned Team fields
     if (item.lead_id) payload.lead_id = item.lead_id;
     if (item.relationship_manager_id) payload.relationship_manager_id = item.relationship_manager_id;
-    
+
     // Company Info fields
     if (item.product_id) payload.product_id = item.product_id;
     if (item.company_type) payload.company_type = item.company_type;
     if (item.industry) payload.industry = item.industry;
-    
+
     // Contact Info fields
     if (item.poc_name) payload.poc_name = item.poc_name;
     if (item.contact_email) payload.contact_email = item.contact_email;
     if (item.contact_phone) payload.contact_phone = item.contact_phone;
     if (item.contact_person) payload.contact_person = item.contact_person;
-    
+
     // Sales Pipeline fields
     if (item.status) payload.status = item.status;
     if (item.lead_source) payload.lead_source = item.lead_source;
     if (item.account_manager_id) payload.account_manager_id = item.account_manager_id;
-    
+
     // Deal Info fields
     if (item.estimated_deal_value) payload.estimated_deal_value = item.estimated_deal_value;
     if (item.expected_closing_date) payload.expected_closing_date = item.expected_closing_date;
-    
+
     // Key Dates fields
     if (item.first_contact_date) payload.first_contact_date = item.first_contact_date;
     if (item.last_followup_date) payload.last_followup_date = item.last_followup_date;
     if (item.next_action_date) payload.next_action_date = item.next_action_date;
-    
+
     // Notes
     if (item.notes) payload.notes = item.notes;
 
@@ -676,83 +676,8 @@ export class DataService {
   // =============================================
   // SALARY CRUD
   // =============================================
-  async updateSalary(item: Partial<FactSalary>) {
-    const { id, created_at, ...payload } = item as any;
-    const { data, error } = await this.supabase.from('fact_salary').update(payload).eq('id', id).select();
-    if (data) this.salaries.update(v => v.map(s => s.id === id ? data[0] : s));
-    return { success: !error, error: error?.message, data };
-  }
 
-  async generateMonthlySalaries(year: number, month: number): Promise<{ success: boolean; error?: any; generated: number }> {
-    try {
-      const allEmployees = this.employees();
-      const activeEmployees = allEmployees.filter(emp => !emp.end_date);
 
-      if (activeEmployees.length === 0) {
-        return { success: true, generated: 0 };
-      }
-
-      const localSalaries = this.salaries();
-      const existingForThisMonth = localSalaries.filter(s => s.year === year && s.month === month);
-      const existingEmployeeIds = new Set(existingForThisMonth.map(s => s.employee_id));
-
-      const employeesNeedingSalary = activeEmployees.filter(
-        emp => !existingEmployeeIds.has(emp.employee_id)
-      );
-
-      if (employeesNeedingSalary.length === 0) {
-        return { success: true, generated: 0 };
-      }
-
-      const newSalaryRecords = employeesNeedingSalary.map(emp => {
-        const finalSalary = Math.round((Number(emp.salary) || 0) * 100) / 100;
-
-        return {
-          employee_id: emp.employee_id,
-          year: year,
-          month: month,
-          base_salary: finalSalary,
-          bonus: 0,
-          deductions: 0,
-          net_salary: finalSalary,
-          status: 'pending' as const
-        };
-      });
-
-      const BATCH_SIZE = 50;
-      let totalInserted = 0;
-      const allInsertedData: any[] = [];
-
-      for (let i = 0; i < newSalaryRecords.length; i += BATCH_SIZE) {
-        const batch = newSalaryRecords.slice(i, i + BATCH_SIZE);
-
-        const { data: insertedData, error: insertError } = await this.supabase
-          .from('fact_salary')
-          .insert(batch)
-          .select();
-
-        if (insertError) {
-          console.error('Error inserting batch:', insertError);
-          continue;
-        }
-
-        if (insertedData) {
-          totalInserted += insertedData.length;
-          allInsertedData.push(...insertedData);
-        }
-      }
-
-      if (allInsertedData.length > 0) {
-        this.salaries.update(current => [...allInsertedData, ...current]);
-      }
-
-      return { success: true, generated: totalInserted };
-
-    } catch (error: any) {
-      console.error('Unexpected error in generateMonthlySalaries:', error);
-      return { success: false, error: error.message, generated: 0 };
-    }
-  }
 
   // =============================================
   // TARGET CRUD
@@ -770,5 +695,88 @@ export class DataService {
     if (data) this.targets.update(v => v.map(t => t.id === id ? data[0] : t));
     return { success: !error, error: error?.message, data };
   }
+  // أضف هذه الدالة داخل كلاس DataService
 
+ // =============================================
+  // SALARY MANAGEMENT (UPDATED)
+  // =============================================
+
+  // 1. إضافة راتب يدوي (Snapshotting Department)
+  async addManualSalary(salary: Partial<FactSalary>) {
+    // نجلب الموظف لنعرف قسمه الحالي
+    const employee = this.employees().find(e => e.employee_id === salary.employee_id);
+
+    const payload = {
+      ...salary,
+      // ⚠️ هنا السر: نأخذ القسم الحالي للموظف ونخزنه في الراتب للأبد
+      product_id: employee?.product_id,
+      status: 'pending'
+    };
+
+    const { data, error } = await this.supabase.from('fact_salary').insert([payload]).select();
+
+    if (data) {
+      this.salaries.update(current => [...data, ...current]);
+      return { success: true, data: data[0] };
+    }
+    return { success: false, error: error?.message };
+  }
+
+  // 2. تحديث راتب موجود
+  async updateSalary(salary: FactSalary) {
+    const { id, ...payload } = salary;
+    // تنظيف البيانات من الحقول المحسوبة
+    const { created_by_name, updated_by_name, ...cleanPayload } = payload as any;
+
+    const { data, error } = await this.supabase
+      .from('fact_salary')
+      .update(cleanPayload)
+      .eq('id', id)
+      .select();
+
+    if (data) {
+      this.salaries.update(list => list.map(s => s.id === id ? (data[0] as FactSalary) : s));
+      return { success: true, data: data[0] };
+    }
+    return { success: false, error: error?.message };
+  }
+ // =============================================
+  // SALARY GENERATION (Bulk)
+  // =============================================
+
+  // 3. توليد الرواتب الجماعي (مع التثبيت)
+  async generateMonthlySalaries(year: number, month: number) {
+    try {
+      const activeEmployees = this.employees().filter(e => !e.end_date);
+      const existingSalaries = this.salaries().filter(s => s.year === year && s.month === month);
+
+      const employeesToPay = activeEmployees.filter(e =>
+        !existingSalaries.some(s => s.employee_id === e.employee_id)
+      );
+
+      if (employeesToPay.length === 0) return { success: true, generated: 0 };
+
+      const newSalaries = employeesToPay.map(emp => ({
+        employee_id: emp.employee_id,
+        year: year,
+        month: month,
+        base_salary: emp.salary,
+        net_salary: emp.salary, // مبدئياً
+        status: 'pending',
+        // ⚠️ تثبيت القسم التاريخي
+        product_id: emp.product_id
+      }));
+
+      const { data, error } = await this.supabase.from('fact_salary').insert(newSalaries).select();
+
+      if (data) {
+        this.salaries.update(current => [...data, ...current]);
+        return { success: true, generated: data.length };
+      }
+      return { success: false, error: error?.message, generated: 0 };
+
+    } catch (error: any) {
+      return { success: false, error: error.message, generated: 0 };
+    }
+  }
 }

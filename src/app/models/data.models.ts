@@ -1,3 +1,25 @@
+// ╔══════════════════════════════════════════════════════════════════════════════╗
+// ║                        7AWI SYSTEM - DATA MODELS                             ║
+// ╚══════════════════════════════════════════════════════════════════════════════╝
+
+// --- Types & Enums ---
+export type UserRole = 'admin' | 'manager' | 'finance' | 'viewer' | 'sales';
+export type SalaryStatus = 'pending' | 'paid' | 'cancelled';
+export type ContractType = 'Full Time Contractor' | 'Part Time Contractor' | 'Permanent' | 'Internship' | 'Freelance';
+
+// --- Interfaces ---
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  full_name?: string;
+  role: UserRole;
+  avatar_url?: string;
+  phone?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface DimProduct {
   product_id: number;
   product_name: string;
@@ -11,10 +33,9 @@ export interface DimClient {
   client_name: string;
   country: string;
   product_id?: number;
-  lead_id?: number;
+  lead_id?: number; // ✅ ضروري للـ Booking Order
   relationship_manager_id?: number;
   created_at?: string;
-
   // CRM Fields
   company_type?: 'Direct' | 'Agency';
   first_contact_date?: string;
@@ -22,9 +43,9 @@ export interface DimClient {
   poc_name?: string;
   contact_email?: string;
   contact_phone?: string;
-  status?: 'New Lead' | 'Attempted Contact' | 'Contacted' | 'Qualified' | 'Meeting Scheduled' | 'Proposal Out' | 'Follow Up' | 'Negotiation' | 'Verbal Commitment' | 'PO Received' | 'Closed Won' | 'Closed Lost' | 'On Hold';
-  lead_source?: 'Research' | 'Referral' | 'Database' | 'Website' | 'Inbound Inquiry' | 'Event' | 'Social Media';
-  industry?: 'Research' | 'Banking' | 'Automotive' | 'FMCG' | 'Real Estate' | 'Technology' | 'Healthcare' | 'Retail' | 'Others';
+  status?: string;
+  lead_source?: string;
+  industry?: string;
   estimated_deal_value?: number;
   expected_closing_date?: string;
   notes?: string;
@@ -38,88 +59,72 @@ export interface DimEmployee {
   name: string;
   salary: number;
   salary_aed: number;
-  contract: string;
+  contract: ContractType;
   office: string;
   start_date: string;
-  end_date: string | null;
-  product_id: number;
+  end_date?: string | null;
   email?: string;
   phone?: string;
+  product_id?: number; // القسم الحالي
   created_at?: string;
 }
 
-// ✅ Enhanced Booking Order / Revenue Interface
+// ✅ FactRevenue (كاملة لضمان عمل Booking Order)
 export interface FactRevenue {
   id?: number;
-  
-  // Project Info
-  order_seq?: number;           // Auto-generated sequential number
-  order_number?: string;        // Project ID (legacy field)
-  bo_name?: string;             // Full BO Name: Country_Client_BizUnit_CampaignName_Date_Sequential#
+  date: string;
+  product_id: number;
+  country: string;
+  gross_amount: number;
+  estimated_revenue?: number;
+  order_number?: string;
+  bo_name?: string;
   campaign_name?: string;
   description?: string;
-  project_type?: string;        // Flexible string type
-  booking_order_type?: string;  // Flexible string type
-  
-  // Relations
-  owner_id?: number;            // Employee (Owner)
-  product_id: number;           // Department
-  client_id?: number;           // Client
-  lead_id?: number;             // Lead (legacy)
-  
-  // Location
-  country: string;
-  
-  // Dates
-  date: string;                 // Legacy booking date
+  project_type?: string;
+  booking_order_type?: 'One Time' | 'Multi Retainer';
+  client_id?: number;
+  owner_id?: number;
+  lead_id?: number; // ✅ ضروري
   bo_submission_date?: string;
   start_date?: string | null;
   end_date?: string | null;
   payment_date?: string;
-  
-  // ✅ Payment Terms - Using flexible string type to avoid TypeScript assignment errors
-  payment_terms?: string;                   // 'Upfront' | 'Upon Completion' | 'Custom' | 'Retainer'
-  payment_custom_percentage?: number;       // For Custom payment type (1-100)
-  payment_retainer_start?: string | null;   // For Retainer payment type
-  payment_retainer_end?: string | null;     // For Retainer payment type
-  
-  // Revenue
-  estimated_revenue?: number;
-  gross_amount: number;         // Actual Revenue
-  total_value?: number;         // Legacy total value
-  
-  // Direct Costs
+  order_seq?: number;
+
+  // Costs
   direct_cost_labor?: number;
   direct_cost_material?: number;
   direct_cost_equipment?: number;
   direct_cost_tools?: number;
   direct_cost_other?: number;
-  
-  // One Time Costs
   one_time_marketing?: number;
   one_time_consultation?: number;
   one_time_misc?: number;
-  
-  // Comments
+
+  // Payment Terms (Added recently)
+  payment_terms?: 'Upfront' | 'Upon Completion' | 'Custom' | 'Retainer';
+  payment_custom_percentage?: number;
+  payment_retainer_start?: string | null;
+  payment_retainer_end?: string | null;
+
+  // Approval
   comments?: string;
-  notes?: string;               // Legacy notes
-  
-  // Approval System
-  approval_status?: string;     // 'Pending' | 'Approved' | 'Rejected'
-  approved_by?: number;         // Employee ID who approved
-  approved_at?: string;         // Timestamp of approval
+  approval_status?: 'Pending' | 'Approved' | 'Rejected';
+  approved_by?: number;
+  approved_at?: string;
   approval_notes?: string;
-  
-  // Legacy fields
+
+  // Legacy fields protection
+  total_value?: number;
   year?: number;
   month?: number;
   booking_order?: string;
 }
 
-// ✅ Monthly Distribution for Multi-Retainer
 export interface FactRevenueMonthly {
   id?: number;
-  revenue_id: number;           // FK to fact_revenue
+  revenue_id: number;
   year: number;
   month: number;
   estimated_revenue: number;
@@ -129,22 +134,16 @@ export interface FactRevenueMonthly {
   updated_at?: string;
 }
 
-// ✅ Profitability View (Calculated)
-export interface RevenueProfitability {
-  id: number;
-  order_number?: string;
-  bo_name?: string;
-  campaign_name?: string;
-  estimated_revenue: number;
-  actual_revenue: number;
-  total_direct_cost: number;
-  total_one_time_cost: number;
-  total_cost: number;
-  net_profit: number;
-  profit_margin_percent: number;
-  approval_status?: string;
-  approved_by?: number;
-  approved_at?: string;
+export interface FactCost {
+  id?: number;
+  date: string;
+  year: number;
+  month: number;
+  amount: number;
+  product_id?: number;
+  client_id?: number;
+  revenue_id?: number;
+  description?: string;
 }
 
 export interface FactPipeline {
@@ -168,37 +167,77 @@ export interface FactTarget {
   quarter?: number | null;
 }
 
-export interface FactCost {
-  id?: number;
-  date: string;
-  year: number;
-  month: number;
-  amount: number;
-  product_id?: number;
-  client_id?: number;
-  revenue_id?: number;
-  description?: string;
-}
-
+// ✅ FactSalary (محدثة مع حقول التتبع والقسم التاريخي)
 export interface FactSalary {
   id?: number;
   employee_id: number;
   year: number;
   month: number;
   base_salary: number;
-  bonus?: number;
-  deductions?: number;
+  bonus: number;
+  deductions: number;
   net_salary: number;
   payment_date?: string;
-  status: 'pending' | 'paid' | 'cancelled';
+  status: SalaryStatus;
   notes?: string;
   created_at?: string;
+
+  // الحقول الجديدة (Database v2.0)
+  product_id?: number; // القسم التاريخي وقت الراتب
+  created_by?: string;
+  created_by_name?: string;
+  updated_by?: string;
+  updated_by_name?: string;
+  updated_at?: string;
 }
 
-export interface UserProfile {
-  id: string;
-  email: string;
-  full_name?: string;
-  role: 'admin' | 'manager' | 'viewer' | 'finance';
-  created_at?: string;
+// واجهة مساعدة للعرض في الجدول
+export interface SalaryWithDetails extends FactSalary {
+  effective_product_id?: number;
+  department_name?: string;
+  employee_name?: string;
+  employee_email?: string;
+  employee_contract?: string;
+  employee_office?: string;
+}
+
+// ✅ سجلات التتبع (Audit Logs)
+export interface EmployeeChangeLog {
+  id?: number;
+  employee_id: number;
+  field_changed: string;
+  old_value: string | null;
+  new_value: string | null;
+  changed_by_user_id?: string;
+  changed_by_name?: string;
+  changed_at?: string;
+  change_reason?: string;
+}
+
+export interface SalaryChangeLog {
+  id?: number;
+  salary_id: number;
+  employee_id: number;
+  field_changed: string;
+  old_value: string | null;
+  new_value: string | null;
+  changed_by_user_id?: string;
+  changed_by_name?: string;
+  changed_at?: string;
+  change_reason?: string;
+}
+
+// --- Helper Functions ---
+
+export function calculateNetSalary(base: number, bonus: number, deductions: number): number {
+  return (base || 0) + (bonus || 0) - (deductions || 0);
+}
+
+export function convertUsdToAed(usd: number): number {
+  return Math.round(usd * 3.67 * 100) / 100;
+}
+
+export function getMonthName(month: number): string {
+  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  return months[month - 1] || 'Unknown';
 }

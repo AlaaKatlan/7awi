@@ -70,13 +70,13 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
   bookingOrderTypes = ['One Time', 'Multi Retainer'];
 
   // ✅ NEW: Payment Terms Options
-  paymentTermsOptions = [
+ // ✅ التعديل الوحيد هنا: تحديد النوع بدقة ليقبله TypeScript
+  paymentTermsOptions: { value: 'Upfront' | 'Upon Completion' | 'Custom' | 'Retainer'; label: string; icon: string }[] = [
     { value: 'Upfront', label: 'Upfront', icon: 'bolt' },
     { value: 'Upon Completion', label: 'Upon Completion', icon: 'check_circle' },
     { value: 'Custom', label: 'Custom (%)', icon: 'tune' },
     { value: 'Retainer', label: 'Retainer', icon: 'autorenew' }
   ];
-
   approvalStatuses = ['Pending', 'Approved', 'Rejected'];
 
   countries = ['UAE', 'KSA', 'JOR', 'SYR', 'EGY', 'QAT', 'KWT', 'BHR', 'OMN', 'Other'];

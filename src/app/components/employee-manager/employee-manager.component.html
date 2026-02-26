@@ -58,7 +58,8 @@
       </select>
     </div>
 
-    <button (click)="openModal()"
+    <button *ngIf="authService.canManageEmployees()"
+            (click)="openModal()"
             class="bg-[#1e3a8a] text-white px-6 py-2 rounded-lg font-bold shadow-md hover:bg-blue-900 transition flex items-center gap-2">
       <span class="material-icons text-sm">person_add</span> Add Employee
     </button>
@@ -112,11 +113,12 @@
           }
         </div>
 
-        <div class="px-6 py-4 bg-slate-50 flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div class="px-6 py-4 bg-slate-50 flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity"
+             *ngIf="authService.canManageEmployees()">
           <button (click)="editEmployee(emp)" class="p-2 hover:bg-white rounded-lg transition">
             <span class="material-icons text-slate-400 hover:text-[#1e3a8a]">edit</span>
           </button>
-          <button (click)="confirmDelete(emp)" class="p-2 hover:bg-white rounded-lg transition">
+          <button *ngIf="authService.isAdmin()" (click)="confirmDelete(emp)" class="p-2 hover:bg-white rounded-lg transition">
             <span class="material-icons text-slate-400 hover:text-red-500">delete</span>
           </button>
         </div>
@@ -179,13 +181,13 @@
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div>
             <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Salary (USD) *</label>
-            <input type="number" [(ngModel)]="currentEmployee.salary"
+            <input type="number" [(ngModel)]="currentEmployee.salary" (input)="calculateAed()"
                    class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a] font-bold">
           </div>
           <div>
             <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Salary (AED)</label>
-            <input type="number" [(ngModel)]="currentEmployee.salary_aed"
-                   class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a]">
+            <input type="number" [(ngModel)]="currentEmployee.salary_aed" readonly
+                   class="w-full p-3 bg-slate-100 rounded-xl border-0 outline-none text-slate-500 font-bold cursor-not-allowed">
           </div>
           <div>
             <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">Contract Type</label>
@@ -203,6 +205,8 @@
               <option value="KSA">KSA</option>
               <option value="Remote">Remote</option>
               <option value="UAE">UAE</option>
+              <option value="Egypt">Egypt</option>
+              <option value="Jordan">Jordan</option>
             </select>
           </div>
         </div>
@@ -214,9 +218,9 @@
                    class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a]">
           </div>
           <div>
-            <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">End Date (if applicable)</label>
+            <label class="block text-[10px] font-black text-slate-400 uppercase mb-1">End Date</label>
             <input type="date" [(ngModel)]="currentEmployee.end_date"
-                   class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-[#1e3a8a]">
+                   class="w-full p-3 bg-slate-50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-red-500 text-red-600 font-bold">
           </div>
         </div>
       </div>

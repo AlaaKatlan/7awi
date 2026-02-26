@@ -2,7 +2,9 @@ import { Component, inject, computed, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DataService } from '../../services/data.service';
-import { DimEmployee } from '../../models/data.models';
+import { AuthService } from '../../services/auth.service'; // ✅
+import { ChangeTrackingService } from '../../services/change-tracking.service'; // ✅
+import { DimEmployee, convertUsdToAed } from '../../models/data.models';
 
 @Component({
   selector: 'app-employee-manager',
@@ -12,6 +14,8 @@ import { DimEmployee } from '../../models/data.models';
 })
 export class EmployeeManagerComponent {
   dataService = inject(DataService);
+  authService = inject(AuthService); // لجعل الزر يعمل
+  changeTracker = inject(ChangeTrackingService); // لتسجيل التعديلات
 
   searchText = signal('');
   filterProduct = signal<number | null>(null);
@@ -24,7 +28,6 @@ export class EmployeeManagerComponent {
   isEditMode = false;
   employeeToDelete: DimEmployee | null = null;
 
-  // Computed: المنتجات مرتبة أبجدياً مع Other في النهاية
   sortedProducts = computed(() => {
     return this.dataService.products().slice().sort((a, b) => {
       if (a.product_name.toLowerCase() === 'others') return 1;
@@ -33,69 +36,49 @@ export class EmployeeManagerComponent {
     });
   });
 
-  // Computed: أنواع العقود مرتبة أبجدياً
   sortedContracts = computed(() => {
-    return ['Full Time Contractor', 'Part Time Contractor', 'Permanent','Internship'].sort((a, b) => a.localeCompare(b));
+    return ['Full Time', 'Part Time', 'Contract', 'Intern', 'Freelance'].sort();
   });
 
   currentEmployee: DimEmployee = this.getEmptyEmployee();
 
   filteredEmployees = computed(() => {
     let data = this.dataService.employees();
-
-    if (this.filterStatus() === 'active') {
-      data = data.filter(e => !e.end_date);
-    } else if (this.filterStatus() === 'inactive') {
-      data = data.filter(e => !!e.end_date);
-    }
-
-    if (this.filterProduct() !== null) {
-      data = data.filter(e => e.product_id === this.filterProduct());
-    }
-
-    if (this.filterContract() !== 'ALL') {
-      data = data.filter(e => e.contract === this.filterContract());
-    }
+    if (this.filterStatus() === 'active') data = data.filter(e => !e.end_date);
+    else if (this.filterStatus() === 'inactive') data = data.filter(e => !!e.end_date);
+    if (this.filterProduct() !== null) data = data.filter(e => e.product_id === this.filterProduct());
+    if (this.filterContract() !== 'ALL') data = data.filter(e => e.contract === this.filterContract());
 
     const text = this.searchText().toLowerCase();
     if (text) {
-      data = data.filter(e =>
-        e.name.toLowerCase().includes(text) ||
-        (e.email?.toLowerCase().includes(text))
-      );
+      data = data.filter(e => e.name.toLowerCase().includes(text) || (e.email?.toLowerCase().includes(text)));
     }
-
     return data.sort((a, b) => a.name.localeCompare(b.name));
   });
 
   activeEmployeesCount = computed(() => this.filteredEmployees().filter(e => !e.end_date).length);
   totalPayroll = computed(() => this.filteredEmployees().filter(e => !e.end_date).reduce((sum, e) => sum + Number(e.salary), 0));
-  fullTimeCount = computed(() => this.filteredEmployees().filter(e => !e.end_date && (e.contract === 'Full Time Contractor' || e.contract === 'Permanent')).length);
+  fullTimeCount = computed(() => this.filteredEmployees().filter(e => !e.end_date && e.contract.includes('Full Time')).length);
   productsCount = computed(() => new Set(this.filteredEmployees().map(e => e.product_id)).size);
 
   getEmptyEmployee(): DimEmployee {
     return {
-      employee_id: 0,
-      name: '',
-      salary: 0,
-      salary_aed: 0,
-      contract: 'Full Time Contractor',
-      office: 'UAE',
-      start_date: new Date().toISOString().split('T')[0],
-      end_date: null,
-      product_id: 0,
-      email: '',
-      phone: ''
+      employee_id: 0, name: '', salary: 0, salary_aed: 0, contract: 'Full Time Contractor',
+      office: 'UAE', start_date: new Date().toISOString().split('T')[0], end_date: null,
+      product_id: this.sortedProducts()[0]?.product_id || 0, email: '', phone: ''
     };
+  }
+
+  // ✅ وظيفة جديدة: تحويل العملة عند الكتابة
+  calculateAed() {
+    if (this.currentEmployee.salary) {
+      this.currentEmployee.salary_aed = convertUsdToAed(this.currentEmployee.salary);
+    }
   }
 
   openModal() {
     this.isEditMode = false;
     this.currentEmployee = this.getEmptyEmployee();
-    const products = this.sortedProducts();
-    if (products.length > 0) {
-        this.currentEmployee.product_id = products[0].product_id;
-    }
     this.showModal = true;
   }
 
@@ -116,46 +99,27 @@ export class EmployeeManagerComponent {
   }
 
   async save() {
-    if (!this.currentEmployee.name?.trim()) {
-      alert('Employee Name is required');
-      return;
-    }
-    if (!this.currentEmployee.salary || this.currentEmployee.salary <= 0) {
-      alert('Valid Salary is required');
-      return;
-    }
+    if (!this.currentEmployee.name?.trim()) return alert('Name required');
+    if (!this.currentEmployee.salary) return alert('Salary required');
 
     this.saving.set(true);
-
     try {
+      const payload: DimEmployee = { ...this.currentEmployee };
       let result;
-      const payload: Partial<DimEmployee> = {
-          name: this.currentEmployee.name.trim(),
-          salary: Number(this.currentEmployee.salary),
-          salary_aed: Number(this.currentEmployee.salary_aed) || 0,
-          contract: this.currentEmployee.contract,
-          office: this.currentEmployee.office,
-          start_date: this.currentEmployee.start_date,
-          end_date: this.currentEmployee.end_date || null,
-          product_id: Number(this.currentEmployee.product_id),
-          email: this.currentEmployee.email || '',
-          phone: this.currentEmployee.phone || ''
-      };
 
       if (this.isEditMode) {
-        payload.employee_id = this.currentEmployee.employee_id;
+        // ✅ هنا تم دمج التتبع
+        const oldEmp = this.dataService.employees().find(e => e.employee_id === payload.employee_id);
         result = await this.dataService.updateEmployee(payload);
+        if (result.success && oldEmp) {
+          await this.changeTracker.trackEmployeeUpdate(oldEmp, payload);
+        }
       } else {
         result = await this.dataService.addEmployee(payload);
       }
 
-      if (result.success) {
-        this.closeModal();
-      } else {
-        alert('Error saving employee: ' + (result.error || 'Unknown error'));
-      }
-    } catch (error: any) {
-      alert('An unexpected error occurred: ' + error.message);
+      if (result.success) this.closeModal();
+      else alert('Error: ' + result.error);
     } finally {
       this.saving.set(false);
     }
@@ -163,17 +127,8 @@ export class EmployeeManagerComponent {
 
   async deleteEmployee() {
     if (!this.employeeToDelete) return;
-
-    try {
-      const result = await this.dataService.deleteEmployee(this.employeeToDelete.employee_id);
-      if (!result.success) {
-        alert('Error deleting employee: ' + result.error);
-      }
-    } catch (error: any) {
-      alert('Error deleting employee: ' + error.message);
-    }
-
+    const result = await this.dataService.deleteEmployee(this.employeeToDelete.employee_id);
+    if (!result.success) alert('Error: ' + result.error);
     this.showDeleteModal = false;
-    this.employeeToDelete = null;
   }
 }
