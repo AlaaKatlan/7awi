@@ -3,11 +3,38 @@
 // ╚══════════════════════════════════════════════════════════════════════════════╝
 
 // --- Types & Enums ---
-export type UserRole = 'admin' | 'manager' | 'finance' | 'viewer' | 'sales';
+export type UserRole = 'admin' | 'manager' | 'finance' | 'viewer' | 'sales' | 'hou';
 export type SalaryStatus = 'pending' | 'paid' | 'cancelled';
 export type ContractType = 'Full Time Contractor' | 'Part Time Contractor' | 'Permanent' | 'Internship' | 'Freelance';
+export type PaymentType = 'one_time' | 'multiple' | 'multi_retainer';
 
-// --- Interfaces ---
+// --- Sub-Interfaces ---
+export interface BookingOrderItem {
+  id?: number;
+  revenue_id?: number;
+  item_order?: number;
+  item_name: string;
+  quantity: number;
+  unit_price: number;
+  discount: number;
+  net_amount?: number;
+  notes?: string;
+}
+
+export interface PaymentMilestone {
+  id?: number;
+  revenue_id?: number;
+  milestone_order?: number;
+  milestone_name: string;
+  percentage: number;
+  amount?: number;
+  due_date?: string;
+  status?: string;
+  paid_date?: string;
+  notes?: string;
+}
+
+// --- Main Interfaces ---
 
 export interface UserProfile {
   id: string;
@@ -33,9 +60,14 @@ export interface DimClient {
   client_name: string;
   country: string;
   product_id?: number;
-  lead_id?: number; // ✅ ضروري للـ Booking Order
+  lead_id?: number;
   relationship_manager_id?: number;
   created_at?: string;
+
+  // Audit Fields
+  created_by?: string;
+  created_by_name?: string;
+
   // CRM Fields
   company_type?: 'Direct' | 'Agency';
   first_contact_date?: string;
@@ -65,11 +97,11 @@ export interface DimEmployee {
   end_date?: string | null;
   email?: string;
   phone?: string;
-  product_id?: number; // القسم الحالي
+  product_id?: number;
   created_at?: string;
 }
 
-// ✅ FactRevenue (كاملة لضمان عمل Booking Order)
+// ✅ FactRevenue (Merged & Cleaned)
 export interface FactRevenue {
   id?: number;
   date: string;
@@ -81,16 +113,42 @@ export interface FactRevenue {
   bo_name?: string;
   campaign_name?: string;
   description?: string;
+
+  // Using generic string to prevent HTML Template Literal errors
   project_type?: string;
-  booking_order_type?: 'One Time' | 'Multi Retainer';
+  booking_order_type?: string;
+  payment_type?: PaymentType;
+  payment_terms?: string;
+  approval_status?: string;
+
   client_id?: number;
   owner_id?: number;
-  lead_id?: number; // ✅ ضروري
+  lead_id?: number;
   bo_submission_date?: string;
   start_date?: string | null;
   end_date?: string | null;
-  payment_date?: string;
-  order_seq?: number;
+
+  // Payment Dates
+  payment_date?: string; // Legacy
+  expected_payment_date?: string; // New
+
+  payment_custom_percentage?: number;
+  payment_retainer_start?: string | null;
+  payment_retainer_end?: string | null;
+
+  // VAT & Totals
+  vat_enabled?: boolean;
+  vat_percentage?: number;
+  vat_amount?: number;
+  grand_total?: number;
+  items_subtotal?: number;
+
+  requires_approval?: boolean;
+  approval_required_reason?: string;
+
+  // Relational Tables
+  booking_order_items?: BookingOrderItem[];
+  payment_milestones?: PaymentMilestone[];
 
   // Costs
   direct_cost_labor?: number;
@@ -102,24 +160,18 @@ export interface FactRevenue {
   one_time_consultation?: number;
   one_time_misc?: number;
 
-  // Payment Terms (Added recently)
-  payment_terms?: 'Upfront' | 'Upon Completion' | 'Custom' | 'Retainer';
-  payment_custom_percentage?: number;
-  payment_retainer_start?: string | null;
-  payment_retainer_end?: string | null;
-
-  // Approval
+  // Approval & Notes
   comments?: string;
-  approval_status?: 'Pending' | 'Approved' | 'Rejected';
   approved_by?: number;
   approved_at?: string;
   approval_notes?: string;
 
-  // Legacy fields protection
+  // Legacy
   total_value?: number;
   year?: number;
   month?: number;
   booking_order?: string;
+  order_seq?: number;
 }
 
 export interface FactRevenueMonthly {
@@ -167,7 +219,6 @@ export interface FactTarget {
   quarter?: number | null;
 }
 
-// ✅ FactSalary (محدثة مع حقول التتبع والقسم التاريخي)
 export interface FactSalary {
   id?: number;
   employee_id: number;
@@ -182,8 +233,8 @@ export interface FactSalary {
   notes?: string;
   created_at?: string;
 
-  // الحقول الجديدة (Database v2.0)
-  product_id?: number; // القسم التاريخي وقت الراتب
+  // Audit Fields
+  product_id?: number;
   created_by?: string;
   created_by_name?: string;
   updated_by?: string;
@@ -191,7 +242,6 @@ export interface FactSalary {
   updated_at?: string;
 }
 
-// واجهة مساعدة للعرض في الجدول
 export interface SalaryWithDetails extends FactSalary {
   effective_product_id?: number;
   department_name?: string;
@@ -201,7 +251,7 @@ export interface SalaryWithDetails extends FactSalary {
   employee_office?: string;
 }
 
-// ✅ سجلات التتبع (Audit Logs)
+// --- Tracking Logs ---
 export interface EmployeeChangeLog {
   id?: number;
   employee_id: number;

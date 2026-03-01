@@ -34,9 +34,11 @@ export class DataService {
   // =============================================
   // Helper: Fetch all rows with pagination
   // =============================================
+  // ✅ تم إضافة `selectQuery` لدعم جلب الجداول المرتبطة (مثل البنود والدفعات)
   private async fetchAllRows<T>(
     tableName: string,
-    orderBy?: { column: string; ascending: boolean }
+    orderBy?: { column: string; ascending: boolean },
+    selectQuery: string = '*'
   ): Promise<T[]> {
     const PAGE_SIZE = 1000;
     let allData: T[] = [];
@@ -46,7 +48,7 @@ export class DataService {
     while (hasMore) {
       let query = this.supabase
         .from(tableName)
-        .select('*')
+        .select(selectQuery)
         .range(from, from + PAGE_SIZE - 1);
 
       if (orderBy) {
@@ -61,7 +63,8 @@ export class DataService {
       }
 
       if (data && data.length > 0) {
-        allData = [...allData, ...data];
+        // ✅ الإصلاح هنا: استخدام as any[] لتخطي مشكلة GenericStringError
+        allData = [...allData, ...(data as any[])];
         from += PAGE_SIZE;
         if (data.length < PAGE_SIZE) {
           hasMore = false;
@@ -112,7 +115,9 @@ export class DataService {
   }
 
   async fetchRevenues() {
-    const data = await this.fetchAllRows<FactRevenue>('fact_revenue', { column: 'date', ascending: false });
+    // ✅ جلب الطلب الأساسي مع الجداول المرتبطة به (البنود والدفعات)
+    const selectQuery = '*, booking_order_items(*), payment_milestones(*)';
+    const data = await this.fetchAllRows<FactRevenue>('fact_revenue', { column: 'id', ascending: false }, selectQuery);
     if (data) this.revenues.set(data);
   }
 
@@ -187,6 +192,7 @@ export class DataService {
     return Math.max(...sequenceNumbers) + 1;
   }
 
+  // ✅ الدالة التي كانت مفقودة وتسببت بالخطأ
   regenerateBookingRefForEdit(country: string, productId: number, currentOrderNumber: string): string {
     const countryCode = (country || 'UAE').substring(0, 3).toUpperCase();
     const product = this.products().find(p => p.product_id == productId);
@@ -204,113 +210,122 @@ export class DataService {
   }
 
   // =============================================
-  // REVENUE / BOOKING ORDER CRUD
+  // REVENUE / BOOKING ORDER CRUD (UPDATED FOR ERP)
   // =============================================
   async addRevenue(item: Partial<FactRevenue>) {
+    // 1. استخراج الجداول المرتبطة من الـ Payload
+    const { booking_order_items, payment_milestones, ...mainPayload } = item;
+
+    // تجهيز بيانات الجدول الرئيسي (بدون الجداول المرتبطة)
     const payload: any = {
-      date: item.date,
-      gross_amount: item.gross_amount || 0,
-      total_value: item.total_value || 0,
-      order_number: item.order_number,
-      product_id: item.product_id,
-      country: item.country,
-      lead_id: item.lead_id || null,
-      owner_id: item.owner_id || null,
-      start_date: item.start_date || null,
-      end_date: item.end_date || null,
-      // New fields
-      bo_name: item.bo_name || null,
-      campaign_name: item.campaign_name || null,
-      description: item.description || null,
-      project_type: item.project_type || null,
-      booking_order_type: item.booking_order_type || 'One Time',
-      client_id: item.client_id || null,
-      bo_submission_date: item.bo_submission_date || null,
-      payment_date: item.payment_date || null,
-      estimated_revenue: item.estimated_revenue || 0,
-      direct_cost_labor: item.direct_cost_labor || 0,
-      direct_cost_material: item.direct_cost_material || 0,
-      direct_cost_equipment: item.direct_cost_equipment || 0,
-      direct_cost_tools: item.direct_cost_tools || 0,
-      direct_cost_other: item.direct_cost_other || 0,
-      one_time_marketing: item.one_time_marketing || 0,
-      one_time_consultation: item.one_time_consultation || 0,
-      one_time_misc: item.one_time_misc || 0,
-      comments: item.comments || null,
-      approval_status: item.approval_status || 'Pending',
-      // Payment Terms fields
-      payment_terms: item.payment_terms || 'Upfront',
-      payment_custom_percentage: item.payment_custom_percentage || 50,
-      payment_retainer_start: item.payment_retainer_start || null,
-      payment_retainer_end: item.payment_retainer_end || null
+      ...mainPayload,
+      expected_payment_date: item.expected_payment_date || item.payment_date || null, // التوافق مع الاسم الجديد
+      payment_type: item.payment_type || 'one_time',
+      vat_enabled: item.vat_enabled ?? true,
+      vat_percentage: item.vat_percentage ?? 5,
     };
 
-    const { data, error } = await this.supabase.from('fact_revenue').insert([payload]).select();
+    // إزالة الحقول المؤقتة أو القديمة إن وجدت
+    delete payload.id;
+    delete payload.payment_date;
 
-    if (data) {
-      this.revenues.update(v => [data[0], ...v]);
+    // 2. إدخال الطلب الأساسي
+    const { data: revData, error: revError } = await this.supabase
+      .from('fact_revenue')
+      .insert([payload])
+      .select()
+      .single();
+
+    if (revError) return { success: false, error: revError.message };
+
+    const newRevenueId = revData.id;
+
+    // 3. إدخال البنود المرتبطة (إن وجدت)
+    if (booking_order_items && booking_order_items.length > 0) {
+      const itemsToInsert = booking_order_items.map((i, idx) => ({
+        revenue_id: newRevenueId,
+        item_order: idx + 1,
+        item_name: i.item_name,
+        quantity: i.quantity || 1,
+        unit_price: i.unit_price || 0,
+        discount: i.discount || 0
+      }));
+      await this.supabase.from('booking_order_items').insert(itemsToInsert);
     }
 
-    return { success: !error, error: error?.message, data };
+    // 4. إدخال الدفعات المتعددة (إن وجدت)
+    if (payment_milestones && payment_milestones.length > 0) {
+      const milestonesToInsert = payment_milestones.map((m, idx) => ({
+        revenue_id: newRevenueId,
+        milestone_order: idx + 1,
+        milestone_name: m.milestone_name, // ✅ الإصلاح هنا
+        percentage: m.percentage || 0,
+        amount: m.amount || 0,
+        status: m.status || 'pending'
+      }));
+      await this.supabase.from('payment_milestones').insert(milestonesToInsert);
+    }
+
+    // 5. إعادة الجلب لتحديث الـ Signal والـ Triggers
+    await this.fetchRevenues();
+    return { success: true, data: [revData] };
   }
 
   async updateRevenue(item: Partial<FactRevenue>) {
-    const { id, ...rest } = item;
+    const { id, booking_order_items, payment_milestones, ...rest } = item;
 
-    const payload: any = {};
+    if (!id) return { success: false, error: 'No ID provided' };
 
-    // Basic fields
-    if (rest.date !== undefined) payload.date = rest.date;
-    if (rest.gross_amount !== undefined) payload.gross_amount = rest.gross_amount;
-    if (rest.total_value !== undefined) payload.total_value = rest.total_value;
-    if (rest.order_number !== undefined) payload.order_number = rest.order_number;
-    if (rest.product_id !== undefined) payload.product_id = rest.product_id;
-    if (rest.country !== undefined) payload.country = rest.country;
-    if (rest.lead_id !== undefined) payload.lead_id = rest.lead_id || null;
-    if (rest.owner_id !== undefined) payload.owner_id = rest.owner_id || null;
-    if (rest.start_date !== undefined) payload.start_date = rest.start_date || null;
-    if (rest.end_date !== undefined) payload.end_date = rest.end_date || null;
+    const payload: any = { ...rest };
+    delete payload.payment_date; // التأكد من عدم إرسال الحقل القديم
 
-    // New fields
-    if (rest.bo_name !== undefined) payload.bo_name = rest.bo_name;
-    if (rest.campaign_name !== undefined) payload.campaign_name = rest.campaign_name;
-    if (rest.description !== undefined) payload.description = rest.description;
-    if (rest.project_type !== undefined) payload.project_type = rest.project_type;
-    if (rest.booking_order_type !== undefined) payload.booking_order_type = rest.booking_order_type;
-    if (rest.client_id !== undefined) payload.client_id = rest.client_id || null;
-    if (rest.bo_submission_date !== undefined) payload.bo_submission_date = rest.bo_submission_date;
-    if (rest.payment_date !== undefined) payload.payment_date = rest.payment_date;
-    if (rest.estimated_revenue !== undefined) payload.estimated_revenue = rest.estimated_revenue;
-    if (rest.direct_cost_labor !== undefined) payload.direct_cost_labor = rest.direct_cost_labor;
-    if (rest.direct_cost_material !== undefined) payload.direct_cost_material = rest.direct_cost_material;
-    if (rest.direct_cost_equipment !== undefined) payload.direct_cost_equipment = rest.direct_cost_equipment;
-    if (rest.direct_cost_tools !== undefined) payload.direct_cost_tools = rest.direct_cost_tools;
-    if (rest.direct_cost_other !== undefined) payload.direct_cost_other = rest.direct_cost_other;
-    if (rest.one_time_marketing !== undefined) payload.one_time_marketing = rest.one_time_marketing;
-    if (rest.one_time_consultation !== undefined) payload.one_time_consultation = rest.one_time_consultation;
-    if (rest.one_time_misc !== undefined) payload.one_time_misc = rest.one_time_misc;
-    if (rest.comments !== undefined) payload.comments = rest.comments;
-    if (rest.approval_status !== undefined) payload.approval_status = rest.approval_status;
-    // Payment Terms fields
-    if (rest.payment_terms !== undefined) payload.payment_terms = rest.payment_terms;
-    if (rest.payment_custom_percentage !== undefined) payload.payment_custom_percentage = rest.payment_custom_percentage;
-    if (rest.payment_retainer_start !== undefined) payload.payment_retainer_start = rest.payment_retainer_start || null;
-    if (rest.payment_retainer_end !== undefined) payload.payment_retainer_end = rest.payment_retainer_end || null;
+    // 1. تحديث الطلب الأساسي
+    const { error: revError } = await this.supabase
+      .from('fact_revenue')
+      .update(payload)
+      .eq('id', id);
 
-    const { data, error } = await this.supabase.from('fact_revenue').update(payload).eq('id', id).select();
+    if (revError) return { success: false, error: revError.message };
 
-    if (data) {
-      this.revenues.update(v => v.map(r => r.id === id ? data[0] : r));
+    // 2. تحديث البنود (مسح القديم وإدخال الجديد لتفادي التعقيد)
+    if (booking_order_items) {
+      await this.supabase.from('booking_order_items').delete().eq('revenue_id', id);
+      if (booking_order_items.length > 0) {
+        const itemsToInsert = booking_order_items.map((i, idx) => ({
+          revenue_id: id,
+          item_order: idx + 1,
+          item_name: i.item_name,
+          quantity: i.quantity || 1,
+          unit_price: i.unit_price || 0,
+          discount: i.discount || 0
+        }));
+        await this.supabase.from('booking_order_items').insert(itemsToInsert);
+      }
     }
 
-    return { success: !error, error: error?.message, data };
+    // 3. تحديث الدفعات (مسح القديم وإدخال الجديد)
+    if (payment_milestones) {
+      await this.supabase.from('payment_milestones').delete().eq('revenue_id', id);
+      if (payment_milestones.length > 0) {
+        const milestonesToInsert = payment_milestones.map((m, idx) => ({
+          revenue_id: id,
+          milestone_order: idx + 1,
+          milestone_name: m.milestone_name, // ✅ الإصلاح هنا
+          percentage: m.percentage || 0,
+          amount: m.amount || 0,
+          status: m.status || 'pending'
+        }));
+        await this.supabase.from('payment_milestones').insert(milestonesToInsert);
+      }
+    }
+
+    // إعادة الجلب لتحديث الـ Signal والـ Triggers
+    await this.fetchRevenues();
+    return { success: true };
   }
 
   async deleteRevenue(id: number) {
-    // First delete monthly data
-    await this.supabase.from('fact_revenue_monthly').delete().eq('revenue_id', id);
-
-    // Then delete revenue
+    // بفضل ON DELETE CASCADE في قاعدة البيانات، حذف الأساسي يحذف البنود والدفعات تلقائياً
     const { error } = await this.supabase.from('fact_revenue').delete().eq('id', id);
     if (!error) {
       this.revenues.update(v => v.filter(r => r.id !== id));
@@ -322,8 +337,8 @@ export class DataService {
   // APPROVAL SYSTEM
   // =============================================
   async approveRevenue(revenueId: number, notes?: string) {
-    const currentUser = this.authService.currentUser();
-    const employee = this.employees().find(e => e.email === currentUser?.email);
+    const userProfile = this.authService.userProfile();
+    const employee = this.employees().find(e => e.email === userProfile?.email);
 
     const payload = {
       approval_status: 'Approved',
@@ -332,22 +347,14 @@ export class DataService {
       approval_notes: notes || null
     };
 
-    const { data, error } = await this.supabase
-      .from('fact_revenue')
-      .update(payload)
-      .eq('id', revenueId)
-      .select();
-
-    if (data) {
-      this.revenues.update(v => v.map(r => r.id === revenueId ? data[0] : r));
-    }
-
-    return { success: !error, error: error?.message, data };
+    const { error } = await this.supabase.from('fact_revenue').update(payload).eq('id', revenueId);
+    if (!error) await this.fetchRevenues();
+    return { success: !error, error: error?.message };
   }
 
   async rejectRevenue(revenueId: number, notes?: string) {
-    const currentUser = this.authService.currentUser();
-    const employee = this.employees().find(e => e.email === currentUser?.email);
+    const userProfile = this.authService.userProfile();
+    const employee = this.employees().find(e => e.email === userProfile?.email);
 
     const payload = {
       approval_status: 'Rejected',
@@ -356,17 +363,9 @@ export class DataService {
       approval_notes: notes || null
     };
 
-    const { data, error } = await this.supabase
-      .from('fact_revenue')
-      .update(payload)
-      .eq('id', revenueId)
-      .select();
-
-    if (data) {
-      this.revenues.update(v => v.map(r => r.id === revenueId ? data[0] : r));
-    }
-
-    return { success: !error, error: error?.message, data };
+    const { error } = await this.supabase.from('fact_revenue').update(payload).eq('id', revenueId);
+    if (!error) await this.fetchRevenues();
+    return { success: !error, error: error?.message };
   }
 
   // =============================================
@@ -379,11 +378,6 @@ export class DataService {
       .eq('revenue_id', revenueId)
       .order('year', { ascending: true })
       .order('month', { ascending: true });
-
-    if (error) {
-      console.error('Error fetching monthly data:', error);
-      return [];
-    }
 
     return data || [];
   }
@@ -399,7 +393,6 @@ export class DataService {
           updated_at: new Date().toISOString()
         })
         .eq('id', monthly.id);
-
       return { success: !error, error: error?.message };
     } else {
       const { error } = await this.supabase
@@ -412,7 +405,6 @@ export class DataService {
           actual_revenue: monthly.actual_revenue,
           notes: monthly.notes
         }]);
-
       return { success: !error, error: error?.message };
     }
   }
@@ -420,21 +412,13 @@ export class DataService {
   async updateRevenueMonthly(monthly: FactRevenueMonthly): Promise<{ success: boolean; error?: string }> {
     const { error } = await this.supabase
       .from('fact_revenue_monthly')
-      .update({
-        actual_revenue: monthly.actual_revenue,
-        updated_at: new Date().toISOString()
-      })
+      .update({ actual_revenue: monthly.actual_revenue, updated_at: new Date().toISOString() })
       .eq('id', monthly.id);
-
     return { success: !error, error: error?.message };
   }
 
   async deleteRevenueMonthly(revenueId: number): Promise<{ success: boolean; error?: string }> {
-    const { error } = await this.supabase
-      .from('fact_revenue_monthly')
-      .delete()
-      .eq('revenue_id', revenueId);
-
+    const { error } = await this.supabase.from('fact_revenue_monthly').delete().eq('revenue_id', revenueId);
     return { success: !error, error: error?.message };
   }
 
@@ -443,38 +427,21 @@ export class DataService {
   // =============================================
   async addEmployee(item: Partial<DimEmployee>) {
     const { employee_id, created_at, ...payload } = item as any;
-
-    const { data, error } = await this.supabase
-      .from('dim_employee')
-      .insert([payload])
-      .select();
-
+    const { data, error } = await this.supabase.from('dim_employee').insert([payload]).select();
     if (data && data.length > 0) {
       this.employees.update(v => [...v, data[0]].sort((a, b) => a.name.localeCompare(b.name)));
     }
-
     return { success: !error, error: error?.message, data };
   }
 
   async updateEmployee(item: Partial<DimEmployee>) {
     const { employee_id, created_at, ...payload } = item as any;
+    if (!employee_id) return { success: false, error: 'No employee_id provided', data: null };
 
-    if (!employee_id) {
-      return { success: false, error: 'No employee_id provided', data: null };
-    }
-
-    const { data, error } = await this.supabase
-      .from('dim_employee')
-      .update(payload)
-      .eq('employee_id', employee_id)
-      .select();
-
+    const { data, error } = await this.supabase.from('dim_employee').update(payload).eq('employee_id', employee_id).select();
     if (data && data.length > 0) {
-      this.employees.update(currentList =>
-        currentList.map(e => e.employee_id === employee_id ? data[0] : e)
-      );
+      this.employees.update(list => list.map(e => e.employee_id === employee_id ? data[0] : e));
     }
-
     return { success: !error, error: error?.message, data };
   }
 
@@ -485,75 +452,38 @@ export class DataService {
   }
 
   // =============================================
-  // CLIENT CRUD (Updated with all CRM fields)
+  // CLIENT CRUD (Updated with User Audit)
   // =============================================
   async addClient(item: Partial<DimClient>) {
+    const user = this.authService.currentUser();
+    const profile = this.authService.userProfile();
+
     const payload: any = {
-      client_name: item.client_name,
-      country: item.country || 'UAE'
+      ...item,
+      country: item.country || 'UAE',
+      // ✅ تتبع من أنشأ العميل
+      created_by: user?.id,
+      created_by_name: profile?.full_name || user?.email || 'Unknown'
     };
 
-    // Assigned Team fields
-    if (item.lead_id) payload.lead_id = item.lead_id;
-    if (item.relationship_manager_id) payload.relationship_manager_id = item.relationship_manager_id;
-
-    // Company Info fields
-    if (item.product_id) payload.product_id = item.product_id;
-    if (item.company_type) payload.company_type = item.company_type;
-    if (item.industry) payload.industry = item.industry;
-
-    // Contact Info fields
-    if (item.poc_name) payload.poc_name = item.poc_name;
-    if (item.contact_email) payload.contact_email = item.contact_email;
-    if (item.contact_phone) payload.contact_phone = item.contact_phone;
-    if (item.contact_person) payload.contact_person = item.contact_person;
-
-    // Sales Pipeline fields
-    if (item.status) payload.status = item.status;
-    if (item.lead_source) payload.lead_source = item.lead_source;
-    if (item.account_manager_id) payload.account_manager_id = item.account_manager_id;
-
-    // Deal Info fields
-    if (item.estimated_deal_value) payload.estimated_deal_value = item.estimated_deal_value;
-    if (item.expected_closing_date) payload.expected_closing_date = item.expected_closing_date;
-
-    // Key Dates fields
-    if (item.first_contact_date) payload.first_contact_date = item.first_contact_date;
-    if (item.last_followup_date) payload.last_followup_date = item.last_followup_date;
-    if (item.next_action_date) payload.next_action_date = item.next_action_date;
-
-    // Notes
-    if (item.notes) payload.notes = item.notes;
+    delete payload.client_id;
+    delete payload.created_at;
 
     const { data, error } = await this.supabase.from('dim_client').insert([payload]).select();
-
     if (data && data.length > 0) {
       this.clients.update(v => [data[0], ...v]);
     }
-
     return { success: !error, error: error?.message, data };
   }
 
   async updateClient(item: Partial<DimClient>) {
-    const { client_id, created_at, ...rest } = item as any;
+    const { client_id, created_at, created_by, created_by_name, ...rest } = item as any;
+    if (!client_id) return { success: false, error: 'No client_id provided', data: null };
 
-    if (!client_id) {
-      return { success: false, error: 'No client_id provided', data: null };
-    }
-
-    const payload: any = {};
-    Object.keys(rest).forEach(key => {
-      if (rest[key] !== undefined) {
-        payload[key] = rest[key] || null;
-      }
-    });
-
-    const { data, error } = await this.supabase.from('dim_client').update(payload).eq('client_id', client_id).select();
-
+    const { data, error } = await this.supabase.from('dim_client').update(rest).eq('client_id', client_id).select();
     if (data && data.length > 0) {
       this.clients.update(v => v.map(c => c.client_id === client_id ? data[0] : c));
     }
-
     return { success: !error, error: error?.message, data };
   }
 
@@ -575,8 +505,6 @@ export class DataService {
 
   async updatePipeline(item: Partial<FactPipeline>) {
     const { id, created_at, ...payload } = item as any;
-    if (!id) return { success: false, error: 'No pipeline id provided', data: null };
-
     const { data, error } = await this.supabase.from('fact_pipeline').update(payload).eq('id', id).select();
     if (data) this.pipelines.update(v => v.map(p => p.id === id ? data[0] : p));
     return { success: !error, error: error?.message, data };
@@ -612,20 +540,9 @@ export class DataService {
   }
 
   async addCostsBulk(items: Partial<FactCost>[]) {
-    const { data, error } = await this.supabase
-      .from('fact_cost')
-      .insert(items)
-      .select();
-
-    if (data) {
-      this.costs.update(current => [...data, ...current]);
-    }
-
-    return {
-      success: !error,
-      error: error?.message,
-      count: data?.length || 0
-    };
+    const { data, error } = await this.supabase.from('fact_cost').insert(items).select();
+    if (data) this.costs.update(current => [...data, ...current]);
+    return { success: !error, error: error?.message, count: data?.length || 0 };
   }
 
   async generateZeroCostsForMonth(year: number, month: number): Promise<{ success: boolean; generated: number; error?: string }> {
@@ -635,49 +552,24 @@ export class DataService {
 
       const currentCosts = this.costs().filter(c => c.year === year && c.month === month);
       const existingProductIds = new Set(currentCosts.map(c => c.product_id));
-
       const missingProducts = allProducts.filter(p => !existingProductIds.has(p.product_id));
 
-      if (missingProducts.length === 0) {
-        return { success: true, generated: 0 };
-      }
+      if (missingProducts.length === 0) return { success: true, generated: 0 };
 
       const dateStr = `${year}-${month.toString().padStart(2, '0')}-01`;
-
       const newCosts = missingProducts.map(prod => ({
-        year: year,
-        month: month,
-        date: dateStr,
-        amount: 0,
-        product_id: prod.product_id,
-        description: `Monthly Cost - ${prod.product_name}`,
-        client_id: null
+        year: year, month: month, date: dateStr, amount: 0,
+        product_id: prod.product_id, description: `Monthly Cost - ${prod.product_name}`, client_id: null
       }));
 
-      const { data, error } = await this.supabase
-        .from('fact_cost')
-        .insert(newCosts)
-        .select();
-
+      const { data, error } = await this.supabase.from('fact_cost').insert(newCosts).select();
       if (error) throw error;
-
-      if (data) {
-        this.costs.update(current => [...data, ...current]);
-      }
-
+      if (data) this.costs.update(current => [...data, ...current]);
       return { success: true, generated: data?.length || 0 };
-
     } catch (error: any) {
-      console.error('Generate zero costs error:', error);
       return { success: false, generated: 0, error: error.message };
     }
   }
-
-  // =============================================
-  // SALARY CRUD
-  // =============================================
-
-
 
   // =============================================
   // TARGET CRUD
@@ -695,26 +587,14 @@ export class DataService {
     if (data) this.targets.update(v => v.map(t => t.id === id ? data[0] : t));
     return { success: !error, error: error?.message, data };
   }
-  // أضف هذه الدالة داخل كلاس DataService
 
- // =============================================
-  // SALARY MANAGEMENT (UPDATED)
   // =============================================
-
-  // 1. إضافة راتب يدوي (Snapshotting Department)
+  // SALARY MANAGEMENT
+  // =============================================
   async addManualSalary(salary: Partial<FactSalary>) {
-    // نجلب الموظف لنعرف قسمه الحالي
     const employee = this.employees().find(e => e.employee_id === salary.employee_id);
-
-    const payload = {
-      ...salary,
-      // ⚠️ هنا السر: نأخذ القسم الحالي للموظف ونخزنه في الراتب للأبد
-      product_id: employee?.product_id,
-      status: 'pending'
-    };
-
+    const payload = { ...salary, product_id: employee?.product_id, status: 'pending' };
     const { data, error } = await this.supabase.from('fact_salary').insert([payload]).select();
-
     if (data) {
       this.salaries.update(current => [...data, ...current]);
       return { success: true, data: data[0] };
@@ -722,59 +602,36 @@ export class DataService {
     return { success: false, error: error?.message };
   }
 
-  // 2. تحديث راتب موجود
   async updateSalary(salary: FactSalary) {
-    const { id, ...payload } = salary;
-    // تنظيف البيانات من الحقول المحسوبة
-    const { created_by_name, updated_by_name, ...cleanPayload } = payload as any;
-
-    const { data, error } = await this.supabase
-      .from('fact_salary')
-      .update(cleanPayload)
-      .eq('id', id)
-      .select();
-
+    const { id, created_by_name, updated_by_name, ...cleanPayload } = salary as any;
+    const { data, error } = await this.supabase.from('fact_salary').update(cleanPayload).eq('id', id).select();
     if (data) {
       this.salaries.update(list => list.map(s => s.id === id ? (data[0] as FactSalary) : s));
       return { success: true, data: data[0] };
     }
     return { success: false, error: error?.message };
   }
- // =============================================
-  // SALARY GENERATION (Bulk)
-  // =============================================
 
-  // 3. توليد الرواتب الجماعي (مع التثبيت)
   async generateMonthlySalaries(year: number, month: number) {
     try {
       const activeEmployees = this.employees().filter(e => !e.end_date);
       const existingSalaries = this.salaries().filter(s => s.year === year && s.month === month);
-
-      const employeesToPay = activeEmployees.filter(e =>
-        !existingSalaries.some(s => s.employee_id === e.employee_id)
-      );
+      const employeesToPay = activeEmployees.filter(e => !existingSalaries.some(s => s.employee_id === e.employee_id));
 
       if (employeesToPay.length === 0) return { success: true, generated: 0 };
 
       const newSalaries = employeesToPay.map(emp => ({
-        employee_id: emp.employee_id,
-        year: year,
-        month: month,
-        base_salary: emp.salary,
-        net_salary: emp.salary, // مبدئياً
-        status: 'pending',
-        // ⚠️ تثبيت القسم التاريخي
-        product_id: emp.product_id
+        employee_id: emp.employee_id, year: year, month: month,
+        base_salary: emp.salary, net_salary: emp.salary,
+        status: 'pending', product_id: emp.product_id
       }));
 
       const { data, error } = await this.supabase.from('fact_salary').insert(newSalaries).select();
-
       if (data) {
         this.salaries.update(current => [...data, ...current]);
         return { success: true, generated: data.length };
       }
       return { success: false, error: error?.message, generated: 0 };
-
     } catch (error: any) {
       return { success: false, error: error.message, generated: 0 };
     }

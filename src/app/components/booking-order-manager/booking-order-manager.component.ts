@@ -1,27 +1,34 @@
-import { Component, inject, computed, signal, AfterViewInit, OnDestroy } from '@angular/core';
+// ╔══════════════════════════════════════════════════════════════════════════════╗
+// ║              7AWI SYSTEM - BOOKING ORDER MANAGER V2                         ║
+// ╚══════════════════════════════════════════════════════════════════════════════╝
+
+import { Component, inject, computed, signal, AfterViewInit, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DataService } from '../../services/data.service';
 import { AuthService } from '../../services/auth.service';
-import { FactRevenue, FactRevenueMonthly } from '../../models/data.models';
+import { FactRevenue, FactRevenueMonthly, BookingOrderItem, PaymentMilestone, PaymentType } from '../../models/data.models';
 
 declare var flatpickr: any;
 declare var XLSX: any;
+declare var jspdf: any;
 
 @Component({
   selector: 'app-booking-order-manager',
   standalone: true,
   imports: [CommonModule, FormsModule],
-  templateUrl: './booking-order-manager.component.html'
+  templateUrl: './booking-order-manager.component.html',
+  styleUrls: ['./booking-order-manager.component.scss']
 })
-export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
+export class BookingOrderManagerComponent implements OnInit, AfterViewInit, OnDestroy {
   dataService = inject(DataService);
   authService = inject(AuthService);
 
-  // View State
+  // ════════════════════════════════════════════════════════════════════════════
+  // View State & Filters
+  // ════════════════════════════════════════════════════════════════════════════
   currentView = signal<'list' | 'form'>('list');
 
-  // Filters
   searchText = signal('');
   filterYear = signal<number | null>(new Date().getFullYear());
   filterMonth = signal<number | null>(null);
@@ -31,56 +38,67 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
   filterApproval = signal<string>('ALL');
   filterType = signal<string>('ALL');
 
+  // ════════════════════════════════════════════════════════════════════════════
   // UI State
+  // ════════════════════════════════════════════════════════════════════════════
   saving = signal(false);
   exporting = signal(false);
+  generatingPdf = signal(false);
   showDeleteModal = false;
   showApprovalModal = false;
   isEditMode = false;
+
   revenueToDelete: FactRevenue | null = null;
   revenueToApprove: FactRevenue | null = null;
   approvalNotes = '';
 
-  // Expanded rows for Multi-Retainer
-  expandedRows = signal<Set<number>>(new Set());
-
-  // Monthly distribution data
-  monthlyData = signal<Map<number, FactRevenueMonthly[]>>(new Map());
-
-
-
-  // Profit margin thresholds (editable)
-  marginThreshold1 = signal(20);
-  marginThreshold2 = signal(25);
-  marginThreshold3 = signal(30);
-
-  // Flatpickr instances
   private flatpickrInstances: any[] = [];
 
+  // Data initialization
+  currentItem: FactRevenue = {} as FactRevenue;
+
+  orderItems = signal<BookingOrderItem[]>([]);
+  paymentMilestones = signal<PaymentMilestone[]>([]);
+  expandedRows = signal<Set<number>>(new Set());
+  monthlyData = signal<Map<number, FactRevenueMonthly[]>>(new Map());
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // Editable Profit Margin Thresholds
+  // ════════════════════════════════════════════════════════════════════════════
+  marginThreshold1 = signal(25);
+  marginThreshold2 = signal(30);
+  marginThreshold3 = signal(35);
+
+  // ════════════════════════════════════════════════════════════════════════════
   // Dropdown Options
-  projectTypes = [
-    'Social Media Management',
-    'Production',
-    'Distribution',
-    'Event',
-    'SEO Content',
-    'Others'
+  // ════════════════════════════════════════════════════════════════════════════
+  projectTypes = ['Social Media Management', 'Production', 'Distribution', 'Event', 'SEO Content', 'Others'];
+  bookingOrderTypes = ['One Time', 'Multiple Payment', 'Multi Retainer'];
+
+  approvalStatuses = ['Pending', 'RFP Received', 'RFP Responded', 'Approved', 'Completed', 'Canceled', 'Rejected'];
+
+  orderStatuses = [
+    { value: 'Pending', label: 'Pending', color: 'amber' },
+    { value: 'RFP Received', label: 'RFP Received', color: 'purple' },
+    { value: 'RFP Responded', label: 'RFP Responded', color: 'indigo' },
+    { value: 'Approved', label: 'Approved', color: 'emerald' },
+    { value: 'Completed', label: 'Completed', color: 'blue' },
+    { value: 'Canceled', label: 'Canceled', color: 'slate' },
+    { value: 'Rejected', label: 'Rejected', color: 'red' }
   ];
 
-  bookingOrderTypes = ['One Time', 'Multi Retainer'];
-
-  // ✅ NEW: Payment Terms Options
- // ✅ التعديل الوحيد هنا: تحديد النوع بدقة ليقبله TypeScript
-  paymentTermsOptions: { value: 'Upfront' | 'Upon Completion' | 'Custom' | 'Retainer'; label: string; icon: string }[] = [
-    { value: 'Upfront', label: 'Upfront', icon: 'bolt' },
-    { value: 'Upon Completion', label: 'Upon Completion', icon: 'check_circle' },
-    { value: 'Custom', label: 'Custom (%)', icon: 'tune' },
-    { value: 'Retainer', label: 'Retainer', icon: 'autorenew' }
+  paymentTypes: { value: PaymentType; label: string; icon: string; description: string }[] = [
+    { value: 'one_time', label: 'One Time', icon: 'bolt', description: 'Single payment (Upfront or Upon Completion)' },
+    { value: 'multiple', label: 'Multiple Payment', icon: 'view_list', description: 'Milestone-based payments (percentages)' },
+    { value: 'multi_retainer', label: 'Multi Retainer', icon: 'autorenew', description: 'Monthly distribution over contract period' }
   ];
-  approvalStatuses = ['Pending', 'Approved', 'Rejected'];
+
+  oneTimePaymentTerms = [
+    { value: 'Upfront', label: 'Upfront (100%)' },
+    { value: 'Upon Completion', label: 'Upon Completion' }
+  ];
 
   countries = ['UAE', 'KSA', 'JOR', 'SYR', 'EGY', 'QAT', 'KWT', 'BHR', 'OMN', 'Other'];
-
   months = [
     { name: 'January', value: 1 }, { name: 'February', value: 2 }, { name: 'March', value: 3 },
     { name: 'April', value: 4 }, { name: 'May', value: 5 }, { name: 'June', value: 6 },
@@ -88,68 +106,36 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
     { name: 'October', value: 10 }, { name: 'November', value: 11 }, { name: 'December', value: 12 }
   ];
 
+  // ════════════════════════════════════════════════════════════════════════════
   // Computed Lists
+  // ════════════════════════════════════════════════════════════════════════════
   yearsList = computed(() => {
-    const years = new Set(this.dataService.revenues().map(r => new Date(r.date).getFullYear()));
+    const years = new Set(this.dataService.revenues().map(r => r.date ? new Date(r.date).getFullYear() : new Date().getFullYear()));
     years.add(new Date().getFullYear());
     years.add(new Date().getFullYear() + 1);
     return Array.from(years).sort((a, b) => b - a);
   });
 
   sortedProducts = computed(() => {
-    return this.dataService.products().slice().sort((a, b) => {
-      if (a.product_name.toLowerCase() === 'others') return 1;
-      if (b.product_name.toLowerCase() === 'others') return -1;
-      return a.product_name.localeCompare(b.product_name);
-    });
+    return this.dataService.products().slice().sort((a, b) => a.product_name.localeCompare(b.product_name));
   });
-
   sortedClients = computed(() => {
-    return this.dataService.clients().slice().sort((a, b) => {
-      if (a.client_name.toLowerCase() === 'others') return 1;
-      if (b.client_name.toLowerCase() === 'others') return -1;
-      return a.client_name.localeCompare(b.client_name);
-    });
+    return this.dataService.clients().slice().sort((a, b) => a.client_name.localeCompare(b.client_name));
   });
-
   sortedEmployees = computed(() => {
-    return this.dataService.employees()
-      .filter(e => !e.end_date)
-      .slice()
-      .sort((a, b) => a.name.localeCompare(b.name));
+    return this.dataService.employees().filter(e => !e.end_date).slice().sort((a, b) => a.name.localeCompare(b.name));
   });
 
-  // Filtered Revenues
   filteredRevenues = computed(() => {
     let data = this.dataService.revenues();
 
-    if (this.filterYear()) {
-      data = data.filter(r => new Date(r.date).getFullYear() === this.filterYear());
-    }
-
-    if (this.filterMonth()) {
-      data = data.filter(r => new Date(r.date).getMonth() + 1 === this.filterMonth());
-    }
-
-    if (this.filterProduct()) {
-      data = data.filter(r => r.product_id === this.filterProduct());
-    }
-
-    if (this.filterClient()) {
-      data = data.filter(r => r.client_id === this.filterClient());
-    }
-
-    if (this.filterStatus() !== 'ALL') {
-      data = data.filter(r => r.project_type === this.filterStatus());
-    }
-
-    if (this.filterApproval() !== 'ALL') {
-      data = data.filter(r => r.approval_status === this.filterApproval());
-    }
-
-    if (this.filterType() !== 'ALL') {
-      data = data.filter(r => r.booking_order_type === this.filterType());
-    }
+    if (this.filterYear()) data = data.filter(r => r.date && new Date(r.date).getFullYear() === this.filterYear());
+    if (this.filterMonth()) data = data.filter(r => r.date && new Date(r.date).getMonth() + 1 === this.filterMonth());
+    if (this.filterProduct()) data = data.filter(r => r.product_id === this.filterProduct());
+    if (this.filterClient()) data = data.filter(r => r.client_id === this.filterClient());
+    if (this.filterStatus() !== 'ALL') data = data.filter(r => r.project_type === this.filterStatus());
+    if (this.filterApproval() !== 'ALL') data = data.filter(r => r.approval_status === this.filterApproval());
+    if (this.filterType() !== 'ALL') data = data.filter(r => r.booking_order_type === this.filterType());
 
     const text = this.searchText().toLowerCase();
     if (text) {
@@ -160,35 +146,45 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
         this.dataService.getClientName(r.client_id).toLowerCase().includes(text)
       );
     }
-
     return data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   });
 
-  // Stats
   totalRevenues = computed(() => this.filteredRevenues().length);
-  totalEstimatedRevenue = computed(() =>
-    this.filteredRevenues().reduce((sum, r) => sum + (r.estimated_revenue || r.gross_amount || 0), 0)
-  );
-  totalActualRevenue = computed(() =>
-    this.filteredRevenues().reduce((sum, r) => sum + (r.gross_amount || 0), 0)
-  );
-  pendingApprovalCount = computed(() =>
-    this.filteredRevenues().filter(r => r.approval_status === 'Pending').length
-  );
-  multiRetainerCount = computed(() =>
-    this.filteredRevenues().filter(r => r.booking_order_type === 'Multi Retainer').length
-  );
-  // Current item being edited
-  currentItem: FactRevenue = this.getEmptyRevenue();
+  totalEstimatedRevenue = computed(() => this.filteredRevenues().reduce((sum, r) => sum + (r.estimated_revenue || r.gross_amount || 0), 0));
+  totalActualRevenue = computed(() => this.filteredRevenues().reduce((sum, r) => sum + (r.gross_amount || 0), 0));
+  pendingApprovalCount = computed(() => this.filteredRevenues().filter(r => r.approval_status === 'Pending').length);
+  multiRetainerCount = computed(() => this.filteredRevenues().filter(r => r.booking_order_type === 'Multi Retainer').length);
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // ⚡ تم تحويلها لدوال عادية لكي تتحدث الواجهة فوراً عند تغيير النسبة
+  // ════════════════════════════════════════════════════════════════════════════
+  itemsSubtotal() { return this.currentItem.items_subtotal || 0; }
+  vatAmount() { return this.currentItem.vat_amount || 0; }
+  grandTotal() { return this.currentItem.grand_total || 0; }
+
+  milestonesTotal = computed(() => this.paymentMilestones().reduce((sum, m) => sum + (m.percentage || 0), 0));
+  milestonesValid = computed(() => Math.abs(this.milestonesTotal() - 100) < 0.01);
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // Lifecycle
+  // ════════════════════════════════════════════════════════════════════════════
+  ngOnInit() {
+    this.currentItem = this.getEmptyRevenue();
+  }
+
   ngAfterViewInit() {
     this.loadFlatpickrStyles();
     this.loadXLSXLibrary();
+    this.loadJsPDFLibrary();
   }
 
   ngOnDestroy() {
     this.destroyFlatpickrInstances();
   }
 
+  // ════════════════════════════════════════════════════════════════════════════
+  // Library Loading
+  // ════════════════════════════════════════════════════════════════════════════
   private loadFlatpickrStyles() {
     if (!document.getElementById('flatpickr-css')) {
       const link = document.createElement('link');
@@ -197,21 +193,15 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
       link.href = 'https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css';
       document.head.appendChild(link);
     }
-
     if (!document.getElementById('flatpickr-js')) {
       const script = document.createElement('script');
       script.id = 'flatpickr-js';
       script.src = 'https://cdn.jsdelivr.net/npm/flatpickr';
-      script.onload = () => {
-        if (this.currentView() === 'form') {
-          this.initializeFlatpickr();
-        }
-      };
+      script.onload = () => { if (this.currentView() === 'form') this.initializeFlatpickr(); };
       document.head.appendChild(script);
     }
   }
 
-  // ✅ NEW: Load XLSX library for Excel export
   private loadXLSXLibrary() {
     if (!document.getElementById('xlsx-js')) {
       const script = document.createElement('script');
@@ -221,25 +211,31 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
     }
   }
 
+  private loadJsPDFLibrary() {
+    if (!document.getElementById('jspdf-js')) {
+      const script = document.createElement('script');
+      script.id = 'jspdf-js';
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+      document.head.appendChild(script);
+    }
+    if (!document.getElementById('jspdf-autotable-js')) {
+      const script = document.createElement('script');
+      script.id = 'jspdf-autotable-js';
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js';
+      document.head.appendChild(script);
+    }
+  }
+
   private initializeFlatpickr() {
     this.destroyFlatpickrInstances();
-
     setTimeout(() => {
       if (typeof flatpickr === 'undefined') return;
-
-      const config = {
-        dateFormat: 'Y-m-d',
-        altInput: true,
-        altFormat: 'F j, Y',
-        animate: true,
-        disableMobile: true
-      };
-
+      const config = { dateFormat: 'Y-m-d', altInput: true, altFormat: 'F j, Y', animate: true };
       const dateInputs = [
         { id: 'bo_submission_date', field: 'bo_submission_date' },
         { id: 'start_date', field: 'start_date' },
         { id: 'end_date', field: 'end_date' },
-        { id: 'payment_date', field: 'payment_date' },
+        { id: 'expected_payment_date', field: 'expected_payment_date' },
         { id: 'payment_retainer_start', field: 'payment_retainer_start' },
         { id: 'payment_retainer_end', field: 'payment_retainer_end' }
       ];
@@ -254,6 +250,9 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
               (this.currentItem as any)[input.field] = dateStr || null;
               if (input.field === 'start_date' || input.field === 'end_date') {
                 this.generateMonthlyDistribution();
+                if (this.currentItem.payment_type === 'multi_retainer') {
+                  this.syncRetainerDatesFromProject();
+                }
               }
             }
           });
@@ -264,19 +263,27 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
   }
 
   private destroyFlatpickrInstances() {
-    this.flatpickrInstances.forEach(instance => {
-      if (instance && instance.destroy) {
-        instance.destroy();
-      }
-    });
+    this.flatpickrInstances.forEach(instance => { if (instance && instance.destroy) instance.destroy(); });
     this.flatpickrInstances = [];
   }
 
+  // ════════════════════════════════════════════════════════════════════════════
+  // Empty Revenue
+  // ════════════════════════════════════════════════════════════════════════════
   getEmptyRevenue(): FactRevenue {
-    const today = new Date();
+    const today = new Date().toISOString().split('T')[0];
+    let defaultProductId = 1;
+
+    try {
+      if (this.sortedProducts && typeof this.sortedProducts === 'function') {
+        const products = this.sortedProducts();
+        if (products && products.length > 0) defaultProductId = products[0].product_id;
+      }
+    } catch (e) { }
+
     return {
-      date: today.toISOString().split('T')[0],
-      product_id: this.sortedProducts()[0]?.product_id || 1,
+      date: today,
+      product_id: defaultProductId,
       country: 'UAE',
       gross_amount: 0,
       estimated_revenue: 0,
@@ -288,11 +295,16 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
       booking_order_type: 'One Time',
       client_id: undefined,
       owner_id: undefined,
-      bo_submission_date: today.toISOString().split('T')[0],
+      bo_submission_date: today,
       start_date: null,
       end_date: null,
-      payment_date: undefined,
-      // ✅ NEW: Payment Terms defaults
+      expected_payment_date: undefined,
+      vat_enabled: false,
+      vat_percentage: 5,
+      vat_amount: 0,
+      grand_total: 0,
+      items_subtotal: 0,
+      payment_type: 'one_time',
       payment_terms: 'Upfront',
       payment_custom_percentage: 50,
       payment_retainer_start: null,
@@ -306,14 +318,165 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
       one_time_consultation: 0,
       one_time_misc: 0,
       comments: '',
-      approval_status: 'Pending'
-    };
+      approval_status: 'Pending',
+      requires_approval: false
+    } as FactRevenue;
   }
 
-  // =============================================
-  // PROFITABILITY CALCULATIONS
-  // =============================================
+  // ════════════════════════════════════════════════════════════════════════════
+  // Items Table Methods
+  // ════════════════════════════════════════════════════════════════════════════
+  addItem(): void {
+    const items = this.orderItems();
+    const newItem: BookingOrderItem = {
+      item_order: items.length + 1,
+      item_name: '',
+      quantity: 1,
+      unit_price: 0,
+      discount: 0,
+      net_amount: 0
+    };
+    this.orderItems.set([...items, newItem]);
+    this.updateItemsTotals();
+  }
 
+  removeItem(index: number): void {
+    const items = this.orderItems();
+    items.splice(index, 1);
+    items.forEach((item, i) => item.item_order = i + 1);
+    this.orderItems.set([...items]);
+    this.updateItemsTotals();
+  }
+
+  updateItemNet(item: BookingOrderItem): void {
+    item.net_amount = (item.quantity * item.unit_price) - (item.discount || 0);
+    this.orderItems.set([...this.orderItems()]);
+    this.updateItemsTotals();
+  }
+
+  updateItemsTotals(): void {
+    const subtotal = this.orderItems().reduce((sum, item) => sum + (item.net_amount || 0), 0);
+
+    this.currentItem.items_subtotal = subtotal;
+    this.currentItem.estimated_revenue = subtotal; // الدخل للشركة هو الصافي قبل الضريبة
+
+    if (this.currentItem.vat_enabled) {
+      const vatPercent = Number(this.currentItem.vat_percentage) || 0;
+      this.currentItem.vat_amount = Math.round(subtotal * (vatPercent / 100) * 100) / 100;
+    } else {
+      this.currentItem.vat_amount = 0;
+    }
+
+    this.currentItem.grand_total = subtotal + (this.currentItem.vat_amount || 0);
+
+    // تحديث مبالغ الدفعات المتعددة تلقائياً بناءً على السعر الجديد الشامل
+    if (this.currentItem.payment_type === 'multiple' && this.paymentMilestones().length > 0) {
+      this.updateMilestoneAmounts();
+    }
+  }
+
+  onVatChange(): void {
+    this.updateItemsTotals();
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // Payment Milestones Methods
+  // ════════════════════════════════════════════════════════════════════════════
+  addMilestone(): void {
+    const milestones = this.paymentMilestones();
+    const remaining = 100 - this.milestonesTotal();
+
+    const newMilestone: PaymentMilestone = {
+      milestone_order: milestones.length + 1,
+      milestone_name: `Milestone ${milestones.length + 1}`,
+      percentage: remaining > 0 ? remaining : 0,
+      amount: 0,
+      status: 'pending'
+    };
+
+    this.paymentMilestones.set([...milestones, newMilestone]);
+    this.updateMilestoneAmounts();
+  }
+
+  removeMilestone(index: number): void {
+    const milestones = this.paymentMilestones();
+    milestones.splice(index, 1);
+    milestones.forEach((m, i) => m.milestone_order = i + 1);
+    this.paymentMilestones.set([...milestones]);
+    this.updateMilestoneAmounts();
+  }
+
+  updateMilestoneAmounts(): void {
+    const totalAmount = this.currentItem.grand_total || this.currentItem.estimated_revenue || 0;
+    const milestones = this.paymentMilestones();
+
+    milestones.forEach(m => {
+      m.amount = Math.round(totalAmount * (m.percentage / 100) * 100) / 100;
+    });
+
+    this.paymentMilestones.set([...milestones]);
+  }
+
+  onPaymentTypeChange(): void {
+    const paymentType = this.currentItem.payment_type;
+    this.paymentMilestones.set([]);
+
+    if (paymentType === 'one_time') {
+      this.currentItem.booking_order_type = 'One Time';
+      this.currentItem.payment_terms = 'Upfront';
+    } else if (paymentType === 'multiple') {
+      this.currentItem.booking_order_type = 'Multiple Payment';
+      this.currentItem.payment_terms = 'Multiple';
+      this.addMilestone();
+      this.addMilestone();
+    } else if (paymentType === 'multi_retainer') {
+      this.currentItem.booking_order_type = 'Multi Retainer';
+      this.currentItem.payment_terms = 'Retainer';
+      this.syncRetainerDatesFromProject();
+    }
+  }
+
+  syncRetainerDatesFromProject(): void {
+    if (this.currentItem.start_date) {
+      this.currentItem.payment_retainer_start = this.currentItem.start_date;
+    }
+    if (this.currentItem.end_date) {
+      this.currentItem.payment_retainer_end = this.currentItem.end_date;
+    }
+    this.generateMonthlyDistribution();
+  }
+
+  setPaymentType(value: string): void {
+    this.currentItem.payment_type = value as PaymentType;
+    this.onPaymentTypeChange();
+  }
+
+  onBookingOrderTypeChange(type: string): void {
+    if (type === 'One Time') {
+      this.currentItem.payment_type = 'one_time';
+      this.currentItem.payment_terms = 'Upfront';
+      this.paymentMilestones.set([]);
+    } else if (type === 'Multiple Payment') {
+      this.currentItem.payment_type = 'multiple';
+      this.currentItem.payment_terms = 'Multiple';
+      this.paymentMilestones.set([]);
+      this.addMilestone();
+      this.addMilestone();
+    } else if (type === 'Multi Retainer') {
+      this.currentItem.payment_type = 'multi_retainer';
+      this.currentItem.payment_terms = 'Retainer';
+      this.paymentMilestones.set([]);
+      this.syncRetainerDatesFromProject();
+    }
+  }
+
+  isActualRevenueEnabled(): boolean {
+    return this.currentItem.approval_status === 'Completed';
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // Profitability Calculations
+  // ════════════════════════════════════════════════════════════════════════════
   calculateTotalDirectCost(item: FactRevenue): number {
     return (item.direct_cost_labor || 0) +
       (item.direct_cost_material || 0) +
@@ -343,23 +506,40 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
     return ((revenue - this.calculateTotalCost(item)) / revenue) * 100;
   }
 
-  // Calculate required revenue for target margin: Total Cost / (1 - margin%)
   calculateRequiredRevenue(totalCost: number, marginPercent: number): number {
     if (marginPercent >= 100) return 0;
     return totalCost / (1 - marginPercent / 100);
   }
 
-  isProfitMarginLow(item: FactRevenue): boolean {
-    return this.calculateProfitMargin(item) < 30;
+  getProfitMarginColor(item: FactRevenue): string {
+    const margin = this.calculateProfitMargin(item);
+    if (margin < this.marginThreshold1()) return 'red';
+    if (margin < this.marginThreshold2()) return 'orange';
+    return 'green';
   }
 
-  // =============================================
-  // BO NAME GENERATION
-  // =============================================
-// =============================================
-  // BO NAME GENERATION
-  // =============================================
+  getProfitMarginColorClass(item: FactRevenue): string {
+    const color = this.getProfitMarginColor(item);
+    const colorMap: Record<string, string> = {
+      'red': 'bg-red-100 text-red-700 border-red-300',
+      'orange': 'bg-amber-100 text-amber-700 border-amber-300',
+      'green': 'bg-emerald-100 text-emerald-700 border-emerald-300'
+    };
+    return colorMap[color] || 'bg-slate-100 text-slate-700 border-slate-300';
+  }
 
+  isProfitMarginLow(item: FactRevenue): boolean {
+    return this.calculateProfitMargin(item) < this.marginThreshold2();
+  }
+
+  canApproveOrder(item: FactRevenue): boolean {
+    const margin = this.calculateProfitMargin(item);
+    return margin >= this.marginThreshold2() || this.authService.isAdmin();
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // BO Name Generation
+  // ════════════════════════════════════════════════════════════════════════════
   generateBoName(): void {
     const country = this.currentItem.country || 'UAE';
     const client = this.sortedClients().find(c => c.client_id === this.currentItem.client_id);
@@ -371,33 +551,33 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
     const clientCode = (client?.client_name || 'CLIENT').split(' ')[0].substring(0, 10).toUpperCase();
     const productCode = (product?.product_name || 'DEPT').replace(/\s/g, '').substring(0, 15).toUpperCase();
     const campaignCode = campaign.replace(/\s/g, '').substring(0, 20).toUpperCase();
-    const dateCode = date.substring(5, 7) + date.substring(0, 4); // MMYYYY
+    const dateCode = date.substring(5, 7) + date.substring(0, 4);
 
-    // ✅ التعديل هنا: جلب أعلى رقم order_seq من كل الطلبات، وإضافة 1 للطلب الجديد
     const allRevenues = this.dataService.revenues();
     const maxSeq = allRevenues.length > 0 ? Math.max(...allRevenues.map(r => r.order_seq || 0)) : 0;
-
-    // إذا كان الطلب موجود مسبقاً (تعديل) نأخذ رقمه الحالي، وإذا كان جديد نأخذ (الماكس + 1)
     const nextSeq = this.currentItem.order_seq || (maxSeq + 1);
     const seqCode = nextSeq.toString().padStart(3, '0');
 
     this.currentItem.bo_name = `${countryCode}_${clientCode}_${productCode}_${campaignCode}_${dateCode}_${seqCode}`;
 
-    // Also update order_number for legacy compatibility
-    if(this.dataService.generateBookingRef) {
-        this.currentItem.order_number = this.dataService.generateBookingRef(country, this.currentItem.product_id);
+    if (this.dataService.generateBookingRef) {
+      this.currentItem.order_number = this.dataService.generateBookingRef(country, this.currentItem.product_id);
     }
   }
-  // =============================================
-  // MULTI-RETAINER MONTHLY DISTRIBUTION
-  // =============================================
 
+  // ════════════════════════════════════════════════════════════════════════════
+  // Multi-Retainer Monthly Distribution
+  // ════════════════════════════════════════════════════════════════════════════
   generateMonthlyDistribution(): void {
-    if (this.currentItem.booking_order_type !== 'Multi Retainer') return;
-    if (!this.currentItem.start_date || !this.currentItem.end_date) return;
+    if (this.currentItem.payment_type !== 'multi_retainer') return;
 
-    const startDate = new Date(this.currentItem.start_date);
-    const endDate = new Date(this.currentItem.end_date);
+    const startDateStr = this.currentItem.payment_retainer_start || this.currentItem.start_date;
+    const endDateStr = this.currentItem.payment_retainer_end || this.currentItem.end_date;
+
+    if (!startDateStr || !endDateStr) return;
+
+    const startDate = new Date(startDateStr);
+    const endDate = new Date(endDateStr);
 
     if (startDate >= endDate) return;
 
@@ -415,7 +595,6 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
     const totalRevenue = this.currentItem.estimated_revenue || 0;
     const monthlyRevenue = months.length > 0 ? totalRevenue / months.length : 0;
 
-    // Update local monthly data signal
     const distribution: FactRevenueMonthly[] = months.map(m => ({
       revenue_id: this.currentItem.id || 0,
       year: m.year,
@@ -430,26 +609,26 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
   }
 
   getMonthsCount(): number {
-    if (!this.currentItem.start_date || !this.currentItem.end_date) return 0;
+    const startDateStr = this.currentItem.payment_retainer_start || this.currentItem.start_date;
+    const endDateStr = this.currentItem.payment_retainer_end || this.currentItem.end_date;
 
-    const start = new Date(this.currentItem.start_date);
-    const end = new Date(this.currentItem.end_date);
+    if (!startDateStr || !endDateStr) return 0;
 
+    const start = new Date(startDateStr);
+    const end = new Date(endDateStr);
     return (end.getFullYear() - start.getFullYear()) * 12 +
       (end.getMonth() - start.getMonth()) + 1;
   }
 
-  // =============================================
-  // ROW EXPANSION FOR MULTI-RETAINER
-  // =============================================
-
+  // ════════════════════════════════════════════════════════════════════════════
+  // Row Expansion
+  // ════════════════════════════════════════════════════════════════════════════
   toggleRowExpansion(revenueId: number): void {
     const expanded = new Set(this.expandedRows());
     if (expanded.has(revenueId)) {
       expanded.delete(revenueId);
     } else {
       expanded.add(revenueId);
-      // Load monthly data if not already loaded
       this.loadMonthlyData(revenueId);
     }
     this.expandedRows.set(expanded);
@@ -477,10 +656,9 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
     await this.dataService.updateRevenueMonthly(monthly);
   }
 
-  // =============================================
-  // APPROVAL SYSTEM
-  // =============================================
-
+  // ════════════════════════════════════════════════════════════════════════════
+  // Approval System
+  // ════════════════════════════════════════════════════════════════════════════
   canApprove(): boolean {
     return this.authService.isAdmin();
   }
@@ -493,6 +671,12 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
 
   async approveRevenue(): Promise<void> {
     if (!this.revenueToApprove) return;
+
+    const margin = this.calculateProfitMargin(this.revenueToApprove);
+    if (margin < this.marginThreshold2() && !this.authService.isAdmin()) {
+      alert(`Cannot approve: Profit margin is below ${this.marginThreshold2()}%. Admin approval required.`);
+      return;
+    }
 
     const result = await this.dataService.approveRevenue(
       this.revenueToApprove.id!,
@@ -523,13 +707,106 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  // =============================================
-  // ✅ NEW: EXCEL EXPORT
-  // =============================================
+  // ════════════════════════════════════════════════════════════════════════════
+  // PDF Export (Print Quotation)
+  // ════════════════════════════════════════════════════════════════════════════
+  async exportToPDF(): Promise<void> {
+    if (typeof jspdf === 'undefined') {
+      alert('PDF library is still loading. Please try again.');
+      return;
+    }
 
+    this.generatingPdf.set(true);
+
+    try {
+      const { jsPDF } = jspdf;
+      const doc = new jsPDF();
+
+      doc.setFontSize(20);
+      doc.setFont('helvetica', 'bold');
+      doc.text('QUOTATION', 105, 20, { align: 'center' });
+
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text('7awi Company', 20, 35);
+      doc.text('Dubai, UAE', 20, 40);
+
+      doc.text(`BO Number: ${this.currentItem.bo_name || '-'}`, 140, 35);
+      doc.text(`Date: ${this.currentItem.bo_submission_date || '-'}`, 140, 40);
+      doc.text(`Valid Until: ${this.currentItem.expected_payment_date || '-'}`, 140, 45);
+
+      const clientName = this.dataService.getClientName(this.currentItem.client_id);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Bill To:', 20, 55);
+      doc.setFont('helvetica', 'normal');
+      doc.text(clientName, 20, 60);
+      doc.text(this.currentItem.country || '-', 20, 65);
+
+      doc.setFont('helvetica', 'bold');
+      doc.text('Campaign:', 20, 75);
+      doc.setFont('helvetica', 'normal');
+      doc.text(this.currentItem.campaign_name || '-', 50, 75);
+
+      const items = this.orderItems();
+      if (items.length > 0) {
+        const tableData = items.map((item, index) => [
+          (item.item_order || index + 1).toString(),
+          item.item_name,
+          item.quantity.toString(),
+          this.formatCurrency(item.unit_price),
+          this.formatCurrency(item.discount),
+          this.formatCurrency(item.net_amount)
+        ]);
+
+        (doc as any).autoTable({
+          startY: 85,
+          head: [['#', 'Item', 'Qty', 'Unit Price', 'Discount', 'Net']],
+          body: tableData,
+          theme: 'striped',
+          headStyles: { fillColor: [30, 58, 138] },
+          styles: { fontSize: 9 }
+        });
+      }
+
+      const finalY = (doc as any).lastAutoTable?.finalY || 120;
+
+      doc.setFont('helvetica', 'bold');
+      doc.text('Subtotal:', 130, finalY + 10);
+      doc.text(this.formatCurrency(this.currentItem.items_subtotal || 0), 180, finalY + 10, { align: 'right' });
+
+      if (this.currentItem.vat_enabled) {
+        doc.text(`VAT (${this.currentItem.vat_percentage}%):`, 130, finalY + 17);
+        doc.text(this.formatCurrency(this.currentItem.vat_amount || 0), 180, finalY + 17, { align: 'right' });
+      }
+
+      doc.setFontSize(12);
+      doc.text('Grand Total:', 130, finalY + 27);
+      doc.text(this.formatCurrency(this.currentItem.grand_total || this.currentItem.estimated_revenue || 0), 180, finalY + 27, { align: 'right' });
+
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Payment Terms: ${this.getPaymentTermsDisplay(this.currentItem)}`, 20, finalY + 40);
+
+      doc.setFontSize(8);
+      doc.text('Thank you for your business!', 105, 280, { align: 'center' });
+
+      const fileName = `Quotation_${this.currentItem.bo_name || 'draft'}_${new Date().toISOString().split('T')[0]}.pdf`;
+      doc.save(fileName);
+
+    } catch (error: any) {
+      console.error('PDF export error:', error);
+      alert('Error generating PDF: ' + error.message);
+    } finally {
+      this.generatingPdf.set(false);
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // Excel Export
+  // ════════════════════════════════════════════════════════════════════════════
   async exportToExcel(): Promise<void> {
     if (typeof XLSX === 'undefined') {
-      alert('Excel library is still loading. Please try again in a moment.');
+      alert('Excel library is still loading. Please try again.');
       return;
     }
 
@@ -538,7 +815,6 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
     try {
       const data = this.filteredRevenues();
 
-      // Prepare data for Excel
       const excelData = data.map(r => ({
         'BO Name': r.bo_name || '-',
         'Campaign': r.campaign_name || '-',
@@ -546,49 +822,24 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
         'Department': this.dataService.getProductName(r.product_id),
         'Country': r.country,
         'Project Type': r.project_type || '-',
-        'Booking Type': r.booking_order_type || '-',
-        'Owner': this.dataService.getEmployeeName(r.owner_id),
-        'BO Submission Date': r.bo_submission_date || '-',
-        'Start Date': r.start_date || '-',
-        'End Date': r.end_date || '-',
-        'Payment Date': r.payment_date || '-',
-        'Payment Terms': this.getPaymentTermsDisplay(r),
+        'Payment Type': r.payment_type || '-',
+        'Status': r.approval_status || '-',
         'Estimated Revenue': r.estimated_revenue || 0,
         'Actual Revenue': r.gross_amount || 0,
-        'Direct Cost (Labor)': r.direct_cost_labor || 0,
-        'Direct Cost (Material)': r.direct_cost_material || 0,
-        'Direct Cost (Equipment)': r.direct_cost_equipment || 0,
-        'Direct Cost (Tools)': r.direct_cost_tools || 0,
-        'Direct Cost (Other)': r.direct_cost_other || 0,
-        'Total Direct Cost': this.calculateTotalDirectCost(r),
-        'One Time (Marketing)': r.one_time_marketing || 0,
-        'One Time (Consultation)': r.one_time_consultation || 0,
-        'One Time (Misc)': r.one_time_misc || 0,
-        'Total One Time Cost': this.calculateTotalOneTimeCost(r),
         'Total Cost': this.calculateTotalCost(r),
         'Net Profit': this.calculateNetProfit(r),
-        'Profit Margin %': Math.round(this.calculateProfitMargin(r) * 100) / 100,
-        'Approval Status': r.approval_status || '-',
-        'Comments': r.comments || '-'
+        'Profit Margin %': Math.round(this.calculateProfitMargin(r) * 100) / 100
       }));
 
-      // Create workbook
       const ws = XLSX.utils.json_to_sheet(excelData);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Booking Orders');
 
-      // Auto-size columns
-      const colWidths = Object.keys(excelData[0] || {}).map(key => ({
-        wch: Math.max(key.length, 15)
-      }));
+      const colWidths = Object.keys(excelData[0] || {}).map(key => ({ wch: Math.max(key.length, 15) }));
       ws['!cols'] = colWidths;
 
-      // Generate filename with date
       const today = new Date().toISOString().split('T')[0];
-      const filename = `Booking_Orders_${today}.xlsx`;
-
-      // Download file
-      XLSX.writeFile(wb, filename);
+      XLSX.writeFile(wb, `Booking_Orders_${today}.xlsx`);
 
     } catch (error: any) {
       console.error('Export error:', error);
@@ -598,37 +849,14 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  // =============================================
-  // ✅ NEW: PAYMENT TERMS HELPER
-  // =============================================
-
-  getPaymentTermsDisplay(item: FactRevenue): string {
-    if (!item.payment_terms) return '-';
-
-    switch (item.payment_terms) {
-      case 'Custom':
-        return `Custom (${item.payment_custom_percentage || 0}%)`;
-      case 'Retainer':
-        const start = item.payment_retainer_start ? this.formatDate(item.payment_retainer_start) : '?';
-        const end = item.payment_retainer_end ? this.formatDate(item.payment_retainer_end) : '?';
-        return `Retainer (${start} - ${end})`;
-      default:
-        return item.payment_terms;
-    }
-  }
-
-  getPaymentTermsIcon(terms: string): string {
-    const option = this.paymentTermsOptions.find(o => o.value === terms);
-    return option?.icon || 'payments';
-  }
-
-  // =============================================
-  // NAVIGATION & CRUD
-  // =============================================
-
+  // ════════════════════════════════════════════════════════════════════════════
+  // Navigation & CRUD
+  // ════════════════════════════════════════════════════════════════════════════
   openAddForm(): void {
     this.isEditMode = false;
     this.currentItem = this.getEmptyRevenue();
+    this.orderItems.set([]);
+    this.paymentMilestones.set([]);
     this.currentView.set('form');
     setTimeout(() => this.initializeFlatpickr(), 250);
   }
@@ -636,6 +864,8 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
   editRevenue(revenue: FactRevenue): void {
     this.isEditMode = true;
     this.currentItem = { ...revenue };
+    this.orderItems.set(revenue.booking_order_items || []);
+    this.paymentMilestones.set(revenue.payment_milestones || []);
     this.currentView.set('form');
     setTimeout(() => this.initializeFlatpickr(), 250);
   }
@@ -644,6 +874,8 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
     this.destroyFlatpickrInstances();
     this.currentView.set('list');
     this.currentItem = this.getEmptyRevenue();
+    this.orderItems.set([]);
+    this.paymentMilestones.set([]);
   }
 
   confirmDelete(revenue: FactRevenue): void {
@@ -657,21 +889,34 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
       return;
     }
 
-    // Generate BO Name if not set
+    if (this.currentItem.payment_type === 'multiple' && !this.milestonesValid()) {
+      alert('Payment milestones must total 100%');
+      return;
+    }
+
     if (!this.currentItem.bo_name) {
       this.generateBoName();
     }
 
-    // Check profit margin for approval status
+    this.updateItemsTotals();
+
     const margin = this.calculateProfitMargin(this.currentItem);
-    if (margin < 30) {
-      this.currentItem.approval_status = 'Pending';
+    if (margin < this.marginThreshold2()) {
+      this.currentItem.requires_approval = true;
+      this.currentItem.approval_required_reason = `Profit margin (${margin.toFixed(1)}%) is below ${this.marginThreshold2()}%`;
+
+      if (this.currentItem.approval_status === 'Approved') {
+        this.currentItem.approval_status = 'Pending';
+      }
     }
 
     this.saving.set(true);
 
     try {
-      let result;
+      let result: any;
+
+      this.currentItem.booking_order_items = this.orderItems();
+      this.currentItem.payment_milestones = this.paymentMilestones();
 
       if (this.isEditMode) {
         result = await this.dataService.updateRevenue(this.currentItem);
@@ -680,11 +925,12 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
       }
 
       if (result.success) {
-        // Save monthly distribution for Multi Retainer
-        if (this.currentItem.booking_order_type === 'Multi Retainer' && result.data?.[0]?.id) {
+        const savedId = this.isEditMode ? this.currentItem.id : result.data?.[0]?.id;
+
+        if (this.currentItem.payment_type === 'multi_retainer' && savedId) {
           const monthlyDistribution = this.monthlyData().get(this.currentItem.id || 0) || [];
           for (const monthly of monthlyDistribution) {
-            monthly.revenue_id = result.data[0].id;
+            monthly.revenue_id = savedId;
             await this.dataService.saveRevenueMonthly(monthly);
           }
         }
@@ -711,37 +957,55 @@ export class BookingOrderManagerComponent implements AfterViewInit, OnDestroy {
     this.revenueToDelete = null;
   }
 
-  // =============================================
-  // HELPERS
-  // =============================================
+  // ════════════════════════════════════════════════════════════════════════════
+  // Helpers
+  // ════════════════════════════════════════════════════════════════════════════
   trackByRevenue(index: number, revenue: FactRevenue): any {
     return revenue.id;
   }
+
+  trackByItem(index: number, item: BookingOrderItem): number {
+    return item.item_order || index;
+  }
+
+  trackByMilestone(index: number, milestone: PaymentMilestone): number {
+    return milestone.milestone_order || index;
+  }
+
   getApprovalStatusClass(status: string | undefined): string {
     if (!status) return 'bg-slate-100 text-slate-600';
 
     const classes: Record<string, string> = {
       'Pending': 'bg-amber-100 text-amber-700',
       'Approved': 'bg-emerald-100 text-emerald-700',
-      'Rejected': 'bg-red-100 text-red-700'
+      'Rejected': 'bg-red-100 text-red-700',
+      'Completed': 'bg-blue-100 text-blue-700',
+      'Canceled': 'bg-slate-100 text-slate-600',
+      'RFP Received': 'bg-purple-100 text-purple-700',
+      'RFP Responded': 'bg-indigo-100 text-indigo-700'
     };
 
     return classes[status] || 'bg-slate-100 text-slate-600';
   }
 
-  getProjectTypeClass(type: string | undefined): string {
-    if (!type) return 'bg-slate-100 text-slate-600';
+  getPaymentTermsDisplay(item: FactRevenue): string {
+    if (!item.payment_type) return item.payment_terms || '-';
 
-    const classes: Record<string, string> = {
-      'Social Media Management': 'bg-blue-50 text-blue-700',
-      'Production': 'bg-purple-50 text-purple-700',
-      'Distribution': 'bg-cyan-50 text-cyan-700',
-      'Event': 'bg-pink-50 text-pink-700',
-      'SEO Content': 'bg-indigo-50 text-indigo-700',
-      'Others': 'bg-slate-100 text-slate-600'
-    };
-
-    return classes[type] || 'bg-slate-100 text-slate-600';
+    switch (item.payment_type) {
+      case 'one_time':
+        return item.payment_terms || 'Upfront';
+      case 'multiple':
+        const milestones = this.paymentMilestones();
+        if (milestones.length > 0) {
+          return milestones.map(m => `${m.percentage}%`).join(' - ');
+        }
+        return 'Multiple Payments';
+      case 'multi_retainer':
+        const months = this.getMonthsCount();
+        return `Retainer (${months} months)`;
+      default:
+        return item.payment_terms || '-';
+    }
   }
 
   formatCurrency(value: number | undefined): string {

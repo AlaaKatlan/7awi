@@ -23,7 +23,7 @@ export class AuthService {
   isManager = computed(() => ['admin', 'manager'].includes(this.userProfile()?.role || ''));
   isFinance = computed(() => ['finance'].includes(this.userProfile()?.role || ''));
   isSales = computed(() => ['sales'].includes(this.userProfile()?.role || ''));
-
+  isHou = computed(() => ['hou'].includes(this.userProfile()?.role || ''));
   // ✅ هذا السطر الذي كان ينقصك وشغل المشاكل
   canManageEmployees = computed(() => ['admin', 'manager'].includes(this.userProfile()?.role || ''));
 

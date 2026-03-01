@@ -1,6 +1,6 @@
-<!-- ============================================= -->
-<!-- BOOKING ORDER MANAGER - RESPONSIVE + PAYMENT TERMS + EXCEL EXPORT -->
-<!-- ============================================= -->
+<!-- ╔══════════════════════════════════════════════════════════════════════════════╗
+     ║    7AWI SYSTEM - BOOKING ORDER MANAGER (Updated with Items, VAT, PDF)       ║
+     ╚══════════════════════════════════════════════════════════════════════════════╝ -->
 
 <!-- ==================== LIST VIEW ==================== -->
 <div *ngIf="currentView() === 'list'" class="space-y-6">
@@ -342,11 +342,20 @@
         <p class="text-slate-500 text-sm mt-0.5">Fill in the details below</p>
       </div>
     </div>
-    <button (click)="save()" [disabled]="saving()"
-            class="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-hawy-blue text-white rounded-xl font-bold text-sm hover:bg-hawy-dark transition-all shadow-lg disabled:opacity-50">
-      <span class="material-icons text-lg" [class.animate-spin]="saving()">{{ saving() ? 'sync' : 'save' }}</span>
-      {{ saving() ? 'Saving...' : 'Save Booking Order' }}
-    </button>
+    <div class="flex gap-3">
+      <!-- PDF Export -->
+      <button (click)="exportToPDF()" [disabled]="generatingPdf()"
+              class="flex items-center gap-2 px-4 py-2.5 bg-rose-600 text-white rounded-xl font-bold text-sm hover:bg-rose-700 disabled:opacity-50">
+        <span class="material-icons text-lg" [class.animate-spin]="generatingPdf()">{{ generatingPdf() ? 'sync' : 'picture_as_pdf' }}</span>
+        <span class="hidden sm:inline">Print Quotation</span>
+      </button>
+      <!-- Save -->
+      <button (click)="save()" [disabled]="saving()"
+              class="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-hawy-blue text-white rounded-xl font-bold text-sm hover:bg-hawy-dark transition-all shadow-lg disabled:opacity-50">
+        <span class="material-icons text-lg" [class.animate-spin]="saving()">{{ saving() ? 'sync' : 'save' }}</span>
+        {{ saving() ? 'Saving...' : 'Save Booking Order' }}
+      </button>
+    </div>
   </div>
 
   <!-- FORM GRID - Responsive -->
@@ -390,7 +399,7 @@
             <!-- Booking Order Type -->
             <div>
               <label class="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5">Booking Order Type</label>
-              <select [(ngModel)]="currentItem.booking_order_type"
+              <select [(ngModel)]="currentItem.booking_order_type" (ngModelChange)="onBookingOrderTypeChange($event)"
                       class="w-full px-4 py-3 bg-slate-50 rounded-xl border-0 font-medium text-slate-700 focus:ring-2 focus:ring-hawy-blue outline-none">
                 <option *ngFor="let type of bookingOrderTypes" [value]="type">{{ type }}</option>
               </select>
@@ -443,12 +452,112 @@
               </select>
             </div>
 
+            <!-- Status -->
+            <div>
+              <label class="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5">Status</label>
+              <select [(ngModel)]="currentItem.approval_status"
+                      class="w-full px-4 py-3 bg-slate-50 rounded-xl border-0 font-medium text-slate-700 focus:ring-2 focus:ring-hawy-blue outline-none">
+                <option *ngFor="let status of orderStatuses" [value]="status.value">{{ status.label }}</option>
+              </select>
+            </div>
+
             <!-- Description -->
             <div class="sm:col-span-2">
               <label class="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5">Description</label>
               <textarea [(ngModel)]="currentItem.description" rows="2"
                         placeholder="Brief project description..."
                         class="w-full px-4 py-3 bg-slate-50 rounded-xl border-0 font-medium text-slate-700 focus:ring-2 focus:ring-hawy-blue outline-none resize-none"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ✅ ITEMS TABLE SECTION -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="bg-gradient-to-r from-cyan-600 to-cyan-500 px-5 py-3 flex justify-between items-center">
+          <h3 class="text-white font-bold flex items-center gap-2">
+            <span class="material-icons text-lg">list_alt</span>Items / Services
+          </h3>
+          <button (click)="addItem()" type="button" class="flex items-center gap-1 px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white rounded-lg text-sm font-bold">
+            <span class="material-icons text-sm">add</span>Add Item
+          </button>
+        </div>
+        <div class="p-4 sm:p-6">
+          <div class="overflow-x-auto">
+            <table class="w-full min-w-[600px]">
+              <thead class="bg-slate-50">
+                <tr>
+                  <th class="px-3 py-2 text-left text-[10px] font-black text-slate-500 uppercase">#</th>
+                  <th class="px-3 py-2 text-left text-[10px] font-black text-slate-500 uppercase">Item Name</th>
+                  <th class="px-3 py-2 text-center text-[10px] font-black text-slate-500 uppercase w-20">Qty</th>
+                  <th class="px-3 py-2 text-right text-[10px] font-black text-slate-500 uppercase w-28">Unit Price</th>
+                  <th class="px-3 py-2 text-right text-[10px] font-black text-slate-500 uppercase w-24">Discount</th>
+                  <th class="px-3 py-2 text-right text-[10px] font-black text-slate-500 uppercase w-28">Net</th>
+                  <th class="px-3 py-2 w-12"></th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                <tr *ngFor="let item of orderItems(); let i = index; trackBy: trackByItem" class="hover:bg-slate-50">
+                  <td class="px-3 py-2 text-sm font-bold text-slate-400">{{ item.item_order }}</td>
+                  <td class="px-3 py-2">
+                    <input type="text" [(ngModel)]="item.item_name" placeholder="Service or product name"
+                           class="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 outline-none">
+                  </td>
+                  <td class="px-3 py-2">
+                    <input type="number" [(ngModel)]="item.quantity" (ngModelChange)="updateItemNet(item)" min="1"
+                           class="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-sm text-center focus:ring-2 focus:ring-cyan-400 outline-none">
+                  </td>
+                  <td class="px-3 py-2">
+                    <input type="number" [(ngModel)]="item.unit_price" (ngModelChange)="updateItemNet(item)" min="0"
+                           class="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-sm text-right focus:ring-2 focus:ring-cyan-400 outline-none">
+                  </td>
+                  <td class="px-3 py-2">
+                    <input type="number" [(ngModel)]="item.discount" (ngModelChange)="updateItemNet(item)" min="0"
+                           class="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-sm text-right focus:ring-2 focus:ring-cyan-400 outline-none">
+                  </td>
+                  <td class="px-3 py-2 text-right font-bold text-cyan-700">{{ formatCurrency(item.net_amount) }}</td>
+                  <td class="px-3 py-2 text-center">
+                    <button (click)="removeItem(i)" type="button" class="w-7 h-7 rounded-lg bg-red-50 hover:bg-red-100 flex items-center justify-center">
+                      <span class="material-icons text-red-500 text-sm">close</span>
+                    </button>
+                  </td>
+                </tr>
+                <tr *ngIf="orderItems().length === 0">
+                  <td colspan="7" class="px-3 py-8 text-center text-slate-400">
+                    <span class="material-icons text-3xl text-slate-200 mb-2">inventory_2</span>
+                    <p class="text-sm">No items added yet. Click "Add Item" to start.</p>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Totals -->
+          <div class="mt-4 pt-4 border-t border-slate-100 space-y-3">
+            <div class="flex justify-between items-center">
+              <span class="text-sm font-bold text-slate-600">Subtotal:</span>
+              <span class="text-lg font-black text-slate-800">{{ formatCurrency(itemsSubtotal()) }}</span>
+            </div>
+            <!-- VAT Toggle -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-slate-50 rounded-xl">
+              <div class="flex items-center gap-3">
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" [(ngModel)]="currentItem.vat_enabled" (ngModelChange)="onVatChange()" class="sr-only peer">
+                  <div class="w-11 h-6 bg-slate-200 peer-focus:ring-4 peer-focus:ring-cyan-300 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-600"></div>
+                </label>
+                <span class="text-sm font-bold text-slate-600">Enable VAT</span>
+              </div>
+              <div class="flex items-center gap-2" *ngIf="currentItem.vat_enabled">
+                <input type="number" [(ngModel)]="currentItem.vat_percentage" (ngModelChange)="onVatChange()" min="0" max="100" step="0.5"
+                       class="w-20 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm text-center font-bold focus:ring-2 focus:ring-cyan-400 outline-none">
+                <span class="text-sm text-slate-500">%</span>
+                <span class="text-sm font-bold text-cyan-600 ml-4">{{ formatCurrency(vatAmount()) }}</span>
+              </div>
+            </div>
+            <!-- Grand Total -->
+            <div class="flex justify-between items-center p-3 bg-gradient-to-r from-cyan-50 to-emerald-50 rounded-xl border border-cyan-100">
+              <span class="text-sm font-black text-cyan-800">Grand Total:</span>
+              <span class="text-2xl font-black text-cyan-700">{{ formatCurrency(grandTotal()) }}</span>
             </div>
           </div>
         </div>
@@ -497,16 +606,16 @@
             <!-- Payment Date -->
             <div>
               <label class="block text-[10px] font-black text-blue-600 uppercase tracking-wider mb-1.5">
-                <span class="material-icons text-xs align-middle mr-1">payments</span>Payment Date
+                <span class="material-icons text-xs align-middle mr-1">payments</span>Expected Payment
               </label>
-              <input type="text" id="payment_date" [(ngModel)]="currentItem.payment_date"
+              <input type="text" id="expected_payment_date" [(ngModel)]="currentItem.expected_payment_date"
                      placeholder="Select date"
                      class="w-full px-4 py-3 bg-blue-50 rounded-xl border border-blue-200 font-medium text-slate-700 focus:ring-2 focus:ring-blue-400 outline-none">
             </div>
           </div>
 
           <!-- Multi-Retainer Info Banner -->
-          <div *ngIf="currentItem.booking_order_type === 'Multi Retainer' && currentItem.start_date && currentItem.end_date"
+          <div *ngIf="currentItem.payment_type === 'multi_retainer' && currentItem.start_date && currentItem.end_date"
                class="mt-4 p-4 bg-purple-50 border border-purple-200 rounded-xl">
             <div class="flex flex-col sm:flex-row sm:items-center gap-3">
               <div class="flex items-center gap-2">
@@ -522,7 +631,7 @@
         </div>
       </div>
 
-      <!-- ✅ NEW: PAYMENT TERMS SECTION -->
+      <!-- ✅ PAYMENT TERMS SECTION -->
       <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
         <div class="bg-gradient-to-r from-indigo-600 to-indigo-500 px-5 py-3">
           <h3 class="text-white font-bold flex items-center gap-2">
@@ -532,68 +641,103 @@
         </div>
         <div class="p-4 sm:p-6">
           <!-- Payment Type Selection - Card Style -->
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-            <button *ngFor="let option of paymentTermsOptions"
-                    type="button"
-                    (click)="currentItem.payment_terms = option.value"
-                    [class.ring-2]="currentItem.payment_terms === option.value"
-                    [class.ring-indigo-500]="currentItem.payment_terms === option.value"
-                    [class.bg-indigo-50]="currentItem.payment_terms === option.value"
-                    class="flex flex-col items-center gap-2 p-4 bg-slate-50 rounded-xl border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/50 transition-all cursor-pointer">
-              <span class="material-icons text-2xl"
-                    [class.text-indigo-600]="currentItem.payment_terms === option.value"
-                    [class.text-slate-400]="currentItem.payment_terms !== option.value">
-                {{ option.icon }}
-              </span>
-              <span class="text-xs font-bold"
-                    [class.text-indigo-700]="currentItem.payment_terms === option.value"
-                    [class.text-slate-600]="currentItem.payment_terms !== option.value">
-                {{ option.label }}
-              </span>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+            <button *ngFor="let pt of paymentTypes" type="button" (click)="setPaymentType(pt.value)"
+                    [class.ring-2]="currentItem.payment_type === pt.value"
+                    [class.ring-indigo-500]="currentItem.payment_type === pt.value"
+                    [class.bg-indigo-50]="currentItem.payment_type === pt.value"
+                    class="flex flex-col items-center gap-2 p-4 bg-slate-50 rounded-xl border border-slate-200 hover:border-indigo-300 cursor-pointer transition-all">
+              <span class="material-icons text-2xl" [class.text-indigo-600]="currentItem.payment_type === pt.value" [class.text-slate-400]="currentItem.payment_type !== pt.value">{{ pt.icon }}</span>
+              <span class="text-xs font-bold" [class.text-indigo-700]="currentItem.payment_type === pt.value" [class.text-slate-600]="currentItem.payment_type !== pt.value">{{ pt.label }}</span>
+              <span class="text-[10px] text-slate-400 text-center">{{ pt.description }}</span>
             </button>
           </div>
 
-          <!-- Custom Percentage Input -->
-          <div *ngIf="currentItem.payment_terms === 'Custom'"
-               class="p-4 bg-indigo-50 rounded-xl border border-indigo-200 animate-fade-in">
-            <label class="block text-[10px] font-black text-indigo-600 uppercase tracking-wider mb-2">
-              Custom Payment Percentage
-            </label>
-            <div class="flex items-center gap-3">
-              <input type="range" [(ngModel)]="currentItem.payment_custom_percentage"
-                     min="1" max="100" step="1"
-                     class="flex-1 h-2 bg-indigo-200 rounded-lg appearance-none cursor-pointer accent-indigo-600">
-              <div class="flex items-center gap-1 bg-white px-3 py-2 rounded-lg border border-indigo-200">
-                <input type="number" [(ngModel)]="currentItem.payment_custom_percentage"
-                       min="1" max="100"
-                       class="w-14 bg-transparent font-black text-indigo-700 text-center outline-none">
-                <span class="text-indigo-600 font-bold">%</span>
-              </div>
+          <!-- One Time Options -->
+          <div *ngIf="currentItem.payment_type === 'one_time'" class="p-4 bg-indigo-50 rounded-xl border border-indigo-200">
+            <label class="block text-[10px] font-black text-indigo-600 uppercase mb-2">Payment Timing</label>
+            <div class="grid grid-cols-2 gap-3">
+              <button *ngFor="let term of oneTimePaymentTerms" type="button" (click)="currentItem.payment_terms = term.value"
+                      [class.ring-2]="currentItem.payment_terms === term.value"
+                      [class.ring-indigo-500]="currentItem.payment_terms === term.value"
+                      [class.bg-white]="currentItem.payment_terms === term.value"
+                      class="px-4 py-3 bg-indigo-100/50 rounded-lg font-bold text-sm transition-all">
+                {{ term.label }}
+              </button>
             </div>
-            <p class="mt-2 text-xs text-indigo-600">
-              <span class="font-bold">{{ currentItem.payment_custom_percentage }}%</span> upfront payment,
-              <span class="font-bold">{{ 100 - (currentItem.payment_custom_percentage || 0) }}%</span> upon completion
-            </p>
           </div>
 
-          <!-- Retainer Dates -->
-          <div *ngIf="currentItem.payment_terms === 'Retainer'"
-               class="p-4 bg-indigo-50 rounded-xl border border-indigo-200 animate-fade-in">
-            <label class="block text-[10px] font-black text-indigo-600 uppercase tracking-wider mb-3">
-              Retainer Payment Period
-            </label>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <!-- Multiple Payment (Milestones) -->
+          <div *ngIf="currentItem.payment_type === 'multiple'" class="p-4 bg-indigo-50 rounded-xl border border-indigo-200">
+            <div class="flex justify-between items-center mb-3">
+              <label class="text-[10px] font-black text-indigo-600 uppercase">Payment Milestones</label>
+              <button (click)="addMilestone()" type="button" class="flex items-center gap-1 px-2 py-1 bg-indigo-600 text-white rounded-lg text-xs font-bold">
+                <span class="material-icons text-xs">add</span>Add
+              </button>
+            </div>
+            <div class="space-y-2">
+              <div *ngFor="let milestone of paymentMilestones(); let i = index; trackBy: trackByMilestone" class="flex items-center gap-3 p-3 bg-white rounded-lg">
+                <input type="text" [(ngModel)]="milestone.milestone_name" placeholder="Milestone name"
+                       class="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-indigo-400 outline-none">
+                <div class="flex items-center gap-1">
+                  <input type="number" [(ngModel)]="milestone.percentage" (ngModelChange)="updateMilestoneAmounts()" min="1" max="100"
+                         class="w-16 px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-center font-bold focus:ring-2 focus:ring-indigo-400 outline-none">
+                  <span class="text-sm text-slate-500">%</span>
+                </div>
+                <span class="text-sm font-bold text-indigo-600 w-24 text-right">{{ formatCurrency(milestone.amount) }}</span>
+                <button (click)="removeMilestone(i)" type="button" class="w-7 h-7 rounded-lg bg-red-50 hover:bg-red-100 flex items-center justify-center">
+                  <span class="material-icons text-red-500 text-sm">close</span>
+                </button>
+              </div>
+            </div>
+            <!-- Validation -->
+            <div class="mt-3 flex justify-between items-center p-2 rounded-lg" [class.bg-emerald-100]="milestonesValid()" [class.bg-red-100]="!milestonesValid()">
+              <span class="text-xs font-bold" [class.text-emerald-700]="milestonesValid()" [class.text-red-700]="!milestonesValid()">
+                Total: {{ milestonesTotal() }}%
+              </span>
+              <span *ngIf="!milestonesValid()" class="text-xs text-red-600 flex items-center gap-1">
+                <span class="material-icons text-xs">warning</span>Must equal 100%
+              </span>
+              <span *ngIf="milestonesValid()" class="text-xs text-emerald-600 flex items-center gap-1">
+                <span class="material-icons text-xs">check_circle</span>Valid
+              </span>
+            </div>
+          </div>
+
+          <!-- Multi Retainer -->
+          <div *ngIf="currentItem.payment_type === 'multi_retainer'" class="p-4 bg-indigo-50 rounded-xl border border-indigo-200">
+            <div class="flex justify-between items-center mb-3">
+              <label class="text-[10px] font-black text-indigo-600 uppercase">Retainer Period</label>
+              <button *ngIf="currentItem.start_date && currentItem.end_date" type="button"
+                      (click)="syncRetainerDatesFromProject()"
+                      class="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 px-2 py-1 bg-white rounded-lg border border-indigo-200 hover:bg-indigo-100 transition-all">
+                <span class="material-icons text-xs">sync</span>Sync from Project Dates
+              </button>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
               <div>
                 <label class="block text-xs font-bold text-indigo-700 mb-1.5">Start Date</label>
                 <input type="text" id="payment_retainer_start" [(ngModel)]="currentItem.payment_retainer_start"
-                       placeholder="Select start date"
+                       [placeholder]="currentItem.start_date || 'Select start'"
                        class="w-full px-4 py-3 bg-white rounded-xl border border-indigo-200 font-medium text-slate-700 focus:ring-2 focus:ring-indigo-400 outline-none">
               </div>
               <div>
                 <label class="block text-xs font-bold text-indigo-700 mb-1.5">End Date</label>
                 <input type="text" id="payment_retainer_end" [(ngModel)]="currentItem.payment_retainer_end"
-                       placeholder="Select end date"
+                       [placeholder]="currentItem.end_date || 'Select end'"
                        class="w-full px-4 py-3 bg-white rounded-xl border border-indigo-200 font-medium text-slate-700 focus:ring-2 focus:ring-indigo-400 outline-none">
+              </div>
+            </div>
+            <!-- Monthly Distribution Preview -->
+            <div *ngIf="getMonthsCount() > 0" class="mt-3 p-3 bg-purple-100 rounded-lg">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-bold text-purple-800">
+                  <span class="material-icons text-sm align-middle mr-1">calendar_month</span>
+                  {{ getMonthsCount() }} months
+                </span>
+                <span class="text-sm font-bold text-purple-800">
+                  {{ formatCurrency((currentItem.estimated_revenue || 0) / getMonthsCount()) }} / month
+                </span>
               </div>
             </div>
           </div>
@@ -627,9 +771,20 @@
 
             <!-- Actual Revenue -->
             <div>
-              <label class="block text-[10px] font-black text-blue-600 uppercase tracking-wider mb-1.5">Actual Revenue ($)</label>
+              <label class="block text-[10px] font-black text-blue-600 uppercase tracking-wider mb-1.5">
+                Actual Revenue ($)
+                <span *ngIf="!isActualRevenueEnabled()" class="text-red-500 ml-1">(Enabled when Completed)</span>
+              </label>
               <input type="number" [(ngModel)]="currentItem.gross_amount" min="0" step="100"
-                     class="w-full px-4 py-3 bg-blue-50 rounded-xl border border-blue-200 font-bold text-blue-700 text-lg focus:ring-2 focus:ring-blue-400 outline-none">
+                     [disabled]="!isActualRevenueEnabled()"
+                     class="w-full px-4 py-3 rounded-xl border font-bold text-lg focus:ring-2 outline-none"
+                     [class.bg-blue-50]="isActualRevenueEnabled()"
+                     [class.border-blue-200]="isActualRevenueEnabled()"
+                     [class.text-blue-700]="isActualRevenueEnabled()"
+                     [class.bg-slate-100]="!isActualRevenueEnabled()"
+                     [class.border-slate-200]="!isActualRevenueEnabled()"
+                     [class.text-slate-400]="!isActualRevenueEnabled()"
+                     [class.cursor-not-allowed]="!isActualRevenueEnabled()">
             </div>
           </div>
         </div>
@@ -737,8 +892,10 @@
              [class.bg-gradient-to-r]="true"
              [class.from-emerald-600]="calculateProfitMargin(currentItem) >= 30"
              [class.to-emerald-500]="calculateProfitMargin(currentItem) >= 30"
-             [class.from-red-600]="calculateProfitMargin(currentItem) < 30"
-             [class.to-red-500]="calculateProfitMargin(currentItem) < 30">
+             [class.from-amber-600]="calculateProfitMargin(currentItem) >= 25 && calculateProfitMargin(currentItem) < 30"
+             [class.to-amber-500]="calculateProfitMargin(currentItem) >= 25 && calculateProfitMargin(currentItem) < 30"
+             [class.from-red-600]="calculateProfitMargin(currentItem) < 25"
+             [class.to-red-500]="calculateProfitMargin(currentItem) < 25">
           <h3 class="text-white font-bold flex items-center gap-2">
             <span class="material-icons text-lg">analytics</span>
             Profitability Analysis
@@ -749,15 +906,24 @@
           <div class="text-center mb-6">
             <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Actual Profit Margin</p>
             <div class="flex items-center justify-center gap-2">
-              <span *ngIf="calculateProfitMargin(currentItem) < 30" class="material-icons text-3xl text-red-500 animate-pulse">warning</span>
+              <span *ngIf="calculateProfitMargin(currentItem) < 30" class="material-icons text-3xl animate-pulse"
+                    [class.text-red-500]="calculateProfitMargin(currentItem) < 25"
+                    [class.text-amber-500]="calculateProfitMargin(currentItem) >= 25">warning</span>
               <span class="text-4xl sm:text-5xl font-black"
                     [class.text-emerald-600]="calculateProfitMargin(currentItem) >= 30"
-                    [class.text-red-600]="calculateProfitMargin(currentItem) < 30">
+                    [class.text-amber-600]="calculateProfitMargin(currentItem) >= 25 && calculateProfitMargin(currentItem) < 30"
+                    [class.text-red-600]="calculateProfitMargin(currentItem) < 25">
                 {{ calculateProfitMargin(currentItem) | number:'1.1-1' }}%
               </span>
             </div>
-            <p *ngIf="calculateProfitMargin(currentItem) < 30" class="mt-2 text-xs font-bold text-red-500 bg-red-50 rounded-lg py-1.5 px-3 inline-block">
-              Below 30% - Requires Approval
+            <p *ngIf="calculateProfitMargin(currentItem) < 25" class="mt-2 text-xs font-bold text-red-500 bg-red-50 rounded-lg py-1.5 px-3 inline-block">
+              🔴 Critical - Requires Admin Approval
+            </p>
+            <p *ngIf="calculateProfitMargin(currentItem) >= 25 && calculateProfitMargin(currentItem) < 30" class="mt-2 text-xs font-bold text-amber-600 bg-amber-50 rounded-lg py-1.5 px-3 inline-block">
+              🟠 Below Target - Requires Approval
+            </p>
+            <p *ngIf="calculateProfitMargin(currentItem) >= 30" class="mt-2 text-xs font-bold text-emerald-600 bg-emerald-50 rounded-lg py-1.5 px-3 inline-block">
+              🟢 Healthy Margin
             </p>
           </div>
 
@@ -781,7 +947,7 @@
             </div>
           </div>
 
-          <!-- Margin Thresholds Table -->
+          <!-- Margin Thresholds Table (Editable) -->
           <div>
             <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Required Revenue for Target Margins</p>
             <div class="overflow-hidden rounded-xl border border-slate-200">
@@ -793,42 +959,36 @@
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
-                  <tr>
+                  <tr class="bg-red-50">
                     <td class="px-3 py-2">
                       <div class="flex items-center gap-1">
-                        <input type="number" [(ngModel)]="marginThreshold1" (ngModelChange)="marginThreshold1.set($event)"
-                               min="1" max="99" class="w-12 px-1 py-0.5 bg-slate-50 rounded border border-slate-200 text-center font-bold text-slate-700 text-xs">
-                        <span class="text-slate-500">%</span>
+                        <input type="number" [ngModel]="marginThreshold1()" (ngModelChange)="marginThreshold1.set($event)"
+                               min="1" max="99" class="w-14 px-2 py-1 bg-white rounded border border-red-200 text-center font-bold text-red-700 text-sm outline-none focus:ring-1 focus:ring-red-400">
+                        <span class="text-red-600 font-bold">%</span>
                       </div>
                     </td>
-                    <td class="px-3 py-2 text-right font-bold text-slate-700">
-                      {{ formatCurrency(calculateRequiredRevenue(calculateTotalCost(currentItem), marginThreshold1())) }}
-                    </td>
+                    <td class="px-3 py-2 text-right font-bold text-red-700">{{ formatCurrency(calculateRequiredRevenue(calculateTotalCost(currentItem), marginThreshold1())) }}</td>
                   </tr>
-                  <tr>
+                  <tr class="bg-amber-50">
                     <td class="px-3 py-2">
                       <div class="flex items-center gap-1">
-                        <input type="number" [(ngModel)]="marginThreshold2" (ngModelChange)="marginThreshold2.set($event)"
-                               min="1" max="99" class="w-12 px-1 py-0.5 bg-slate-50 rounded border border-slate-200 text-center font-bold text-slate-700 text-xs">
-                        <span class="text-slate-500">%</span>
+                        <input type="number" [ngModel]="marginThreshold2()" (ngModelChange)="marginThreshold2.set($event)"
+                               min="1" max="99" class="w-14 px-2 py-1 bg-white rounded border border-amber-200 text-center font-bold text-amber-700 text-sm outline-none focus:ring-1 focus:ring-amber-400">
+                        <span class="text-amber-600 font-bold">%</span>
                       </div>
                     </td>
-                    <td class="px-3 py-2 text-right font-bold text-slate-700">
-                      {{ formatCurrency(calculateRequiredRevenue(calculateTotalCost(currentItem), marginThreshold2())) }}
-                    </td>
+                    <td class="px-3 py-2 text-right font-bold text-amber-700">{{ formatCurrency(calculateRequiredRevenue(calculateTotalCost(currentItem), marginThreshold2())) }}</td>
                   </tr>
                   <tr class="bg-emerald-50">
                     <td class="px-3 py-2">
                       <div class="flex items-center gap-1">
-                        <input type="number" [(ngModel)]="marginThreshold3" (ngModelChange)="marginThreshold3.set($event)"
-                               min="1" max="99" class="w-12 px-1 py-0.5 bg-white rounded border border-emerald-300 text-center font-bold text-emerald-700 text-xs">
+                        <input type="number" [ngModel]="marginThreshold3()" (ngModelChange)="marginThreshold3.set($event)"
+                               min="1" max="99" class="w-14 px-2 py-1 bg-white rounded border border-emerald-200 text-center font-bold text-emerald-700 text-sm outline-none focus:ring-1 focus:ring-emerald-400">
                         <span class="text-emerald-600 font-bold">%</span>
-                        <span class="material-icons text-emerald-600 text-xs">check_circle</span>
+                        <span class="material-icons text-emerald-600 text-xs ml-1">check_circle</span>
                       </div>
                     </td>
-                    <td class="px-3 py-2 text-right font-bold text-emerald-700">
-                      {{ formatCurrency(calculateRequiredRevenue(calculateTotalCost(currentItem), marginThreshold3())) }}
-                    </td>
+                    <td class="px-3 py-2 text-right font-bold text-emerald-700">{{ formatCurrency(calculateRequiredRevenue(calculateTotalCost(currentItem), marginThreshold3())) }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -836,37 +996,6 @@
             <p class="mt-3 text-[10px] text-slate-400 text-center">
               Formula: Total Cost ÷ (1 - Margin%)
             </p>
-          </div>
-        </div>
-      </div>
-
-      <!-- APPROVAL STATUS CARD (Edit Mode Only) -->
-      <div *ngIf="isEditMode && currentItem.approval_status"
-           class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        <div class="bg-gradient-to-r from-indigo-600 to-indigo-500 px-5 py-3">
-          <h3 class="text-white font-bold flex items-center gap-2">
-            <span class="material-icons text-lg">verified</span>
-            Approval Status
-          </h3>
-        </div>
-        <div class="p-5 space-y-4">
-          <div class="flex items-center justify-between">
-            <span class="text-sm text-slate-600">Status</span>
-            <span class="px-3 py-1 rounded-lg text-sm font-bold" [ngClass]="getApprovalStatusClass(currentItem.approval_status)">
-              {{ currentItem.approval_status }}
-            </span>
-          </div>
-          <div *ngIf="currentItem.approved_by">
-            <span class="text-sm text-slate-600">Approved By</span>
-            <p class="font-bold text-slate-800">{{ dataService.getEmployeeName(currentItem.approved_by) }}</p>
-          </div>
-          <div *ngIf="currentItem.approved_at">
-            <span class="text-sm text-slate-600">Approved At</span>
-            <p class="font-bold text-slate-800">{{ formatDate(currentItem.approved_at) }}</p>
-          </div>
-          <div *ngIf="currentItem.approval_notes">
-            <span class="text-sm text-slate-600">Notes</span>
-            <p class="font-medium text-slate-700 bg-slate-50 rounded-lg p-3 mt-1">{{ currentItem.approval_notes }}</p>
           </div>
         </div>
       </div>
@@ -884,11 +1013,15 @@
           </li>
           <li class="flex items-start gap-2">
             <span class="material-icons text-xs mt-1 text-blue-400">check_circle</span>
-            BO Name is auto-generated from project details
+            Add items for accurate quotation generation
           </li>
           <li class="flex items-start gap-2">
             <span class="material-icons text-xs mt-1 text-blue-400">check_circle</span>
-            Multi-Retainer distributes revenue across months
+            Actual Revenue unlocks when status is "Completed"
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="material-icons text-xs mt-1 text-blue-400">check_circle</span>
+            Use "Print Quotation" to export PDF
           </li>
         </ul>
       </div>
@@ -942,13 +1075,24 @@
 
     <!-- Profit Margin Warning -->
     <div *ngIf="revenueToApprove && isProfitMarginLow(revenueToApprove)"
-         class="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
-      <span class="material-icons text-amber-600 text-xl">warning</span>
+         class="mb-4 p-4 border rounded-xl flex items-start gap-3"
+         [class.bg-red-50]="calculateProfitMargin(revenueToApprove!) < 25"
+         [class.border-red-200]="calculateProfitMargin(revenueToApprove!) < 25"
+         [class.bg-amber-50]="calculateProfitMargin(revenueToApprove!) >= 25"
+         [class.border-amber-200]="calculateProfitMargin(revenueToApprove!) >= 25">
+      <span class="material-icons text-xl"
+            [class.text-red-600]="calculateProfitMargin(revenueToApprove!) < 25"
+            [class.text-amber-600]="calculateProfitMargin(revenueToApprove!) >= 25">warning</span>
       <div>
-        <p class="font-bold text-amber-800">Low Profit Margin Warning</p>
-        <p class="text-sm text-amber-700">
-          This booking order has a profit margin of <strong>{{ calculateProfitMargin(revenueToApprove!) | number:'1.1-1' }}%</strong>,
-          which is below the recommended 30%.
+        <p class="font-bold"
+           [class.text-red-800]="calculateProfitMargin(revenueToApprove!) < 25"
+           [class.text-amber-800]="calculateProfitMargin(revenueToApprove!) >= 25">
+          {{ calculateProfitMargin(revenueToApprove!) < 25 ? 'Critical: Low Profit Margin' : 'Warning: Below Target Margin' }}
+        </p>
+        <p class="text-sm"
+           [class.text-red-700]="calculateProfitMargin(revenueToApprove!) < 25"
+           [class.text-amber-700]="calculateProfitMargin(revenueToApprove!) >= 25">
+          Profit margin is <strong>{{ calculateProfitMargin(revenueToApprove!) | number:'1.1-1' }}%</strong>
         </p>
       </div>
     </div>
@@ -978,6 +1122,3 @@
     </div>
   </div>
 </div>
-
-<!-- Track By Function -->
-<!-- <ng-template #trackByRevenue let-revenue>{{ revenue.id }}</ng-template> -->

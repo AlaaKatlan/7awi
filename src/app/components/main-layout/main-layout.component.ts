@@ -19,7 +19,7 @@ import { DepartmentPerformanceComponent } from '../department-performance/depart
   standalone: true,
   imports: [
     CommonModule, FormsModule, DashboardComponent, RevenueManagerComponent,
-    BookingOrderManagerComponent, PipelineManagerComponent, TargetManagerComponent, 
+    BookingOrderManagerComponent, PipelineManagerComponent, TargetManagerComponent,
     CostManagerComponent, ClientManagerComponent, EmployeeManagerComponent, SalaryManagerComponent,
     DepartmentPerformanceComponent
   ],
@@ -36,15 +36,15 @@ import { DepartmentPerformanceComponent } from '../department-performance/depart
 
         <nav class="flex-1 p-4 space-y-1 mt-4 overflow-y-auto">
 
-          <button (click)="activeTab = 'dashboard'"
+          <button *ngIf="canSeeFinance()"
+                  (click)="activeTab = 'dashboard'"
                   [class]="activeTab === 'dashboard' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
                   class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
             <span class="material-icons" [class.mr-3]="sidebarOpen">dashboard</span>
             <span *ngIf="sidebarOpen">Dashboard</span>
           </button>
 
-          <!-- ✅ NEW: Department Performance - Admin Only -->
-          <button *ngIf="authService.isAdmin()"
+          <button *ngIf="canSeeDeptPerformance()"
                   (click)="activeTab = 'dept-performance'"
                   [class]="activeTab === 'dept-performance' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
                   class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
@@ -52,47 +52,49 @@ import { DepartmentPerformanceComponent } from '../department-performance/depart
             <span *ngIf="sidebarOpen">Dept. Performance</span>
           </button>
 
-          <div *ngIf="sidebarOpen" class="pt-4 pb-2">
+          <div *ngIf="sidebarOpen && canSeeFinance()" class="pt-4 pb-2">
             <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">Financial</span>
           </div>
 
-          <!-- ✅ Booking Orders Button -->
-          <button (click)="activeTab = 'booking-orders'"
+          <button *ngIf="canSeeBookingOrders()"
+                  (click)="activeTab = 'booking-orders'"
                   [class]="activeTab === 'booking-orders' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
                   class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
             <span class="material-icons" [class.mr-3]="sidebarOpen">receipt_long</span>
             <span *ngIf="sidebarOpen">Booking Orders</span>
           </button>
 
-          <button (click)="activeTab = 'revenue'"
-                  [class]="activeTab === 'revenue' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
-                  class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
-            <span class="material-icons" [class.mr-3]="sidebarOpen">attach_money</span>
-            <span *ngIf="sidebarOpen">Revenue (Legacy)</span>
-          </button>
+          <ng-container *ngIf="canSeeFinance()">
+            <button (click)="activeTab = 'revenue'"
+                    [class]="activeTab === 'revenue' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
+                    class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
+              <span class="material-icons" [class.mr-3]="sidebarOpen">attach_money</span>
+              <span *ngIf="sidebarOpen">Revenue (Legacy)</span>
+            </button>
 
-          <button (click)="activeTab = 'pipeline'"
-                  [class]="activeTab === 'pipeline' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
-                  class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
-            <span class="material-icons" [class.mr-3]="sidebarOpen">insights</span>
-            <span *ngIf="sidebarOpen">Pipeline</span>
-          </button>
+            <button (click)="activeTab = 'pipeline'"
+                    [class]="activeTab === 'pipeline' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
+                    class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
+              <span class="material-icons" [class.mr-3]="sidebarOpen">insights</span>
+              <span *ngIf="sidebarOpen">Pipeline</span>
+            </button>
 
-          <button (click)="activeTab = 'target'"
-                  [class]="activeTab === 'target' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
-                  class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
-            <span class="material-icons" [class.mr-3]="sidebarOpen">flag</span>
-            <span *ngIf="sidebarOpen">Targets</span>
-          </button>
+            <button (click)="activeTab = 'target'"
+                    [class]="activeTab === 'target' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
+                    class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
+              <span class="material-icons" [class.mr-3]="sidebarOpen">flag</span>
+              <span *ngIf="sidebarOpen">Targets</span>
+            </button>
 
-          <button (click)="activeTab = 'cost'"
-                  [class]="activeTab === 'cost' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
-                  class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
-            <span class="material-icons" [class.mr-3]="sidebarOpen">money_off</span>
-            <span *ngIf="sidebarOpen">Costs</span>
-          </button>
+            <button (click)="activeTab = 'cost'"
+                    [class]="activeTab === 'cost' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
+                    class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
+              <span class="material-icons" [class.mr-3]="sidebarOpen">money_off</span>
+              <span *ngIf="sidebarOpen">Costs</span>
+            </button>
+          </ng-container>
 
-          <ng-container *ngIf="authService.isAdmin() || authService.isFinance()">
+          <ng-container *ngIf="canSeeClients()">
             <div *ngIf="sidebarOpen" class="pt-4 pb-2">
               <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">People</span>
             </div>
@@ -104,7 +106,7 @@ import { DepartmentPerformanceComponent } from '../department-performance/depart
               <span *ngIf="sidebarOpen">Clients</span>
             </button>
 
-            <button *ngIf="authService.isAdmin()"
+            <button *ngIf="canSeeHR()"
                     (click)="activeTab = 'employees'"
                     [class]="activeTab === 'employees' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
                     class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
@@ -112,7 +114,7 @@ import { DepartmentPerformanceComponent } from '../department-performance/depart
               <span *ngIf="sidebarOpen">Employees</span>
             </button>
 
-            <button *ngIf="authService.isAdmin()"
+            <button *ngIf="canSeeHR()"
                     (click)="activeTab = 'salaries'"
                     [class]="activeTab === 'salaries' ? 'bg-hawy-blue text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'"
                     class="w-full flex items-center px-4 py-3 rounded-xl transition-all font-medium">
@@ -165,62 +167,46 @@ import { DepartmentPerformanceComponent } from '../department-performance/depart
         </header>
 
         @switch (activeTab) {
-            @case ('dashboard') { <app-dashboard></app-dashboard> }
-            
+            @case ('dashboard') {
+              <app-dashboard *ngIf="canSeeFinance() else accessDenied"></app-dashboard>
+            }
             @case ('dept-performance') {
-              @if (authService.isAdmin()) {
-                <app-department-performance></app-department-performance>
-              } @else {
-                <div class="bg-white rounded-2xl p-12 text-center shadow-sm">
-                  <span class="material-icons text-6xl text-red-200">lock</span>
-                  <h2 class="text-xl font-bold text-slate-700 mt-4">Access Denied</h2>
-                  <p class="text-slate-400 mt-2">You don't have permission to view this page.</p>
-                </div>
-              }
+              <app-department-performance *ngIf="canSeeDeptPerformance() else accessDenied"></app-department-performance>
             }
-            
-            @case ('booking-orders') { <app-booking-order-manager></app-booking-order-manager> }
-            @case ('revenue') { <app-revenue-manager></app-revenue-manager> }
-            @case ('pipeline') { <app-pipeline-manager></app-pipeline-manager> }
-            @case ('target') { <app-target-manager></app-target-manager> }
-            @case ('cost') { <app-cost-manager></app-cost-manager> }
-
+            @case ('booking-orders') {
+              <app-booking-order-manager *ngIf="canSeeBookingOrders() else accessDenied"></app-booking-order-manager>
+            }
+            @case ('revenue') {
+              <app-revenue-manager *ngIf="canSeeFinance() else accessDenied"></app-revenue-manager>
+            }
+            @case ('pipeline') {
+              <app-pipeline-manager *ngIf="canSeeFinance() else accessDenied"></app-pipeline-manager>
+            }
+            @case ('target') {
+              <app-target-manager *ngIf="canSeeFinance() else accessDenied"></app-target-manager>
+            }
+            @case ('cost') {
+              <app-cost-manager *ngIf="canSeeFinance() else accessDenied"></app-cost-manager>
+            }
             @case ('clients') {
-              @if (authService.isAdmin() || authService.isFinance()) {
-                <app-client-manager></app-client-manager>
-              } @else {
-                <div class="bg-white rounded-2xl p-12 text-center shadow-sm">
-                  <span class="material-icons text-6xl text-red-200">lock</span>
-                  <h2 class="text-xl font-bold text-slate-700 mt-4">Access Denied</h2>
-                  <p class="text-slate-400 mt-2">You don't have permission to view this page.</p>
-                </div>
-              }
+              <app-client-manager *ngIf="canSeeClients() else accessDenied"></app-client-manager>
             }
-
             @case ('employees') {
-              @if (authService.isAdmin()) {
-                <app-employee-manager></app-employee-manager>
-              } @else {
-                <div class="bg-white rounded-2xl p-12 text-center shadow-sm">
-                  <span class="material-icons text-6xl text-red-200">lock</span>
-                  <h2 class="text-xl font-bold text-slate-700 mt-4">Access Denied</h2>
-                  <p class="text-slate-400 mt-2">You don't have permission to view this page.</p>
-                </div>
-              }
+              <app-employee-manager *ngIf="canSeeHR() else accessDenied"></app-employee-manager>
             }
-
             @case ('salaries') {
-              @if (authService.isAdmin()) {
-                <app-salary-manager></app-salary-manager>
-              } @else {
-                <div class="bg-white rounded-2xl p-12 text-center shadow-sm">
-                  <span class="material-icons text-6xl text-red-200">lock</span>
-                  <h2 class="text-xl font-bold text-slate-700 mt-4">Access Denied</h2>
-                  <p class="text-slate-400 mt-2">You don't have permission to view this page.</p>
-                </div>
-              }
+              <app-salary-manager *ngIf="canSeeHR() else accessDenied"></app-salary-manager>
             }
         }
+
+        <ng-template #accessDenied>
+          <div class="bg-white rounded-2xl p-12 text-center shadow-sm border border-red-100">
+            <span class="material-icons text-6xl text-red-300">lock</span>
+            <h2 class="text-xl font-bold text-slate-700 mt-4">Access Denied</h2>
+            <p class="text-slate-400 mt-2">You don't have permission to view this page.</p>
+          </div>
+        </ng-template>
+
       </main>
 
       <div *ngIf="showProfileModal()" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
@@ -269,7 +255,7 @@ import { DepartmentPerformanceComponent } from '../department-performance/depart
   `]
 })
 export class MainLayoutComponent {
-  activeTab: 'dashboard' | 'dept-performance' | 'booking-orders' | 'revenue' | 'pipeline' | 'target' | 'cost' | 'clients' | 'employees' | 'salaries' = 'dashboard';
+  activeTab: string = 'dashboard';
   sidebarOpen = true;
 
   dataService = inject(DataService);
@@ -283,9 +269,41 @@ export class MainLayoutComponent {
   userProfile = this.authService.userProfile;
   currentUser = this.authService.currentUser;
 
+  // =============================================
+  // Permissions Logic (Clean Architecture)
+  // =============================================
+
+  // Admin Only (HR, Salaries)
+  canSeeHR = computed(() => this.authService.isAdmin());
+
+  // Finance & Admin (Dashboards, Legacy Revenue, Pipeline, Targets, Cost)
+  canSeeFinance = computed(() => this.authService.isAdmin() || this.authService.isFinance());
+
+  // Admin & Finance (Booking Orders)
+  canSeeBookingOrders = computed(() => this.authService.isAdmin() || this.authService.isFinance());
+
+  // Admin & HOU (Dept Performance)
+  canSeeDeptPerformance = computed(() => this.authService.isAdmin() || this.authService.isHou());
+
+  // Everyone (Clients)
+  canSeeClients = computed(() => this.authService.isAdmin() || this.authService.isFinance() || this.authService.isHou() || this.authService.isSales());
+
   constructor() {
+    // توجيه تلقائي للمستخدم بمجرد تحميل بياناته ليفتح على الصفحة المسموحة له
     effect(() => {
-      console.log('Layout Profile Updated:', this.userProfile());
+      const profile = this.userProfile();
+      if (profile) {
+        if (profile.role === 'sales') {
+          this.activeTab = 'clients';
+        } else if (profile.role === 'hou') {
+          this.activeTab = 'dept-performance';
+        } else if (!this.activeTab || this.activeTab === 'dashboard' && profile.role !== 'admin' && profile.role !== 'finance') {
+            // كإجراء احتياطي إذا لم يكن لديه صلاحية لرؤية الداشبورد
+            this.activeTab = 'clients';
+        } else {
+          this.activeTab = 'dashboard';
+        }
+      }
     });
   }
 

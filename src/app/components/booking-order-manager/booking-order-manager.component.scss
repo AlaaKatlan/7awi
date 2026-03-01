@@ -1,0 +1,262 @@
+// ╔══════════════════════════════════════════════════════════════════════════════╗
+// ║              7AWI SYSTEM - BOOKING ORDER MANAGER V2 STYLES                  ║
+// ╚══════════════════════════════════════════════════════════════════════════════╝
+
+// Animations
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+// Table styles
+table {
+  thead th {
+    white-space: nowrap;
+    letter-spacing: 1px;
+  }
+
+  tbody tr {
+    transition: all 0.2s;
+
+    &:hover {
+      background-color: rgba(30, 58, 138, 0.04) !important;
+    }
+  }
+}
+
+// Select cursor
+select {
+  cursor: pointer;
+}
+
+// Font weight
+.font-black {
+  font-weight: 900;
+}
+
+// Custom scrollbar
+.overflow-x-auto {
+  &::-webkit-scrollbar {
+    height: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+
+    &:hover {
+      background: #94a3b8;
+    }
+  }
+}
+
+// Toggle switch styles
+.peer:focus ~ .peer-focus\:ring-4 {
+  --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);
+  --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(4px + var(--tw-ring-offset-width)) var(--tw-ring-color);
+  box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000);
+}
+
+// Chevron rotation
+.rotate-90 {
+  transform: rotate(90deg);
+}
+
+// Card hover effects
+.bg-white {
+  transition: box-shadow 0.2s ease-in-out;
+
+  &:hover {
+    // box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  }
+}
+
+// Button transitions
+button {
+  transition: all 0.2s ease-in-out;
+}
+
+// Input focus states
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+}
+
+// Status badge styles
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+// Profit margin color classes
+.margin-red {
+  background-color: #fef2f2;
+  color: #dc2626;
+  border-color: #fecaca;
+}
+
+.margin-orange {
+  background-color: #fffbeb;
+  color: #d97706;
+  border-color: #fed7aa;
+}
+
+.margin-green {
+  background-color: #f0fdf4;
+  color: #16a34a;
+  border-color: #bbf7d0;
+}
+
+// Responsive adjustments
+@media (max-width: 640px) {
+  .grid {
+    gap: 0.75rem;
+  }
+
+  .p-6 {
+    padding: 1rem;
+  }
+
+  .text-2xl {
+    font-size: 1.25rem;
+  }
+
+  .text-xl {
+    font-size: 1rem;
+  }
+}
+
+// Print styles
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  .bg-white {
+    box-shadow: none !important;
+    border: 1px solid #e2e8f0 !important;
+  }
+}
+
+// Custom hawy colors (if not defined in tailwind)
+.bg-hawy-blue {
+  background-color: #1e3a8a;
+}
+
+.bg-hawy-dark {
+  background-color: #1e3a6e;
+}
+
+.text-hawy-blue {
+  color: #1e3a8a;
+}
+
+.hover\:bg-hawy-dark:hover {
+  background-color: #1e3a6e;
+}
+
+// Focus ring colors
+.focus\:ring-hawy-blue:focus {
+  --tw-ring-color: #1e3a8a;
+}
+
+// Items table specific styles
+.items-table {
+  input[type="number"] {
+    -moz-appearance: textfield;
+
+    &::-webkit-outer-spin-button,
+    &::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+  }
+}
+
+// Milestone validation indicator
+.milestone-valid {
+  background-color: #d1fae5;
+  border-color: #6ee7b7;
+}
+
+.milestone-invalid {
+  background-color: #fee2e2;
+  border-color: #fca5a5;
+}
+
+// Sticky sidebar
+.sticky {
+  position: sticky;
+  top: 1.5rem;
+}
+
+// Form section headers
+.section-header {
+  @apply bg-gradient-to-r px-5 py-3;
+
+  h3 {
+    @apply text-white font-bold flex items-center gap-2;
+  }
+}
+
+// Loading spinner
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// Disabled state
+.disabled\:opacity-50:disabled {
+  opacity: 0.5;
+}
+
+.disabled\:cursor-not-allowed:disabled {
+  cursor: not-allowed;
+}
+
+// Backdrop blur
+.backdrop-blur-sm {
+  backdrop-filter: blur(4px);
+}
